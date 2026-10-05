@@ -39,6 +39,7 @@ interface MapCanvasProps {
   selectedFeatureId?: number | null | undefined;
   onSelectFeature?: ((id: number | null) => void) | undefined;
   compareMode?: boolean | undefined;
+  basemapSource?: "s2" | "mapbox" | undefined;
   center?: [number, number] | undefined;
   zoom?: number | undefined;
 }
@@ -81,7 +82,7 @@ function buildMapStyle(year: number): maplibregl.StyleSpecification {
       maxzoom: 22,
       paint: {
         "raster-opacity": 0.95,
-        "raster-fade-duration": 300,
+        "raster-fade-duration": 200,
       },
     },
   ];
@@ -108,7 +109,7 @@ function buildMapStyle(year: number): maplibregl.StyleSpecification {
       },
       paint: {
         "raster-opacity": 0.95,
-        "raster-fade-duration": 300,
+        "raster-fade-duration": 200,
       },
     });
   }
@@ -131,6 +132,7 @@ export function MapCanvas({
   selectedFeatureId,
   onSelectFeature,
   compareMode = false,
+  basemapSource = "s2",
   center = [-62.905, -9.702],
   zoom = 12.5,
 }: MapCanvasProps) {
@@ -142,27 +144,9 @@ export function MapCanvas({
   // Drawing state
   const [activeVertices, setActiveVertices] = useState<[number, number][]>([]);
   const [cursorPos, setCursorPos] = useState<[number, number] | null>(null);
-  const [basemapSource, setBasemapSource] = useState<"s2" | "mapbox">("s2");
 
   const activeVerticesRef = useRef<[number, number][]>([]);
   activeVerticesRef.current = activeVertices;
-
-  const toggleBasemap = (source: "s2" | "mapbox") => {
-    setBasemapSource(source);
-    const map = mapRef.current;
-    if (map && map.isStyleLoaded()) {
-      if (map.getLayer("s2-layer")) {
-        map.setLayoutProperty("s2-layer", "visibility", source === "s2" ? "visible" : "none");
-      }
-      if (map.getLayer("mapbox-layer")) {
-        map.setLayoutProperty(
-          "mapbox-layer",
-          "visibility",
-          source === "mapbox" ? "visible" : "none",
-        );
-      }
-    }
-  };
 
   // Sync dual maps during compare mode
   const syncMaps = useCallback((source: maplibregl.Map, target: maplibregl.Map) => {
@@ -184,6 +168,25 @@ export function MapCanvas({
     };
   }, []);
 
+  // Update Basemap layer visibility on primary and compare maps
+  useEffect(() => {
+    const updateVisibility = (map: maplibregl.Map | null) => {
+      if (!map || !map.isStyleLoaded()) return;
+      if (map.getLayer("s2-layer")) {
+        map.setLayoutProperty("s2-layer", "visibility", basemapSource === "s2" ? "visible" : "none");
+      }
+      if (map.getLayer("mapbox-layer")) {
+        map.setLayoutProperty(
+          "mapbox-layer",
+          "visibility",
+          basemapSource === "mapbox" ? "visible" : "none",
+        );
+      }
+    };
+    updateVisibility(mapRef.current);
+    updateVisibility(compareMapRef.current);
+  }, [basemapSource]);
+
   // Initialize Primary Map (Year T2 or main)
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -201,10 +204,13 @@ export function MapCanvas({
       pitchWithRotate: false,
       touchPitch: false,
       maxPitch: 0,
+      minPitch: 0,
+      bearing: 0,
       doubleClickZoom: false,
       attributionControl: false,
     });
 
+    map.touchZoomRotate.disableRotation();
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
@@ -361,7 +367,14 @@ export function MapCanvas({
 
     mapRef.current = map;
 
+    // Attach ResizeObserver to guarantee WebGL canvas stays sharp and full-bleed
+    const ro = new ResizeObserver(() => {
+      map.resize();
+    });
+    ro.observe(containerRef.current);
+
     return () => {
+      ro.disconnect();
       map.remove();
       mapRef.current = null;
     };
@@ -396,9 +409,13 @@ export function MapCanvas({
       pitchWithRotate: false,
       touchPitch: false,
       maxPitch: 0,
+      minPitch: 0,
+      bearing: 0,
       doubleClickZoom: false,
       attributionControl: false,
     });
+
+    compareMap.touchZoomRotate.disableRotation();
 
     compareMap.on("load", () => {
       if (polygon && polygon.length >= 3) {
@@ -436,6 +453,15 @@ export function MapCanvas({
           paint: { "line-color": "#FFB020", "line-width": 2, "line-dasharray": [4, 2] },
         });
       }
+
+      if (basemapSource === "mapbox") {
+        if (compareMap.getLayer("s2-layer")) {
+          compareMap.setLayoutProperty("s2-layer", "visibility", "none");
+        }
+        if (compareMap.getLayer("mapbox-layer")) {
+          compareMap.setLayoutProperty("mapbox-layer", "visibility", "visible");
+        }
+      }
     });
 
     compareMapRef.current = compareMap;
@@ -443,18 +469,24 @@ export function MapCanvas({
     const cleanSync1 = syncMaps(mapRef.current, compareMap);
     const cleanSync2 = syncMaps(compareMap, mapRef.current);
 
+    const ro = new ResizeObserver(() => {
+      compareMap.resize();
+    });
+    ro.observe(compareContainerRef.current);
+
     setTimeout(() => {
       mapRef.current?.resize();
       compareMap.resize();
     }, 60);
 
     return () => {
+      ro.disconnect();
       cleanSync1();
       cleanSync2();
       compareMap.remove();
       compareMapRef.current = null;
     };
-  }, [compareMode, yearT1, syncMaps, polygon]);
+  }, [compareMode, yearT1, syncMaps, polygon, basemapSource]);
 
   // Update Raster Tile Year when yearT2 changes on primary map
   useEffect(() => {
@@ -668,54 +700,66 @@ export function MapCanvas({
     <div
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      className="relative size-full overflow-hidden bg-ink-950 select-none outline-none"
+      className="relative flex size-full overflow-hidden bg-ink-950 select-none outline-none focus-visible:ring-1 focus-visible:ring-signal-400"
     >
-      {/* Map Viewports: Single or Side-by-Side Dual Synchronized Mode */}
-      {compareMode ? (
-        <div className="absolute inset-0 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-bone-100/15">
-          {/* Left Viewport: T1 Baseline */}
-          <div className="relative size-full overflow-hidden">
-            <div ref={compareContainerRef} className="size-full" />
-            <div className="pointer-events-none absolute top-4 start-4 z-10 flex items-center gap-2 rounded-full border border-bone-100/20 bg-ink-950/90 px-3.5 py-1.5 font-mono text-[11px] tracking-wider text-bone-200 uppercase backdrop-blur shadow-xl">
-              <span className="size-2 rounded-full bg-bone-400" />
-              <span>T₁ Baseline · {yearT1}</span>
-            </div>
+      {/* Permanent Side-by-Side Map Containers (No reparenting / no WebGL destruction) */}
+      <div
+        className={`relative h-full overflow-hidden transition-[width] duration-300 ease-out ${
+          compareMode ? "w-1/2 border-r border-white/10" : "w-0 hidden pointer-events-none"
+        }`}
+      >
+        <div ref={compareContainerRef} className="size-full" />
+        {compareMode && (
+          <div className="pointer-events-none absolute top-3 start-3 z-10 flex items-center gap-2 rounded-md border border-white/10 bg-ink-950/85 px-2.5 py-1 text-xs font-medium text-bone-200 backdrop-blur shadow-sm">
+            <span className="size-1.5 rounded-full bg-bone-400" aria-hidden="true" />
+            <span>Baseline ({yearT1})</span>
           </div>
+        )}
+      </div>
 
-          {/* Right Viewport: T2 Target with Change Overlays */}
-          <div className="relative size-full overflow-hidden">
-            <div ref={containerRef} className="size-full" />
-            <div className="pointer-events-none absolute top-4 start-4 z-10 flex items-center gap-2 rounded-full border border-signal-400/40 bg-ink-950/90 px-3.5 py-1.5 font-mono text-[11px] tracking-wider text-signal-400 uppercase backdrop-blur shadow-xl">
-              <span className="size-2 rounded-full bg-signal-400 animate-pulse" />
-              <span>T₂ Target · {yearT2} · Detected Change</span>
-            </div>
+      <div
+        className={`relative h-full overflow-hidden transition-[width] duration-300 ease-out ${
+          compareMode ? "w-1/2" : "w-full"
+        }`}
+      >
+        <div ref={containerRef} className="size-full" />
+        {compareMode && (
+          <div className="pointer-events-none absolute top-3 start-3 z-10 flex items-center gap-2 rounded-md border border-signal-400/30 bg-ink-950/85 px-2.5 py-1 text-xs font-medium text-signal-400 backdrop-blur shadow-sm">
+            <span
+              className="size-1.5 rounded-full bg-signal-400 animate-pulse"
+              aria-hidden="true"
+            />
+            <span>Target ({yearT2}) & Detected Changes</span>
           </div>
-        </div>
-      ) : (
-        <div ref={containerRef} className="absolute inset-0 size-full" />
-      )}
+        )}
+      </div>
 
-      {/* Live Polygon Drawing HUD Badge */}
+      {/* Live Polygon Drawing Status Bar */}
       {isDrawing ? (
-        <div className="pointer-events-none absolute top-6 inset-x-0 z-30 flex justify-center">
+        <div className="pointer-events-none absolute top-3 inset-x-0 z-30 flex justify-center px-4">
           <div
-            className={`flex items-center gap-3 rounded-full border px-5 py-2.5 shadow-2xl backdrop-blur-md transition-colors ${
+            role="status"
+            aria-live="polite"
+            className={`flex items-center gap-3 rounded-lg border px-4 py-2 text-xs shadow-lg backdrop-blur-md transition-colors ${
               isAreaOversized
                 ? "border-alert-500/80 bg-alert-500/20 text-alert-400"
                 : "border-signal-400/60 bg-ink-950/90 text-bone-100"
             }`}
           >
-            <div
-              className={`size-2.5 rounded-full animate-ping ${
+            <span
+              className={`size-2 rounded-full animate-ping ${
                 isAreaOversized ? "bg-alert-400" : "bg-signal-400"
               }`}
+              aria-hidden="true"
             />
-            <div className="font-mono text-xs">
-              <span className="font-semibold text-bone-100 uppercase tracking-widest">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-bone-100">
                 Vertex {activeVertices.length + 1}
               </span>
-              <span className="mx-2 text-bone-100/40">|</span>
-              <span>
+              <span className="text-bone-400" aria-hidden="true">
+                ·
+              </span>
+              <span className="tabular-nums">
                 Area:{" "}
                 <strong
                   className={
@@ -724,54 +768,30 @@ export function MapCanvas({
                 >
                   {formatArea(liveAreaKm2 * 1_000_000)}
                 </strong>
-                {isAreaOversized ? " (Exceeds 100 km² limit)" : " / 100 km² max"}
+                {isAreaOversized ? " (Exceeds 100\u00A0km² limit)" : " / 100\u00A0km² max"}
               </span>
-              <span className="mx-2 text-bone-100/40">|</span>
+              <span className="text-bone-400" aria-hidden="true">
+                ·
+              </span>
               <span className="text-bone-300">
                 {activeVertices.length >= 3
-                  ? "Click start / Enter to finish · Esc to cancel"
-                  : "Click map to add boundary points"}
+                  ? "Click start or press Enter to finish · Esc to cancel"
+                  : "Click map to add boundary points · Esc to cancel"}
               </span>
             </div>
           </div>
         </div>
       ) : null}
 
-      {/* Satellite Imagery Attribution Badge */}
-      <div className="pointer-events-none absolute bottom-3 start-4 z-10 flex items-center gap-2 rounded-full border border-bone-100/10 bg-ink-950/80 px-3 py-1 font-mono text-[10px] tracking-wider text-bone-400 uppercase backdrop-blur">
+      {/* Discreet Satellite Source Attribution */}
+      <div className="pointer-events-none absolute bottom-3 start-3 z-10 flex items-center gap-2 rounded-md border border-white/5 bg-ink-950/80 px-2.5 py-1 text-[11px] text-bone-400 backdrop-blur">
         <span>
           {basemapSource === "mapbox"
-            ? "Mapbox Satellite Streets (High-Res Aerial)"
-            : `Sentinel-2 Cloudless ${compareMode ? `${yearT1} vs ${yearT2}` : yearT2}`}
+            ? "Mapbox Satellite Aerial"
+            : `Sentinel-2 Cloudless (${compareMode ? `${yearT1} vs ${yearT2}` : yearT2})`}
         </span>
-        <span>·</span>
+        <span aria-hidden="true">·</span>
         <span>{basemapSource === "mapbox" ? "© Mapbox" : "EOX IT Services"}</span>
-      </div>
-
-      {/* Basemap Switcher */}
-      <div className="absolute bottom-3 end-14 z-10 hidden sm:flex items-center gap-1 rounded-full border border-bone-100/15 bg-ink-950/90 p-1 backdrop-blur shadow-xl">
-        <button
-          type="button"
-          onClick={() => toggleBasemap("s2")}
-          className={`rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors ${
-            basemapSource === "s2"
-              ? "bg-signal-400 font-bold text-ink-950"
-              : "text-bone-400 hover:text-bone-100"
-          }`}
-        >
-          Sentinel-2
-        </button>
-        <button
-          type="button"
-          onClick={() => toggleBasemap("mapbox")}
-          className={`rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors ${
-            basemapSource === "mapbox"
-              ? "bg-signal-400 font-bold text-ink-950"
-              : "text-bone-400 hover:text-bone-100"
-          }`}
-        >
-          Mapbox High-Res
-        </button>
       </div>
     </div>
   );
