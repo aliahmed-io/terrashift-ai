@@ -77,8 +77,8 @@ function buildMapStyle(year: number): maplibregl.StyleSpecification {
       id: "s2-layer",
       type: "raster",
       source: "s2-cloudless",
-      minzoom: 4,
-      maxzoom: 14,
+      minzoom: 0,
+      maxzoom: 22,
       paint: {
         "raster-opacity": 0.95,
         "raster-fade-duration": 300,
@@ -102,7 +102,7 @@ function buildMapStyle(year: number): maplibregl.StyleSpecification {
       type: "raster",
       source: "mapbox-satellite",
       minzoom: 0,
-      maxzoom: 19,
+      maxzoom: 22,
       layout: {
         visibility: "none",
       },
@@ -192,6 +192,11 @@ export function MapCanvas({
       style: buildMapStyle(yearT2),
       center,
       zoom,
+      minZoom: 1,
+      maxZoom: 21,
+      scrollZoom: true,
+      dragPan: true,
+      doubleClickZoom: false,
       attributionControl: false,
     });
 
@@ -377,6 +382,11 @@ export function MapCanvas({
       style: buildMapStyle(yearT1),
       center: [mainCenter.lng, mainCenter.lat],
       zoom: mainZoom,
+      minZoom: 1,
+      maxZoom: 21,
+      scrollZoom: true,
+      dragPan: true,
+      doubleClickZoom: false,
       attributionControl: false,
     });
 
@@ -463,6 +473,9 @@ export function MapCanvas({
     }
   }, [selectedFeatureId, features]);
 
+  const activeVerticesRef = useRef<[number, number][]>([]);
+  activeVerticesRef.current = activeVertices;
+
   // Multi-vertex drawing mouse/keyboard events
   useEffect(() => {
     const map = mapRef.current;
@@ -470,8 +483,8 @@ export function MapCanvas({
 
     if (!isDrawing) {
       map.getCanvas().style.cursor = "";
-      setActiveVertices([]);
-      setCursorPos(null);
+      setActiveVertices((prev) => (prev.length > 0 ? [] : prev));
+      setCursorPos((prev) => (prev !== null ? null : prev));
       const src = map.getSource("drawing-source") as maplibregl.GeoJSONSource | undefined;
       if (src && map.isStyleLoaded()) {
         src.setData({ type: "FeatureCollection", features: [] });
@@ -480,6 +493,17 @@ export function MapCanvas({
     }
 
     map.getCanvas().style.cursor = "crosshair";
+
+    const finishDrawing = () => {
+      const vertices = activeVerticesRef.current;
+      if (vertices.length >= 3) {
+        const closed = [...vertices, vertices[0]!];
+        onPolygonChange(closed);
+      }
+      setActiveVertices([]);
+      setCursorPos(null);
+      onDrawingChange(false);
+    };
 
     const onMouseMove = (e: maplibregl.MapMouseEvent) => {
       const currentPoint: [number, number] = [
@@ -491,7 +515,8 @@ export function MapCanvas({
       const src = map.getSource("drawing-source") as maplibregl.GeoJSONSource | undefined;
       if (!src) return;
 
-      if (activeVertices.length === 0) {
+      const currentVertices = activeVerticesRef.current;
+      if (currentVertices.length === 0) {
         src.setData({
           type: "FeatureCollection",
           features: [
@@ -503,7 +528,7 @@ export function MapCanvas({
           ],
         });
       } else {
-        const ringWithCursor = [...activeVertices, currentPoint, activeVertices[0]!];
+        const ringWithCursor = [...currentVertices, currentPoint, currentVertices[0]!];
         src.setData({
           type: "FeatureCollection",
           features: [
@@ -512,7 +537,7 @@ export function MapCanvas({
               geometry: { type: "Polygon", coordinates: [ringWithCursor] },
               properties: {},
             },
-            ...activeVertices.map((v) => ({
+            ...currentVertices.map((v) => ({
               type: "Feature" as const,
               geometry: { type: "Point" as const, coordinates: v },
               properties: {},
@@ -522,28 +547,18 @@ export function MapCanvas({
       }
     };
 
-    const finishDrawing = (vertices: [number, number][]) => {
-      if (vertices.length >= 3) {
-        const closed = [...vertices, vertices[0]!];
-        onPolygonChange(closed);
-      }
-      setActiveVertices([]);
-      setCursorPos(null);
-      onDrawingChange(false);
-    };
-
     const onClick = (e: maplibregl.MapMouseEvent) => {
       const clickPoint: [number, number] = [
         Number(e.lngLat.lng.toFixed(6)),
         Number(e.lngLat.lat.toFixed(6)),
       ];
 
-      // Check if user clicked near first vertex to close
-      if (activeVertices.length >= 3 && activeVertices[0]) {
-        const [v0Lon, v0Lat] = activeVertices[0];
+      const currentVertices = activeVerticesRef.current;
+      if (currentVertices.length >= 3 && currentVertices[0]) {
+        const [v0Lon, v0Lat] = currentVertices[0];
         const dist = Math.hypot(clickPoint[0] - v0Lon, clickPoint[1] - v0Lat);
         if (dist < 0.002) {
-          finishDrawing(activeVertices);
+          finishDrawing();
           return;
         }
       }
@@ -553,8 +568,8 @@ export function MapCanvas({
 
     const onDblClick = (e: maplibregl.MapMouseEvent) => {
       e.preventDefault();
-      if (activeVertices.length >= 3) {
-        finishDrawing(activeVertices);
+      if (activeVerticesRef.current.length >= 3) {
+        finishDrawing();
       }
     };
 
@@ -567,7 +582,7 @@ export function MapCanvas({
       map.off("click", onClick);
       map.off("dblclick", onDblClick);
     };
-  }, [isDrawing, activeVertices, onDrawingChange, onPolygonChange]);
+  }, [isDrawing, onDrawingChange, onPolygonChange]);
 
   // Keyboard shortcut handler for drawing (Enter to complete, Esc to cancel, Backspace to undo)
   const handleKeyDown = useCallback(
@@ -603,8 +618,9 @@ export function MapCanvas({
   const handleSliderMove = useCallback((clientX: number) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
+    if (rect.width <= 0) return;
     const percent = Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100));
-    setSliderPos(percent);
+    setSliderPos((prev) => (Math.abs(prev - percent) > 0.05 ? percent : prev));
   }, []);
 
   return (

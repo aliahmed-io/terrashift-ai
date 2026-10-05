@@ -245,6 +245,17 @@ export function AnalyzeClient() {
     }
   };
 
+  const handlePolygonChange = useCallback((newPoly: [number, number][] | null) => {
+    setPolygon(newPoly);
+    setResult(null);
+    setStatus("idle");
+  }, []);
+
+  const handleSelectFeature = useCallback((id: number | null) => {
+    setSelectedFeatureId(id);
+    if (id != null) setDrawerOpen(true);
+  }, []);
+
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-ink-950 text-bone-100">
       {/* 1. Full-bleed Map Viewport */}
@@ -255,16 +266,9 @@ export function AnalyzeClient() {
         features={result?.features ?? []}
         isDrawing={isDrawing}
         onDrawingChange={setIsDrawing}
-        onPolygonChange={(newPoly) => {
-          setPolygon(newPoly);
-          setResult(null);
-          setStatus("idle");
-        }}
+        onPolygonChange={handlePolygonChange}
         selectedFeatureId={selectedFeatureId}
-        onSelectFeature={(id) => {
-          setSelectedFeatureId(id);
-          if (id != null) setDrawerOpen(true);
-        }}
+        onSelectFeature={handleSelectFeature}
         compareMode={compareMode}
         center={mapCenter}
         zoom={mapZoom}
