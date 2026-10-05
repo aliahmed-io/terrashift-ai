@@ -1,54 +1,46 @@
 """Pydantic request and response schemas for TerraShift API endpoints."""
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal
+
 from pydantic import BaseModel, Field, model_validator
 
+from terrashift.acquisition.tiles import MAX_YEAR, MIN_YEAR
+
+
 class AnalyzeRequest(BaseModel):
-    bbox: List[float] = Field(
+    polygon: List[List[float]] = Field(
         ...,
-        description="Bounding box [west, south, east, north] in EPSG:4326 degrees",
-        min_length=4,
-        max_length=4,
+        min_length=3,
+        description="Area of interest ring as [lon, lat] pairs (EPSG:4326). The ring may be open or closed.",
     )
-    date_t1: str = Field(..., description="Temporal baseline date (YYYY-MM-DD)")
-    date_t2: str = Field(..., description="Temporal comparison date (YYYY-MM-DD)")
-    use_real_stac: bool = Field(
-        default=True,
-        description="If True, query Element84 AWS Earth Search STAC for live Sentinel-2 imagery; falls back gracefully if offline",
-    )
+    year_t1: int = Field(..., ge=MIN_YEAR, le=MAX_YEAR)
+    year_t2: int = Field(..., ge=MIN_YEAR, le=MAX_YEAR)
 
     @model_validator(mode="after")
-    def validate_dates_and_bbox(self) -> "AnalyzeRequest":
-        west, south, east, north = self.bbox
-        if not (-180.0 <= west < east <= 180.0):
-            raise ValueError(f"Invalid longitude span: [{west}, {east}]")
-        if not (-90.0 <= south < north <= 90.0):
-            raise ValueError(f"Invalid latitude span: [{south}, {north}]")
-        if self.date_t1 >= self.date_t2:
-            raise ValueError("date_t1 must be strictly earlier than date_t2")
+    def validate_request(self) -> "AnalyzeRequest":
+        for pt in self.polygon:
+            if len(pt) != 2:
+                raise ValueError("Each polygon vertex must be [lon, lat]")
+            lon, lat = pt
+            if not (-180.0 <= lon <= 180.0 and -85.0 <= lat <= 85.0):
+                raise ValueError(f"Vertex out of range: [{lon}, {lat}]")
+        if self.year_t1 >= self.year_t2:
+            raise ValueError("year_t1 must be earlier than year_t2")
         return self
+
 
 class PolygonFeature(BaseModel):
     type: Literal["Feature"] = "Feature"
     geometry: Dict[str, Any]
     properties: Dict[str, Any]
 
+
 class AnalyzeResponse(BaseModel):
     type: Literal["FeatureCollection"] = "FeatureCollection"
     metadata: Dict[str, Any]
     features: List[PolygonFeature]
-    cloud_fraction_t1: float
-    cloud_fraction_t2: float
     provenance: str
 
-class PreviewRequest(BaseModel):
-    bbox: List[float]
-    date: str
-
-class PreviewResponse(BaseModel):
-    rgb_jpeg_base64: str
-    bounds: List[float]
-    cloud_fraction: float
 
 class ReportRequest(BaseModel):
     metadata: Dict[str, Any]

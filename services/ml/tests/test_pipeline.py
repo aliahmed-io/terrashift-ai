@@ -1,112 +1,126 @@
-"""Unit tests for TerraShift ML microservice and geospatial pipeline."""
+"""Unit tests for the TerraShift ML microservice."""
+
+from typing import Any, Dict
 
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
+from numpy.typing import NDArray
 
-from terrashift.features.indices import ndvi, ndbi, ndwi
-from terrashift.features.stack import build_5channel_stack, SentinelBands
 from terrashift.acquisition.cloud import build_cloud_mask, calculate_cloud_fraction
-from terrashift.acquisition.composite import create_synthetic_composite
-from terrashift.models.siamese_unet import run_physics_guided_inference
-from terrashift.geo.vectorize import mask_to_geojson_polygons
-from terrashift.report.pdf import generate_pdf_report
+from terrashift.acquisition.tiles import AoiError, clamp_year, plan_grid
+from terrashift.api import main as api_main
 from terrashift.api.main import app
+from terrashift.api.schemas import AnalyzeRequest
+from terrashift.features.indices import ndbi, ndvi
+from terrashift.features.stack import SentinelBands, build_5channel_stack
+from terrashift.pipeline import run_analysis
+from terrashift.report.pdf import generate_pdf_report
 
-def test_radiometric_indices():
-    # NDVI = (NIR - Red) / (NIR + Red)
+RING = [[10.0, 45.0], [10.02, 45.0], [10.02, 45.015], [10.0, 45.015]]
+
+
+def make_fetcher(with_change: bool):
+    def fetch(year: int, z: int, x: int, y: int) -> NDArray[np.uint8]:
+        rng = np.random.default_rng(z * 100003 + x * 1009 + y)
+        base = np.zeros((256, 256, 3), dtype=np.float32)
+        base[...] = (60, 110, 55)
+        base += rng.normal(0, 3, size=base.shape).astype(np.float32)
+        if with_change and year >= 2024:
+            base[120:170, 170:220] = (190, 185, 180)
+        return np.clip(base, 0, 255).astype(np.uint8)
+
+    return fetch
+
+
+def test_radiometric_indices() -> None:
     nir = np.array([[4000.0, 1000.0]], dtype=np.float32)
     red = np.array([[1000.0, 4000.0]], dtype=np.float32)
     val = ndvi(nir, red)
-    assert val[0, 0] > 0.5  # High vegetation
-    assert val[0, 1] < -0.5  # Negative index (water/shadow/soil)
-
-    # NDBI = (SWIR - NIR) / (SWIR + NIR)
-    swir = np.array([[3000.0]], dtype=np.float32)
-    nir_b = np.array([[1000.0]], dtype=np.float32)
-    val_ndbi = ndbi(swir, nir_b)
-    assert val_ndbi[0, 0] > 0.4  # Concrete / built-up
-
-    # Zero-division safety
+    assert val[0, 0] > 0.5
+    assert val[0, 1] < -0.5
+    assert ndbi(np.array([[3000.0]], dtype=np.float32), np.array([[1000.0]], dtype=np.float32))[0, 0] > 0.4
     zero = np.zeros((2, 2), dtype=np.float32)
-    safe = ndvi(zero, zero)
-    assert not np.isnan(safe).any()
+    assert not np.isnan(ndvi(zero, zero)).any()
 
-def test_cloud_masking():
-    # SCL: 9 = high cloud, 4 = vegetation
-    scl = np.array([[4, 4], [9, 9]], dtype=np.uint8)
-    mask = build_cloud_mask(scl)
-    assert mask[0, 0] == False
-    assert mask[1, 0] == True
 
-    frac = calculate_cloud_fraction(mask)
-    assert frac == 50.0
+def test_cloud_masking() -> None:
+    mask = build_cloud_mask(np.array([[4, 4], [9, 9]], dtype=np.uint8))
+    assert bool(mask[1, 0]) and not bool(mask[0, 0])
+    assert calculate_cloud_fraction(mask) == 50.0
 
-def test_5channel_stack():
+
+def test_5channel_stack() -> None:
     bands: SentinelBands = {
-        "b02": np.full((32, 32), 1000.0, dtype=np.float32),
-        "b03": np.full((32, 32), 1200.0, dtype=np.float32),
-        "b04": np.full((32, 32), 800.0, dtype=np.float32),
-        "b08": np.full((32, 32), 4000.0, dtype=np.float32),
-        "b11": np.full((32, 32), 2000.0, dtype=np.float32),
+        "b02": np.full((8, 8), 1000.0, dtype=np.float32),
+        "b03": np.full((8, 8), 1200.0, dtype=np.float32),
+        "b04": np.full((8, 8), 800.0, dtype=np.float32),
+        "b08": np.full((8, 8), 4000.0, dtype=np.float32),
+        "b11": np.full((8, 8), 2000.0, dtype=np.float32),
     }
     stack = build_5channel_stack(bands)
-    assert stack.shape == (5, 32, 32)
-    assert 0.0 <= stack.min() <= stack.max() <= 1.0
+    assert stack.shape == (5, 8, 8)
+    assert 0.0 <= float(stack.min()) <= float(stack.max()) <= 1.0
 
-def test_vectorize_and_area():
-    mask = np.zeros((64, 64), dtype=np.uint8)
-    mask[20:30, 20:30] = 1  # 10x10 square
-    prob = np.full((64, 64), 0.9, dtype=np.float32)
-    bbox = [-63.2, -9.9, -63.12, -9.84]
 
-    idx = {"ndvi": np.full((64, 64), 0.5, dtype=np.float32), "ndbi": np.zeros((64, 64), dtype=np.float32)}
-    idx_t2 = {"ndvi": np.full((64, 64), 0.1, dtype=np.float32), "ndbi": np.zeros((64, 64), dtype=np.float32)}
+def test_year_clamp_and_grid() -> None:
+    assert clamp_year(2010) == 2017
+    assert clamp_year(2040) == 2025
+    grid = plan_grid([10.0, 45.0, 10.02, 45.015])
+    assert grid.zoom == 13
+    assert 24 <= grid.width <= 1400
+    with pytest.raises(AoiError):
+        plan_grid([10.0, 45.0, 10.0001, 45.0001])
 
-    fc = mask_to_geojson_polygons(mask, prob, bbox, idx, idx_t2, min_pixels=4)
-    assert fc["type"] == "FeatureCollection"
-    assert len(fc["features"]) >= 1
-    assert fc["metadata"]["total_changed_m2"] > 0.0
-    assert fc["features"][0]["properties"]["area_m2"] > 0.0
 
-def test_pdf_report_generation():
-    meta = {
-        "bbox": [-63.2, -9.9, -63.12, -9.84],
-        "date_t1": "2024-06-14",
-        "date_t2": "2025-01-22",
-        "total_changed_km2": 1.45,
-        "total_changed_m2": 1450000.0,
-        "polygon_count": 4,
-    }
-    features = [
-        {"properties": {"id": 1, "label": "Vegetation Loss", "area_m2": 450000.0, "confidence": 0.92, "ndvi_delta": -0.35}}
-    ]
-    pdf_bytes = generate_pdf_report(meta, features)
-    assert isinstance(pdf_bytes, bytes)
-    assert pdf_bytes.startswith(b"%PDF")
+def test_pipeline_detects_change_with_geodesic_area() -> None:
+    req = AnalyzeRequest(polygon=RING, year_t1=2018, year_t2=2024)
+    events = list(run_analysis(req, make_fetcher(True)))
+    result: Dict[str, Any] = events[-1]["result"]
+    assert [e["progress"] for e in events[:-1]] == sorted(e["progress"] for e in events[:-1])
+    assert result["metadata"]["polygon_count"] >= 1
+    assert result["metadata"]["total_changed_m2"] > 10_000
+    assert result["metadata"]["total_changed_km2"] <= result["metadata"]["aoi_km2"]
+    first = result["features"][0]
+    assert first["geometry"]["type"] == "Polygon"
+    assert first["properties"]["area_m2"] > 0
 
-def test_api_client():
+
+def test_pipeline_reports_no_change_for_identical_years() -> None:
+    req = AnalyzeRequest(polygon=RING, year_t1=2018, year_t2=2019)
+    events = list(run_analysis(req, make_fetcher(False)))
+    assert events[-1]["result"]["metadata"]["polygon_count"] == 0
+
+
+def test_pipeline_rejects_oversized_area() -> None:
+    big = [[10.0, 45.0], [11.0, 45.0], [11.0, 46.0], [10.0, 46.0]]
+    with pytest.raises(AoiError):
+        list(run_analysis(AnalyzeRequest(polygon=big, year_t1=2018, year_t2=2024), make_fetcher(True)))
+
+
+def test_schema_rejects_bad_years() -> None:
+    with pytest.raises(ValueError):
+        AnalyzeRequest(polygon=RING, year_t1=2024, year_t2=2018)
+
+
+def test_pdf_report_generation() -> None:
+    meta = {"aoi_km2": 3.2, "date_t1": "2018", "date_t2": "2024", "total_changed_km2": 0.45, "total_changed_m2": 450000.0, "polygon_count": 1, "changed_pct": 14.0}
+    features = [{"properties": {"id": 1, "label": "Vegetation loss", "area_m2": 450000.0, "confidence": 0.92}}]
+    assert generate_pdf_report(meta, features).startswith(b"%PDF")
+
+
+def test_stream_endpoint_emits_progress_then_result(monkeypatch: pytest.MonkeyPatch) -> None:
+    fetcher = make_fetcher(True)
+    original = api_main.run_analysis
+    monkeypatch.setattr(api_main, "run_analysis", lambda req: original(req, fetcher))
     client = TestClient(app)
-    # Health check
-    res = client.get("/healthz")
+    res = client.post("/v1/analyze/stream", json={"polygon": RING, "year_t1": 2018, "year_t2": 2024})
     assert res.status_code == 200
-    assert res.json()["status"] == "healthy"
+    assert res.headers["content-type"].startswith("text/event-stream")
+    chunks = [c for c in res.text.split("\n\n") if c.startswith("data: ")]
+    assert len(chunks) == 6
+    assert '"done": true' in chunks[-1]
 
-    # Search location
-    res_loc = client.get("/v1/search-location?q=Dubai")
-    assert res_loc.status_code == 200
-    assert len(res_loc.json()) >= 1
 
-    # Analyze endpoint
-    payload = {
-        "bbox": [-63.2, -9.9, -63.12, -9.84],
-        "date_t1": "2024-06-14",
-        "date_t2": "2025-01-22",
-        "use_real_stac": False,
-    }
-    res_an = client.post("/v1/analyze", json=payload)
-    assert res_an.status_code == 200
-    data = res_an.json()
-    assert data["type"] == "FeatureCollection"
-    assert "metadata" in data
-    assert "features" in data
+def test_health() -> None:
+    assert TestClient(app).get("/healthz").json()["status"] == "healthy"

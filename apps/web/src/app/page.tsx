@@ -1,8 +1,8 @@
-import { Closing, Pipeline } from "@/components/landing/pipeline";
 import { Hero } from "@/components/landing/hero";
 import { Manifesto } from "@/components/landing/manifesto";
 import { Nav } from "@/components/landing/nav";
 import { Story } from "@/components/landing/story";
+import { Closing } from "@/components/landing/closing";
 import { SmoothScroll } from "@/components/smooth-scroll";
 
 export default function Home() {
@@ -14,7 +14,6 @@ export default function Home() {
         <Hero />
         <Manifesto />
         <Story />
-        <Pipeline />
         <Closing />
       </main>
     </>

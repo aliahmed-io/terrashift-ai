@@ -1,515 +1,659 @@
 "use client";
 
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import Link from "next/link";
-import { useCallback, useId, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { MapCanvas } from "@/components/map/map-canvas";
+import { useCallback, useState, useRef } from "react";
+import { MapCanvas, type MapFeature } from "@/components/map/map-canvas";
 import { LocationSearch } from "@/components/search/location-search";
-import { RegionOverlay } from "@/components/region-overlay";
-import { SceneCanvas } from "@/components/scene-canvas";
-import { PRESETS, type AoiPreset } from "@/lib/geo";
-import { getScene } from "@/lib/scene";
-import { motion as motionTokens } from "@/tokens";
+import {
+  HOTSPOT_PRESETS,
+  type HotspotPreset,
+  calculatePolygonAreaKm2,
+  formatArea,
+  MAX_AOI_KM2,
+} from "@/lib/tiles";
 import type { GeocodeLocation } from "@/app/api/geocode/route";
 
-type Phase = "idle" | "running" | "done" | "error";
-type ViewMode = "map" | "swipe";
-
-const STEPS = [
-  "Querying Element84 AWS Earth Search STAC",
-  "SCL / QA60 cloud & shadow gating",
-  "Computing 5-channel NDVI/NDBI tensor",
-  "Executing Siamese U-Net inference",
-  "Vectorising polygons & computing metric area",
-] as const;
-
-const FIELD =
-  "w-full rounded-lg border border-bone-100/15 bg-ink-900 px-4 py-3 font-mono text-sm text-bone-100 transition-colors focus:border-signal-400";
-
-interface ChangeFeature {
-  type: "Feature";
-  geometry: { type: "Polygon"; coordinates: number[][][] };
-  properties: {
-    id: number;
-    class: string;
-    label: string;
-    area_m2: number;
-    confidence: number;
-    ndvi_delta?: number;
-    ndbi_delta?: number;
-  };
+interface AnalysisMetadata {
+  bbox: [number, number, number, number];
+  year_t1: number;
+  year_t2: number;
+  date_t1: string;
+  date_t2: string;
+  aoi_km2: number;
+  changed_pct: number;
+  total_changed_km2: number;
+  total_changed_m2: number;
+  polygon_count: number;
+  resolution_m?: number | undefined;
+  threshold?: number | undefined;
+  provenance: string;
+  generated_at?: string | undefined;
 }
 
 interface AnalysisResult {
   type: "FeatureCollection";
-  metadata: {
-    bbox: [number, number, number, number];
-    date_t1: string;
-    date_t2: string;
-    total_changed_km2: number;
-    total_changed_m2: number;
-    polygon_count: number;
-    provenance: string;
-  };
-  features: ChangeFeature[];
-  cloud_fraction_t1: number;
-  cloud_fraction_t2: number;
+  metadata: AnalysisMetadata;
+  features: MapFeature[];
   provenance: string;
 }
 
-function SwipeCompare({
-  seed,
-  dateT1,
-  dateT2,
-  showChange,
-}: {
-  seed: number;
-  dateT1: string;
-  dateT2: string;
-  showChange: boolean;
-}) {
-  const scene = getScene(seed);
-  const frame = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState(50);
-  const dragging = useRef(false);
-
-  const move = useCallback((clientX: number) => {
-    const el = frame.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    setPos(Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100)));
-  }, []);
-
-  const onDown = (e: PointerEvent<HTMLDivElement>): void => {
-    dragging.current = true;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    move(e.clientX);
-  };
-  const onKey = (e: KeyboardEvent<HTMLDivElement>): void => {
-    const step = e.shiftKey ? 10 : 2;
-    if (e.key === "ArrowLeft") setPos((p) => Math.max(0, p - step));
-    else if (e.key === "ArrowRight") setPos((p) => Math.min(100, p + step));
-    else if (e.key === "Home") setPos(0);
-    else if (e.key === "End") setPos(100);
-    else return;
-    e.preventDefault();
-  };
-
-  return (
-    <div
-      ref={frame}
-      dir="ltr"
-      className="relative aspect-[8/5] w-full max-w-[calc((100dvh-14rem)*1.6)] touch-none overflow-hidden rounded-2xl border border-bone-100/10 bg-ink-900 select-none"
-      onPointerDown={onDown}
-      onPointerMove={(e) => {
-        if (dragging.current) move(e.clientX);
-      }}
-      onPointerUp={() => {
-        dragging.current = false;
-      }}
-    >
-      <SceneCanvas scene={scene} mode="before" className="absolute inset-0 size-full object-cover" />
-      <div className="absolute inset-0" style={{ clipPath: `inset(0 0 0 ${pos}%)` }}>
-        <SceneCanvas scene={scene} mode="after" className="absolute inset-0 size-full object-cover" />
-        {showChange ? <RegionOverlay scene={scene} fill className="absolute inset-0 size-full" /> : null}
-      </div>
-      <span className="pointer-events-none absolute start-4 top-4 rounded bg-ink-950/70 px-2 py-1 font-mono text-[11px] tracking-widest uppercase backdrop-blur">
-        T₁ · {dateT1}
-      </span>
-      <span className="pointer-events-none absolute end-4 top-4 rounded bg-ink-950/70 px-2 py-1 font-mono text-[11px] tracking-widest uppercase backdrop-blur">
-        T₂ · {dateT2}
-      </span>
-      <div
-        role="slider"
-        tabIndex={0}
-        aria-label="Compare T1 and T2 imagery"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(pos)}
-        onKeyDown={onKey}
-        className="absolute inset-y-0 w-8 -translate-x-1/2 cursor-ew-resize"
-        style={{ left: `${pos}%` }}
-      >
-        <span className="absolute inset-y-0 start-1/2 w-px bg-signal-400 shadow-[0_0_20px_3px_rgba(255,176,32,0.5)]" />
-        <span className="absolute start-1/2 top-1/2 grid size-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-signal-400 bg-ink-950/80 font-mono text-xs text-signal-400 backdrop-blur">
-          ⇄
-        </span>
-      </div>
-    </div>
-  );
-}
+type AnalysisStatus = "idle" | "running" | "done" | "error";
 
 export function AnalyzeClient() {
-  const uid = useId();
-  const [viewMode, setViewMode] = useState<ViewMode>("map");
-  const [preset, setPreset] = useState<AoiPreset>(PRESETS[0] ?? { id: "", name: "", region: "", seed: 7, bbox: [0, 0, 0, 0] });
-  const [currentBbox, setCurrentBbox] = useState<[number, number, number, number]>([
-    PRESETS[0]?.bbox[0] ?? -63.2,
-    PRESETS[0]?.bbox[1] ?? -9.9,
-    PRESETS[0]?.bbox[2] ?? -63.12,
-    PRESETS[0]?.bbox[3] ?? -9.84,
-  ]);
-  const [dateT1, setDateT1] = useState("2024-06-14");
-  const [dateT2, setDateT2] = useState("2025-01-22");
-  const [showChange, setShowChange] = useState(true);
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [step, setStep] = useState(0);
-  const [message, setMessage] = useState("");
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-  const [selectedPolygonId, setSelectedPolygonId] = useState<number | null>(null);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [yearT1, setYearT1] = useState(2018);
+  const [yearT2, setYearT2] = useState(2024);
+  const [polygon, setPolygon] = useState<[number, number][] | null>(() => {
+    // Default to Rondônia hotspot polygon
+    const preset = HOTSPOT_PRESETS[0];
+    return preset ? [...preset.polygon] : null;
+  });
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
+  const [selectedFeatureId, setSelectedFeatureId] = useState<number | null>(null);
 
-  const done = phase === "done" && analysisResult !== null;
+  // Status & Telemetry
+  const [status, setStatus] = useState<AnalysisStatus>("idle");
+  const [stepLabel, setStepLabel] = useState<string>("");
+  const [progress, setProgress] = useState<number>(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const handleSelectLocation = (loc: GeocodeLocation) => {
-    setCurrentBbox(loc.bbox);
-    setPhase("idle");
-    setAnalysisResult(null);
-  };
+  // Map viewport control
+  const [mapCenter, setMapCenter] = useState<[number, number]>([-62.905, -9.702]);
+  const [mapZoom, setMapZoom] = useState<number>(12.5);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const run = async (): Promise<void> => {
-    setPhase("running");
-    setStep(0);
-    setMessage("");
-    setAnalysisResult(null);
+  const aoiAreaKm2 = polygon && polygon.length >= 3 ? calculatePolygonAreaKm2(polygon) : 0;
+  const isOversized = aoiAreaKm2 > MAX_AOI_KM2;
 
-    const ticker = window.setInterval(() => {
-      setStep((s) => Math.min(STEPS.length - 1, s + 1));
-    }, 650);
+  // Handle Preset selection
+  const selectPreset = useCallback((preset: HotspotPreset) => {
+    setPolygon([...preset.polygon]);
+    setYearT1(preset.yearT1);
+    setYearT2(preset.yearT2);
+    setMapCenter(preset.center);
+    setMapZoom(preset.zoom);
+    setResult(null);
+    setStatus("idle");
+    setErrorMessage(null);
+    setDrawerOpen(false);
+    setSelectedFeatureId(null);
+  }, []);
+
+  // Handle Geocoding location selection
+  const handleSelectLocation = useCallback((loc: GeocodeLocation) => {
+    setMapCenter([loc.lon, loc.lat]);
+    setMapZoom(12);
+    // Construct default 4km box around target
+    const deltaLon = 0.04;
+    const deltaLat = 0.03;
+    setPolygon([
+      [loc.lon - deltaLon, loc.lat - deltaLat],
+      [loc.lon + deltaLon, loc.lat - deltaLat],
+      [loc.lon + deltaLon, loc.lat + deltaLat],
+      [loc.lon - deltaLon, loc.lat + deltaLat],
+      [loc.lon - deltaLon, loc.lat - deltaLat],
+    ]);
+    setResult(null);
+    setStatus("idle");
+  }, []);
+
+  // Stream analysis execution
+  const runAnalysis = async () => {
+    if (!polygon || polygon.length < 3 || isOversized || status === "running") return;
+
+    setStatus("running");
+    setProgress(5);
+    setStepLabel("Connecting to satellite pipeline...");
+    setErrorMessage(null);
+    setResult(null);
+    setSelectedFeatureId(null);
+
+    abortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          bbox: currentBbox,
-          dateT1,
-          dateT2,
+          polygon,
+          yearT1,
+          yearT2,
         }),
+        signal: abortController.signal,
       });
 
-      await new Promise((r) => window.setTimeout(r, STEPS.length * 600));
-
       if (!res.ok) {
-        if (res.status === 429) {
-          setMessage("Rate limit exceeded. Please wait a moment and retry.");
-        } else if (res.status === 422) {
-          const errData = await res.json().catch(() => ({}));
-          setMessage(errData.detail || "Validation error: Check that T1 precedes T2 and AOI is <= 100 km².");
-        } else {
-          setMessage("Unable to process satellite imagery for requested window.");
-        }
-        setPhase("error");
-        return;
+        throw new Error(`Server returned HTTP ${res.status}`);
       }
 
-      const data = (await res.json()) as AnalysisResult;
-      setAnalysisResult(data);
-      setPhase("done");
-    } catch {
-      setMessage("Network communication failure. Please check connection and retry.");
-      setPhase("error");
-    } finally {
-      window.clearInterval(ticker);
+      if (!res.body) {
+        throw new Error("No response stream available");
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data: ")) continue;
+          const jsonStr = trimmed.slice(6);
+
+          try {
+            const data = JSON.parse(jsonStr) as {
+              step?: number;
+              label?: string;
+              progress?: number;
+              done?: boolean;
+              result?: AnalysisResult;
+              error?: { code: string; message: string };
+            };
+
+            if (data.error) {
+              setErrorMessage(data.error.message);
+              setStatus("error");
+              return;
+            }
+
+            if (data.step && data.label && data.progress != null) {
+              setStepLabel(data.label);
+              setProgress(data.progress);
+            }
+
+            if (data.done && data.result) {
+              setResult(data.result);
+              setProgress(100);
+              setStatus("done");
+              setDrawerOpen(true);
+            }
+          } catch {
+            // Ignore incomplete chunk splits
+          }
+        }
+      }
+    } catch (err: unknown) {
+      if ((err as Error)?.name !== "AbortError") {
+        setErrorMessage(
+          err instanceof Error ? err.message : "Analysis stream interrupted",
+        );
+        setStatus("error");
+      }
     }
   };
 
-  const downloadGeoJson = (): void => {
-    if (!analysisResult) return;
-    const blob = new Blob([JSON.stringify(analysisResult, null, 2)], { type: "application/geo+json" });
+  // Export GeoJSON
+  const downloadGeoJson = () => {
+    if (!result) return;
+    const blob = new Blob([JSON.stringify(result, null, 2)], {
+      type: "application/geo+json",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `terrashift-audit-${dateT1}-to-${dateT2}.geojson`;
+    a.download = `terrashift-${yearT1}-${yearT2}.geojson`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const downloadPdfReport = async (): Promise<void> => {
-    if (!analysisResult) return;
-    setDownloadingPdf(true);
+  // Export PDF Report
+  const downloadPdfReport = async () => {
+    if (!result) return;
+    setGeneratingPdf(true);
     try {
       const res = await fetch("/api/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          metadata: analysisResult.metadata,
-          features: analysisResult.features,
+          metadata: result.metadata,
+          feature_count: result.features.length,
+          top_features: result.features.slice(0, 10).map((f) => ({
+            id: f.properties.id,
+            class_name: f.properties.class,
+            label: f.properties.label,
+            area_m2: f.properties.area_m2,
+            confidence: f.properties.confidence,
+          })),
         }),
       });
 
       if (!res.ok) throw new Error("PDF generation failed");
-
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `terrashift-executive-audit-${dateT1}-to-${dateT2}.pdf`;
+      a.download = `terrashift-audit-${result.metadata.year_t1}-${result.metadata.year_t2}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert("Unable to generate PDF report from server. Please retry.");
+      alert("Failed to generate PDF audit report. Verify ML backend service is running.");
     } finally {
-      setDownloadingPdf(false);
+      setGeneratingPdf(false);
     }
   };
 
   return (
-    <div className="grid h-dvh grid-rows-[auto_1fr] bg-ink-950">
-      {/* Top Navbar */}
-      <header className="flex items-center justify-between border-b border-bone-100/10 px-6 py-4">
-        <Link href="/" className="flex items-center gap-2 font-mono text-xs tracking-[0.24em] uppercase">
-          <span className="text-signal-400">←</span> TerraShift
-        </Link>
-        <div className="flex items-center gap-4">
-          <div className="flex rounded-full border border-bone-100/15 p-0.5 bg-ink-900 font-mono text-[11px] uppercase">
-            <button
-              type="button"
-              onClick={() => setViewMode("map")}
-              className={`rounded-full px-3 py-1 transition-colors ${
-                viewMode === "map" ? "bg-signal-400 text-ink-950 font-semibold" : "text-bone-300 hover:text-bone-100"
-              }`}
-            >
-              Interactive GIS Map
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("swipe")}
-              className={`rounded-full px-3 py-1 transition-colors ${
-                viewMode === "swipe" ? "bg-signal-400 text-ink-950 font-semibold" : "text-bone-300 hover:text-bone-100"
-              }`}
-            >
-              Bi-Temporal Swipe
-            </button>
+    <div className="relative h-screen w-screen overflow-hidden bg-ink-950 text-bone-100">
+      {/* 1. Full-bleed Map Viewport */}
+      <MapCanvas
+        yearT1={yearT1}
+        yearT2={yearT2}
+        polygon={polygon}
+        features={result?.features ?? []}
+        isDrawing={isDrawing}
+        onDrawingChange={setIsDrawing}
+        onPolygonChange={(newPoly) => {
+          setPolygon(newPoly);
+          setResult(null);
+          setStatus("idle");
+        }}
+        selectedFeatureId={selectedFeatureId}
+        onSelectFeature={(id) => {
+          setSelectedFeatureId(id);
+          if (id != null) setDrawerOpen(true);
+        }}
+        compareMode={compareMode}
+        center={mapCenter}
+        zoom={mapZoom}
+      />
+
+      {/* 2. Top Header Bar */}
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between p-4 lg:p-6">
+        {/* Brand Link */}
+        <div className="pointer-events-auto flex items-center gap-3">
+          <Link
+            href="/"
+            className="flex items-center gap-2 rounded-full border border-bone-100/15 bg-ink-950/80 px-4 py-2 font-mono text-xs tracking-widest text-bone-200 uppercase backdrop-blur transition-colors hover:border-signal-400 hover:text-signal-400"
+          >
+            <span>←</span>
+            <span>TerraShift</span>
+          </Link>
+        </div>
+
+        {/* Global Location Search & Hotspots */}
+        <div className="pointer-events-auto flex max-w-lg flex-1 items-center gap-2 px-3">
+          <div className="w-full">
+            <LocationSearch onSelectLocation={handleSelectLocation} />
           </div>
-          <span className="hidden font-mono text-[10px] tracking-widest text-ink-400 uppercase sm:inline">
-            Zero-Key Open Geospatial Engine
-          </span>
+        </div>
+
+        {/* Compare & Preset Toolbar */}
+        <div className="pointer-events-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setCompareMode(!compareMode)}
+            className={`flex items-center gap-2 rounded-full border px-4 py-2 font-mono text-xs tracking-wider uppercase backdrop-blur transition-all ${
+              compareMode
+                ? "border-signal-400 bg-signal-400 text-ink-950 font-bold shadow-[0_0_20px_rgba(255,176,32,0.4)]"
+                : "border-bone-100/15 bg-ink-950/80 text-bone-200 hover:border-bone-100/40"
+            }`}
+          >
+            <span>⇄</span>
+            <span>Swipe Mode</span>
+          </button>
         </div>
       </header>
 
-      {/* Main 3-Column Studio */}
-      <div className="grid min-h-0 gap-px overflow-y-auto bg-bone-100/10 lg:grid-cols-[340px_1fr_360px] lg:overflow-hidden">
-        {/* Left Column: Acquisition & Controls */}
-        <aside className="space-y-6 bg-ink-950 p-6 lg:overflow-y-auto" aria-label="Controls">
-          <div>
-            <label className="mb-2 block font-mono text-[11px] tracking-widest text-signal-400 uppercase">
-              Global Location Search
-            </label>
-            <LocationSearch onSelectLocation={handleSelectLocation} />
-          </div>
-
-          <fieldset>
-            <legend className="mb-3 font-mono text-[11px] tracking-widest text-bone-300 uppercase">
-              Curated Sentinel-2 Presets
-            </legend>
-            <div className="space-y-2">
-              {PRESETS.map((p) => (
-                <label
-                  key={p.id}
-                  className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2.5 transition-colors ${
-                    preset.id === p.id && currentBbox[0] === p.bbox[0]
-                      ? "border-signal-400 bg-signal-400/10"
-                      : "border-bone-100/10 hover:border-bone-100/30"
-                  }`}
-                >
-                  <span>
-                    <span className="block text-xs font-medium">{p.name}</span>
-                    <span className="font-mono text-[10px] text-ink-400">{p.region}</span>
-                  </span>
-                  <input
-                    type="radio"
-                    name={`${uid}-aoi`}
-                    className="size-3.5 accent-signal-400"
-                    checked={preset.id === p.id && currentBbox[0] === p.bbox[0]}
-                    onChange={() => {
-                      setPreset(p);
-                      setCurrentBbox([p.bbox[0], p.bbox[1], p.bbox[2], p.bbox[3]]);
-                      setPhase("idle");
-                      setAnalysisResult(null);
-                    }}
-                  />
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor={`${uid}-t1`} className="mb-1.5 block font-mono text-[10px] tracking-widest text-ink-400 uppercase">
-                Date T₁ (Baseline)
-              </label>
-              <input id={`${uid}-t1`} type="date" value={dateT1} onChange={(e) => setDateT1(e.target.value)} className={FIELD} />
-            </div>
-            <div>
-              <label htmlFor={`${uid}-t2`} className="mb-1.5 block font-mono text-[10px] tracking-widest text-ink-400 uppercase">
-                Date T₂ (Comparison)
-              </label>
-              <input id={`${uid}-t2`} type="date" value={dateT2} onChange={(e) => setDateT2(e.target.value)} className={FIELD} />
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => void run()}
-            disabled={phase === "running"}
-            className="w-full rounded-full bg-signal-400 px-6 py-4 font-mono text-xs tracking-widest text-ink-950 uppercase transition-transform hover:scale-[1.02] active:scale-95 disabled:cursor-wait disabled:opacity-60 font-semibold"
-          >
-            {phase === "running" ? "Running STAC & Siamese Model…" : done ? "Re-run Analysis" : "Run Change Analysis"}
-          </button>
-
-          {/* Staged pipeline feedback */}
-          <ol aria-live="polite" className="space-y-1.5 font-mono text-[11px] tracking-wide">
-            {STEPS.map((label, i) => {
-              const state =
-                phase === "done" || (phase === "running" && i < step)
-                  ? "done"
-                  : phase === "running" && i === step
-                    ? "active"
-                    : "wait";
-              return (
-                <li
-                  key={label}
-                  className={`flex items-center gap-2 ${
-                    state === "wait" ? "text-ink-400" : state === "active" ? "text-signal-400" : "text-lagoon-400"
-                  }`}
-                >
-                  <span>{state === "done" ? "✓" : state === "active" ? "›" : "·"}</span>
-                  <span className="truncate">{label}</span>
-                </li>
-              );
-            })}
-          </ol>
-
-          {phase === "error" && (
-            <p role="alert" className="rounded-lg border border-[#FF5240]/50 bg-[#FF5240]/10 p-3 text-xs text-[#FF8A7A]">
-              {message}
-            </p>
-          )}
-        </aside>
-
-        {/* Center Column: GIS Viewer */}
-        <main className="relative flex size-full items-center justify-center bg-ink-950 p-4">
-          {viewMode === "map" ? (
-            <MapCanvas
-              bbox={currentBbox}
-              features={analysisResult ? analysisResult.features : []}
-              onBboxChange={(b) => {
-                setCurrentBbox(b);
-                setPhase("idle");
-                setAnalysisResult(null);
-              }}
-              onSelectPolygon={(id) => setSelectedPolygonId(id)}
-              selectedPolygonId={selectedPolygonId}
-            />
-          ) : (
-            <SwipeCompare seed={preset.seed} dateT1={dateT1} dateT2={dateT2} showChange={showChange && done} />
-          )}
-        </main>
-
-        {/* Right Column: Quantitative Quantification & Audit Report */}
-        <aside className="space-y-6 bg-ink-950 p-6 lg:overflow-y-auto" aria-label="Results">
-          <p className="font-mono text-[11px] tracking-widest text-signal-400 uppercase">Quantification & Audit</p>
-
-          {done && analysisResult ? (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: motionTokens.base, ease: motionTokens.easeOutExpo }}
-              className="space-y-6"
+      {/* 3. Hotspot Preset Pills */}
+      <div className="pointer-events-none absolute top-20 inset-x-0 z-10 hidden justify-center md:flex">
+        <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-bone-100/10 bg-ink-950/80 p-1 backdrop-blur">
+          <span className="px-3 py-1 font-mono text-[10px] tracking-widest text-bone-400 uppercase">
+            Hotspots:
+          </span>
+          {HOTSPOT_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => selectPreset(p)}
+              className="rounded-full px-3 py-1 font-mono text-[11px] text-bone-300 transition-colors hover:bg-bone-100/10 hover:text-signal-400"
             >
-              <div>
-                <p className="font-display text-6xl leading-none">
-                  {analysisResult.metadata.total_changed_km2.toFixed(3)}
-                  <span className="ms-2 text-xl text-ink-400">km²</span>
-                </p>
-                <p className="mt-1 font-mono text-xs text-bone-300">
-                  {analysisResult.metadata.total_changed_m2.toLocaleString()} m² confirmed physical ground shift
-                </p>
-              </div>
-
-              {/* Polygon Inventory */}
-              <div>
-                <h3 className="mb-2 font-mono text-[10px] tracking-widest uppercase text-ink-400">
-                  Detected Polygons ({analysisResult.features.length})
-                </h3>
-                <ul className="max-h-56 divide-y divide-bone-100/10 overflow-y-auto rounded-lg border border-bone-100/10 bg-ink-900/40 p-1">
-                  {analysisResult.features.map((f) => (
-                    <li
-                      key={f.properties.id}
-                      onClick={() => setSelectedPolygonId(f.properties.id)}
-                      className={`flex cursor-pointer items-center justify-between p-2.5 text-xs rounded transition-colors ${
-                        selectedPolygonId === f.properties.id
-                          ? "bg-signal-400/20 text-signal-400"
-                          : "hover:bg-ink-800"
-                      }`}
-                    >
-                      <span>
-                        <span className="me-2 font-mono text-[10px] text-signal-400">#{f.properties.id}</span>
-                        {f.properties.label}
-                      </span>
-                      <span className="text-end font-mono text-[11px]">
-                        {(f.properties.area_m2 / 10000.0).toFixed(2)} ha
-                        <span className="block text-[10px] text-ink-400">
-                          {Math.round(f.properties.confidence * 100)}% conf
-                        </span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Data Provenance & Cloud Specs */}
-              <dl className="space-y-1.5 rounded-lg border border-bone-100/10 bg-ink-900/60 p-3 font-mono text-[10px] text-ink-400">
-                <div className="flex justify-between">
-                  <dt>Cloud T₁ / T₂:</dt>
-                  <dd className="text-bone-100">{analysisResult.cloud_fraction_t1}% / {analysisResult.cloud_fraction_t2}% (Passed)</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt>Data Provider:</dt>
-                  <dd className="text-bone-100">Copernicus Sentinel-2 L2A</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt>Engine:</dt>
-                  <dd className="text-signal-400 truncate max-w-[170px]">{analysisResult.provenance}</dd>
-                </div>
-              </dl>
-
-              {/* Export Buttons */}
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={downloadPdfReport}
-                  disabled={downloadingPdf}
-                  className="w-full rounded-full border border-signal-400 bg-signal-400/10 px-4 py-3 font-mono text-xs tracking-wider text-signal-400 uppercase transition-colors hover:bg-signal-400 hover:text-ink-950 disabled:opacity-50"
-                >
-                  {downloadingPdf ? "Generating PDF…" : "Download Audit Report (PDF)"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={downloadGeoJson}
-                  className="w-full rounded-full border border-bone-100/20 px-4 py-3 font-mono text-xs tracking-wider uppercase transition-colors hover:border-bone-100 hover:text-bone-100"
-                >
-                  Download GeoJSON (RFC 7946)
-                </button>
-              </div>
-            </motion.div>
-          ) : (
-            <div className="rounded-lg border border-bone-100/10 bg-ink-900/40 p-4 text-xs leading-relaxed text-bone-300">
-              <p className="mb-2 font-medium text-bone-100">Ready for Global Analysis</p>
-              <p>
-                1. Search any coordinates globally or choose a preset.
-                <br />
-                2. Use the <strong className="text-signal-400">Draw custom AOI</strong> tool to bound your area.
-                <br />
-                3. Click <strong className="text-signal-400">Run Change Analysis</strong> to trigger the Sentinel-2 STAC
-                cloud-filtered Siamese pipeline.
-              </p>
-            </div>
-          )}
-        </aside>
+              {p.name.split(" ")[0]}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* 4. Bottom Floating Control Dock */}
+      <div className="pointer-events-none absolute bottom-8 inset-x-0 z-20 flex justify-center px-4">
+        <div className="pointer-events-auto flex max-w-3xl flex-col items-center gap-3">
+          {/* Error Notice */}
+          <AnimatePresence>
+            {errorMessage ? (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                className="flex items-center gap-2 rounded-full border border-alert-500/80 bg-alert-500/20 px-4 py-2 font-mono text-xs text-alert-400 shadow-xl backdrop-blur-md"
+              >
+                <span>⚠️</span>
+                <span>{errorMessage}</span>
+                <button
+                  type="button"
+                  onClick={() => setErrorMessage(null)}
+                  className="ms-2 underline hover:text-bone-100"
+                >
+                  Dismiss
+                </button>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+
+          {/* Main Control Pill */}
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-bone-100/15 bg-ink-950/90 p-2 shadow-2xl backdrop-blur-xl">
+            {/* Year T1 */}
+            <div className="flex items-center gap-1 px-2">
+              <span className="font-mono text-[10px] tracking-widest text-bone-400 uppercase">
+                T₁
+              </span>
+              <select
+                aria-label="Year T1 baseline"
+                value={yearT1}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setYearT1(val);
+                  if (val >= yearT2) setYearT2(val + 1);
+                }}
+                disabled={status === "running"}
+                className="rounded-lg border border-bone-100/15 bg-ink-900 px-2.5 py-1.5 font-mono text-xs text-bone-100 focus:border-signal-400 focus:outline-none"
+              >
+                {[2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024].map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <span className="font-mono text-xs text-bone-400">→</span>
+
+            {/* Year T2 */}
+            <div className="flex items-center gap-1 px-2">
+              <span className="font-mono text-[10px] tracking-widest text-signal-400 uppercase">
+                T₂
+              </span>
+              <select
+                aria-label="Year T2 target"
+                value={yearT2}
+                onChange={(e) => setYearT2(Number(e.target.value))}
+                disabled={status === "running"}
+                className="rounded-lg border border-bone-100/15 bg-ink-900 px-2.5 py-1.5 font-mono text-xs text-signal-400 focus:border-signal-400 focus:outline-none"
+              >
+                {[2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
+                  .filter((y) => y > yearT1)
+                  .map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div className="h-6 w-px bg-bone-100/15" />
+
+            {/* Draw Polygon Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsDrawing(!isDrawing)}
+              disabled={status === "running"}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 font-mono text-xs tracking-wider uppercase transition-all ${
+                isDrawing
+                  ? "border border-signal-400 bg-signal-400 text-ink-950 font-bold"
+                  : "border border-bone-100/15 bg-ink-900/60 text-bone-200 hover:border-signal-400/50 hover:text-signal-400"
+              }`}
+            >
+              <span>✏️</span>
+              <span>{isDrawing ? "Click points on map" : "Draw AOI"}</span>
+            </button>
+
+            {/* Area Badge & Clear */}
+            {polygon ? (
+              <div className="flex items-center gap-2 px-2">
+                <span
+                  className={`font-mono text-xs ${
+                    isOversized ? "text-alert-400 font-bold" : "text-bone-300"
+                  }`}
+                >
+                  {formatArea(aoiAreaKm2 * 1_000_000)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPolygon(null);
+                    setResult(null);
+                    setStatus("idle");
+                  }}
+                  className="text-xs text-bone-400 hover:text-alert-400"
+                  title="Clear AOI polygon"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : null}
+
+            <div className="h-6 w-px bg-bone-100/15" />
+
+            {/* Run Analysis CTA / Telemetry Morph */}
+            {status === "running" ? (
+              <div className="flex min-w-[260px] flex-col gap-1.5 px-3 py-1">
+                <div className="flex items-center justify-between font-mono text-[11px]">
+                  <span className="text-signal-400 truncate max-w-[200px]">{stepLabel}</span>
+                  <span className="text-bone-300">{progress}%</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-ink-800">
+                  <div
+                    className="h-full bg-signal-400 transition-all duration-300 ease-out shadow-[0_0_12px_rgba(255,176,32,0.8)]"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={runAnalysis}
+                disabled={!polygon || polygon.length < 3 || isOversized}
+                className={`flex items-center gap-2 rounded-xl px-6 py-2.5 font-mono text-xs tracking-widest uppercase transition-all ${
+                  !polygon || polygon.length < 3 || isOversized
+                    ? "cursor-not-allowed bg-ink-800 text-bone-400"
+                    : "bg-signal-400 text-ink-950 font-bold hover:scale-[1.02] active:scale-95 shadow-[0_0_24px_rgba(255,176,32,0.4)]"
+                }`}
+              >
+                <span>⚡</span>
+                <span>Detect Change</span>
+              </button>
+            )}
+
+            {/* Results Drawer Toggle Button (if result exists) */}
+            {result ? (
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(!drawerOpen)}
+                className="rounded-xl border border-bone-100/15 bg-ink-900 px-3 py-2 font-mono text-xs text-signal-400 hover:border-signal-400"
+              >
+                {drawerOpen ? "Hide Metrics" : "View Metrics"}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {/* 5. Results Slide-out Drawer */}
+      <AnimatePresence>
+        {drawerOpen && result ? (
+          <motion.aside
+            initial={{ opacity: 0, x: 380 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 380 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute top-0 end-0 z-30 h-full w-full max-w-md border-s border-bone-100/10 bg-ink-950/95 p-6 shadow-2xl backdrop-blur-2xl overflow-y-auto"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-bone-100/10 pb-4">
+              <div>
+                <span className="font-mono text-[10px] tracking-widest text-signal-400 uppercase">
+                  Bi-Temporal Audit Report
+                </span>
+                <h2 className="font-display text-2xl text-bone-100">
+                  {result.metadata.year_t1} → {result.metadata.year_t2}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                className="rounded-full border border-bone-100/10 p-2 text-bone-400 hover:border-bone-100/30 hover:text-bone-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Key KPI Stats */}
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-bone-100/10 bg-ink-900/60 p-4">
+                <span className="font-mono text-[10px] tracking-wider text-bone-400 uppercase">
+                  Total Changed
+                </span>
+                <p className="mt-1 font-display text-2xl text-signal-400">
+                  {formatArea(result.metadata.total_changed_m2)}
+                </p>
+                <span className="font-mono text-[10px] text-bone-300">
+                  {result.metadata.changed_pct}% of total AOI
+                </span>
+              </div>
+
+              <div className="rounded-xl border border-bone-100/10 bg-ink-900/60 p-4">
+                <span className="font-mono text-[10px] tracking-wider text-bone-400 uppercase">
+                  Polygons Detected
+                </span>
+                <p className="mt-1 font-display text-2xl text-bone-100">
+                  {result.metadata.polygon_count}
+                </p>
+                <span className="font-mono text-[10px] text-bone-300">
+                  AOI: {result.metadata.aoi_km2.toFixed(1)} km²
+                </span>
+              </div>
+            </div>
+
+            {/* Change Categories Breakdown */}
+            <div className="mt-6">
+              <h3 className="font-mono text-xs tracking-widest text-bone-400 uppercase">
+                Change Class Distribution
+              </h3>
+              <div className="mt-3 space-y-2">
+                {[
+                  {
+                    key: "vegetation_loss",
+                    label: "Vegetation Loss / Clearing",
+                    color: "bg-[#FF5240]",
+                  },
+                  {
+                    key: "new_built_or_bare",
+                    label: "New Built / Soil Exposure",
+                    color: "bg-[#FFB020]",
+                  },
+                  {
+                    key: "surface_change",
+                    label: "Surface / Hydrology Shift",
+                    color: "bg-[#3DD6C3]",
+                  },
+                ].map(({ key, label, color }) => {
+                  const matching = result.features.filter(
+                    (f) => f.properties.class.includes(key) || f.properties.class === key,
+                  );
+                  const count = matching.length;
+                  const totalArea = matching.reduce((acc, f) => acc + f.properties.area_m2, 0);
+                  if (count === 0) return null;
+
+                  return (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between rounded-lg border border-bone-100/5 bg-ink-900/40 p-3"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className={`size-2.5 rounded-full ${color}`} />
+                        <span className="text-xs text-bone-200">{label}</span>
+                      </div>
+                      <div className="text-right font-mono text-xs">
+                        <span className="text-bone-100 font-medium">{formatArea(totalArea)}</span>
+                        <span className="ms-2 text-bone-400">({count})</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Individual Feature Inspector */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between">
+                <h3 className="font-mono text-xs tracking-widest text-bone-400 uppercase">
+                  Top Changed Polygons
+                </h3>
+                <span className="font-mono text-[10px] text-bone-400">Click to fly to</span>
+              </div>
+              <div className="mt-3 max-h-60 space-y-1.5 overflow-y-auto pe-1">
+                {result.features.slice(0, 15).map((f) => (
+                  <button
+                    key={f.properties.id}
+                    type="button"
+                    onClick={() => setSelectedFeatureId(f.properties.id)}
+                    className={`w-full flex items-center justify-between rounded-lg p-2.5 text-start transition-colors ${
+                      selectedFeatureId === f.properties.id
+                        ? "border border-signal-400/80 bg-signal-400/15"
+                        : "border border-bone-100/5 bg-ink-900/30 hover:bg-bone-100/10"
+                    }`}
+                  >
+                    <div>
+                      <span className="block text-xs font-medium text-bone-200">
+                        Polygon #{f.properties.id} · {f.properties.label}
+                      </span>
+                      <span className="font-mono text-[10px] text-bone-400">
+                        Confidence: {(f.properties.confidence * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <span className="font-mono text-xs text-signal-400 font-medium">
+                      {formatArea(f.properties.area_m2)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Export Actions */}
+            <div className="mt-8 space-y-2.5 border-t border-bone-100/10 pt-6">
+              <button
+                type="button"
+                onClick={downloadPdfReport}
+                disabled={generatingPdf}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-signal-400 py-3 font-mono text-xs font-bold tracking-widest text-ink-950 uppercase transition-transform hover:scale-[1.01] active:scale-95 shadow-[0_0_20px_rgba(255,176,32,0.3)] disabled:opacity-50"
+              >
+                <span>📄</span>
+                <span>{generatingPdf ? "Compiling PDF..." : "Download Official Audit PDF"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={downloadGeoJson}
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-bone-100/20 bg-ink-900 py-3 font-mono text-xs tracking-widest text-bone-200 uppercase transition-colors hover:border-signal-400 hover:text-signal-400"
+              >
+                <span>🗺️</span>
+                <span>Download GeoJSON Polygons</span>
+              </button>
+            </div>
+          </motion.aside>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
