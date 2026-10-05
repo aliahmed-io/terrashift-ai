@@ -44,47 +44,79 @@ interface MapCanvasProps {
 }
 
 function buildMapStyle(year: number): maplibregl.StyleSpecification {
-  return {
-    version: 8,
-    sources: {
-      "carto-dark": {
-        type: "raster",
-        tiles: [
-          "https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
-          "https://b.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
-          "https://c.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
-        ],
-        tileSize: 256,
-        attribution: "CartoDB Dark Matter",
-      },
-      "s2-cloudless": {
-        type: "raster",
-        tiles: [getEoxTileUrl(year)],
-        tileSize: 256,
-        maxzoom: 14,
-        attribution: "Sentinel-2 cloudless by EOX IT Services GmbH",
+  const mapboxToken = process.env["NEXT_PUBLIC_MAPBOX_TOKEN"];
+  const sources: maplibregl.StyleSpecification["sources"] = {
+    "carto-dark": {
+      type: "raster",
+      tiles: [
+        "https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
+        "https://b.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
+        "https://c.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+      attribution: "CartoDB Dark Matter",
+    },
+    "s2-cloudless": {
+      type: "raster",
+      tiles: [getEoxTileUrl(year)],
+      tileSize: 256,
+      maxzoom: 14,
+      attribution: "Sentinel-2 cloudless by EOX IT Services GmbH",
+    },
+  };
+
+  const layers: maplibregl.StyleSpecification["layers"] = [
+    {
+      id: "carto-base",
+      type: "raster",
+      source: "carto-dark",
+      minzoom: 0,
+      maxzoom: 20,
+    },
+    {
+      id: "s2-layer",
+      type: "raster",
+      source: "s2-cloudless",
+      minzoom: 4,
+      maxzoom: 14,
+      paint: {
+        "raster-opacity": 0.95,
+        "raster-fade-duration": 300,
       },
     },
-    layers: [
-      {
-        id: "carto-base",
-        type: "raster",
-        source: "carto-dark",
-        minzoom: 0,
-        maxzoom: 20,
+  ];
+
+  if (mapboxToken) {
+    sources["mapbox-satellite"] = {
+      type: "raster",
+      tiles: [
+        `https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.png?access_token=${mapboxToken}`,
+      ],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: "© Mapbox © OpenStreetMap",
+    };
+
+    layers.push({
+      id: "mapbox-layer",
+      type: "raster",
+      source: "mapbox-satellite",
+      minzoom: 0,
+      maxzoom: 19,
+      layout: {
+        visibility: "none",
       },
-      {
-        id: "s2-layer",
-        type: "raster",
-        source: "s2-cloudless",
-        minzoom: 4,
-        maxzoom: 14,
-        paint: {
-          "raster-opacity": 0.95,
-          "raster-fade-duration": 300,
-        },
+      paint: {
+        "raster-opacity": 0.95,
+        "raster-fade-duration": 300,
       },
-    ],
+    });
+  }
+
+  return {
+    version: 8,
+    sources,
+    layers,
   };
 }
 
@@ -111,7 +143,25 @@ export function MapCanvas({
   const [activeVertices, setActiveVertices] = useState<[number, number][]>([]);
   const [cursorPos, setCursorPos] = useState<[number, number] | null>(null);
   const [sliderPos, setSliderPos] = useState(50); // percentage for compare mode
+  const [basemapSource, setBasemapSource] = useState<"s2" | "mapbox">("s2");
   const isDraggingSlider = useRef(false);
+
+  const toggleBasemap = (source: "s2" | "mapbox") => {
+    setBasemapSource(source);
+    const map = mapRef.current;
+    if (map && map.isStyleLoaded()) {
+      if (map.getLayer("s2-layer")) {
+        map.setLayoutProperty("s2-layer", "visibility", source === "s2" ? "visible" : "none");
+      }
+      if (map.getLayer("mapbox-layer")) {
+        map.setLayoutProperty(
+          "mapbox-layer",
+          "visibility",
+          source === "mapbox" ? "visible" : "none",
+        );
+      }
+    }
+  };
 
   // Sync maps during compare mode
   const syncMaps = useCallback((source: maplibregl.Map, target: maplibregl.Map) => {
@@ -659,9 +709,39 @@ export function MapCanvas({
 
       {/* Subtle Satellite Imagery Attribution Badge */}
       <div className="pointer-events-none absolute bottom-3 start-4 z-10 flex items-center gap-2 rounded-full border border-bone-100/10 bg-ink-950/80 px-3 py-1 font-mono text-[10px] tracking-wider text-bone-400 uppercase backdrop-blur">
-        <span>Sentinel-2 Cloudless {compareMode ? `${yearT1} vs ${yearT2}` : yearT2}</span>
+        <span>
+          {basemapSource === "mapbox"
+            ? "Mapbox Satellite Streets (High-Res Aerial)"
+            : `Sentinel-2 Cloudless ${compareMode ? `${yearT1} vs ${yearT2}` : yearT2}`}
+        </span>
         <span>·</span>
-        <span>EOX IT Services</span>
+        <span>{basemapSource === "mapbox" ? "© Mapbox" : "EOX IT Services"}</span>
+      </div>
+
+      {/* Basemap Source Switcher (Sentinel-2 vs Mapbox High-Res) */}
+      <div className="absolute bottom-3 end-14 z-10 hidden sm:flex items-center gap-1 rounded-full border border-bone-100/15 bg-ink-950/90 p-1 backdrop-blur shadow-xl">
+        <button
+          type="button"
+          onClick={() => toggleBasemap("s2")}
+          className={`rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors ${
+            basemapSource === "s2"
+              ? "bg-signal-400 font-bold text-ink-950"
+              : "text-bone-400 hover:text-bone-100"
+          }`}
+        >
+          Sentinel-2
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleBasemap("mapbox")}
+          className={`rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors ${
+            basemapSource === "mapbox"
+              ? "bg-signal-400 font-bold text-ink-950"
+              : "text-bone-400 hover:text-bone-100"
+          }`}
+        >
+          Mapbox High-Res
+        </button>
       </div>
     </div>
   );

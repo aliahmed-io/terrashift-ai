@@ -97,6 +97,16 @@ export function getEoxTileUrl(year: number): string {
   return `https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-${y}_3857/default/g/{z}/{y}/{x}.jpg`;
 }
 
+export function getMapboxStyleUrl(token?: string): string {
+  const t = token || process.env["NEXT_PUBLIC_MAPBOX_TOKEN"] || "";
+  return `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12?access_token=${t}`;
+}
+
+export function getMapboxTileUrl(token?: string): string {
+  const t = token || process.env["NEXT_PUBLIC_MAPBOX_TOKEN"] || "";
+  return `https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.png?access_token=${t}`;
+}
+
 /**
  * Calculates geodesic area of a polygon on Earth (WGS84 spherical approximation) in square meters.
  * Ring should be [[lon, lat], ...] coordinates.
