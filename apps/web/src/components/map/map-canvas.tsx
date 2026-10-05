@@ -71,7 +71,7 @@ function buildMapStyle(year: number): maplibregl.StyleSpecification {
       type: "raster",
       source: "carto-dark",
       minzoom: 0,
-      maxzoom: 20,
+      maxzoom: 22,
     },
     {
       id: "s2-layer",
@@ -142,9 +142,10 @@ export function MapCanvas({
   // Drawing state
   const [activeVertices, setActiveVertices] = useState<[number, number][]>([]);
   const [cursorPos, setCursorPos] = useState<[number, number] | null>(null);
-  const [sliderPos, setSliderPos] = useState(50); // percentage for compare mode
   const [basemapSource, setBasemapSource] = useState<"s2" | "mapbox">("s2");
-  const isDraggingSlider = useRef(false);
+
+  const activeVerticesRef = useRef<[number, number][]>([]);
+  activeVerticesRef.current = activeVertices;
 
   const toggleBasemap = (source: "s2" | "mapbox") => {
     setBasemapSource(source);
@@ -163,7 +164,7 @@ export function MapCanvas({
     }
   };
 
-  // Sync maps during compare mode
+  // Sync dual maps during compare mode
   const syncMaps = useCallback((source: maplibregl.Map, target: maplibregl.Map) => {
     let active = false;
     const onMove = () => {
@@ -172,8 +173,8 @@ export function MapCanvas({
       target.jumpTo({
         center: source.getCenter(),
         zoom: source.getZoom(),
-        bearing: source.getBearing(),
-        pitch: source.getPitch(),
+        bearing: 0,
+        pitch: 0,
       });
       active = false;
     };
@@ -183,7 +184,7 @@ export function MapCanvas({
     };
   }, []);
 
-  // Initialize Primary Map (Year T2 or base)
+  // Initialize Primary Map (Year T2 or main)
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -196,12 +197,16 @@ export function MapCanvas({
       maxZoom: 21,
       scrollZoom: true,
       dragPan: true,
+      dragRotate: false,
+      pitchWithRotate: false,
+      touchPitch: false,
+      maxPitch: 0,
       doubleClickZoom: false,
       attributionControl: false,
     });
 
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
-    map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
     map.on("load", () => {
       // 1. AOI polygon source & layers
@@ -369,6 +374,7 @@ export function MapCanvas({
         compareMapRef.current.remove();
         compareMapRef.current = null;
       }
+      setTimeout(() => mapRef.current?.resize(), 60);
       return;
     }
 
@@ -386,8 +392,50 @@ export function MapCanvas({
       maxZoom: 21,
       scrollZoom: true,
       dragPan: true,
+      dragRotate: false,
+      pitchWithRotate: false,
+      touchPitch: false,
+      maxPitch: 0,
       doubleClickZoom: false,
       attributionControl: false,
+    });
+
+    compareMap.on("load", () => {
+      if (polygon && polygon.length >= 3) {
+        compareMap.addSource("compare-aoi-source", {
+          type: "geojson",
+          data: {
+            type: "FeatureCollection",
+            features: [
+              {
+                type: "Feature",
+                geometry: {
+                  type: "Polygon",
+                  coordinates: [
+                    polygon[0]?.[0] === polygon[polygon.length - 1]?.[0] &&
+                    polygon[0]?.[1] === polygon[polygon.length - 1]?.[1]
+                      ? polygon
+                      : [...polygon, polygon[0] ?? [0, 0]],
+                  ],
+                },
+                properties: {},
+              },
+            ],
+          },
+        });
+        compareMap.addLayer({
+          id: "compare-aoi-fill",
+          type: "fill",
+          source: "compare-aoi-source",
+          paint: { "fill-color": "#FFB020", "fill-opacity": 0.12 },
+        });
+        compareMap.addLayer({
+          id: "compare-aoi-stroke",
+          type: "line",
+          source: "compare-aoi-source",
+          paint: { "line-color": "#FFB020", "line-width": 2, "line-dasharray": [4, 2] },
+        });
+      }
     });
 
     compareMapRef.current = compareMap;
@@ -395,13 +443,18 @@ export function MapCanvas({
     const cleanSync1 = syncMaps(mapRef.current, compareMap);
     const cleanSync2 = syncMaps(compareMap, mapRef.current);
 
+    setTimeout(() => {
+      mapRef.current?.resize();
+      compareMap.resize();
+    }, 60);
+
     return () => {
       cleanSync1();
       cleanSync2();
       compareMap.remove();
       compareMapRef.current = null;
     };
-  }, [compareMode, yearT1, syncMaps]);
+  }, [compareMode, yearT1, syncMaps, polygon]);
 
   // Update Raster Tile Year when yearT2 changes on primary map
   useEffect(() => {
@@ -472,9 +525,6 @@ export function MapCanvas({
       map.flyTo({ center: [centerLon, centerLat], zoom: 14, duration: 1000 });
     }
   }, [selectedFeatureId, features]);
-
-  const activeVerticesRef = useRef<[number, number][]>([]);
-  activeVerticesRef.current = activeVertices;
 
   // Multi-vertex drawing mouse/keyboard events
   useEffect(() => {
@@ -614,72 +664,36 @@ export function MapCanvas({
     currentDrawPoints.length >= 3 ? calculatePolygonAreaKm2(currentDrawPoints) : 0;
   const isAreaOversized = liveAreaKm2 > MAX_AOI_KM2;
 
-  // Swipe slider move handlers
-  const handleSliderMove = useCallback((clientX: number) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    if (rect.width <= 0) return;
-    const percent = Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100));
-    setSliderPos((prev) => (Math.abs(prev - percent) > 0.05 ? percent : prev));
-  }, []);
-
   return (
     <div
       tabIndex={0}
       onKeyDown={handleKeyDown}
       className="relative size-full overflow-hidden bg-ink-950 select-none outline-none"
     >
-      {/* Primary Map (T2 or Main) */}
-      <div ref={containerRef} className="absolute inset-0 size-full" />
-
-      {/* Compare Map (T1) with horizontal swipe clip-path */}
+      {/* Map Viewports: Single or Side-by-Side Dual Synchronized Mode */}
       {compareMode ? (
-        <div
-          ref={compareContainerRef}
-          className="pointer-events-none absolute inset-0 size-full"
-          style={{ clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}
-        />
-      ) : null}
-
-      {/* Split Slider Handle for Compare Mode */}
-      {compareMode ? (
-        <div
-          role="slider"
-          aria-label="Satellite temporal swipe slider"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={sliderPos}
-          tabIndex={0}
-          onPointerDown={(e) => {
-            isDraggingSlider.current = true;
-            e.currentTarget.setPointerCapture(e.pointerId);
-          }}
-          onPointerMove={(e) => {
-            if (isDraggingSlider.current) handleSliderMove(e.clientX);
-          }}
-          onPointerUp={() => {
-            isDraggingSlider.current = false;
-          }}
-          className="absolute inset-y-0 z-20 w-1 cursor-ew-resize bg-signal-400 touch-none shadow-[0_0_20px_rgba(255,176,32,0.8)]"
-          style={{ left: `${sliderPos}%` }}
-        >
-          <div className="absolute top-1/2 -ms-4 grid size-8 -translate-y-1/2 place-items-center rounded-full border border-signal-400 bg-ink-950/90 text-signal-400 backdrop-blur">
-            <span className="font-mono text-[9px] tracking-tighter">T₁|T₂</span>
+        <div className="absolute inset-0 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-bone-100/15">
+          {/* Left Viewport: T1 Baseline */}
+          <div className="relative size-full overflow-hidden">
+            <div ref={compareContainerRef} className="size-full" />
+            <div className="pointer-events-none absolute top-4 start-4 z-10 flex items-center gap-2 rounded-full border border-bone-100/20 bg-ink-950/90 px-3.5 py-1.5 font-mono text-[11px] tracking-wider text-bone-200 uppercase backdrop-blur shadow-xl">
+              <span className="size-2 rounded-full bg-bone-400" />
+              <span>T₁ Baseline · {yearT1}</span>
+            </div>
           </div>
 
-          <div className="pointer-events-none absolute top-4 -translate-x-full pr-3">
-            <span className="rounded-full border border-bone-100/10 bg-ink-950/80 px-2.5 py-1 font-mono text-[10px] tracking-widest text-bone-200 uppercase backdrop-blur">
-              {yearT1} Baseline
-            </span>
-          </div>
-
-          <div className="pointer-events-none absolute top-4 translate-x-full pl-3">
-            <span className="rounded-full border border-signal-400/30 bg-ink-950/80 px-2.5 py-1 font-mono text-[10px] tracking-widest text-signal-400 uppercase backdrop-blur">
-              {yearT2} Target
-            </span>
+          {/* Right Viewport: T2 Target with Change Overlays */}
+          <div className="relative size-full overflow-hidden">
+            <div ref={containerRef} className="size-full" />
+            <div className="pointer-events-none absolute top-4 start-4 z-10 flex items-center gap-2 rounded-full border border-signal-400/40 bg-ink-950/90 px-3.5 py-1.5 font-mono text-[11px] tracking-wider text-signal-400 uppercase backdrop-blur shadow-xl">
+              <span className="size-2 rounded-full bg-signal-400 animate-pulse" />
+              <span>T₂ Target · {yearT2} · Detected Change</span>
+            </div>
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div ref={containerRef} className="absolute inset-0 size-full" />
+      )}
 
       {/* Live Polygon Drawing HUD Badge */}
       {isDrawing ? (
@@ -723,7 +737,7 @@ export function MapCanvas({
         </div>
       ) : null}
 
-      {/* Subtle Satellite Imagery Attribution Badge */}
+      {/* Satellite Imagery Attribution Badge */}
       <div className="pointer-events-none absolute bottom-3 start-4 z-10 flex items-center gap-2 rounded-full border border-bone-100/10 bg-ink-950/80 px-3 py-1 font-mono text-[10px] tracking-wider text-bone-400 uppercase backdrop-blur">
         <span>
           {basemapSource === "mapbox"
@@ -734,7 +748,7 @@ export function MapCanvas({
         <span>{basemapSource === "mapbox" ? "© Mapbox" : "EOX IT Services"}</span>
       </div>
 
-      {/* Basemap Source Switcher (Sentinel-2 vs Mapbox High-Res) */}
+      {/* Basemap Switcher */}
       <div className="absolute bottom-3 end-14 z-10 hidden sm:flex items-center gap-1 rounded-full border border-bone-100/15 bg-ink-950/90 p-1 backdrop-blur shadow-xl">
         <button
           type="button"

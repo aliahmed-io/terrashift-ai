@@ -113,3 +113,22 @@ def export_report(req: ReportRequest) -> Response:
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=terrashift-audit-report.pdf"},
     )
+
+
+@app.get("/v1/model/weights")
+def download_model_weights() -> Response:
+    """Download the trained PyTorch Siamese U-Net checkpoint (.pt)."""
+    import os
+    ckpt_path = os.path.join(
+        os.path.dirname(__file__), "..", "models", "siamese_unet_checkpoint.pt"
+    )
+    if not os.path.exists(ckpt_path):
+        raise HTTPException(status_code=404, detail="Model checkpoint not found")
+    with open(ckpt_path, "rb") as f:
+        data = f.read()
+    return Response(
+        content=data,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": "attachment; filename=siamese_unet_checkpoint.pt"},
+    )
+

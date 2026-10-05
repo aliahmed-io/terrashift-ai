@@ -82,6 +82,7 @@ def run_analysis(req: AnalyzeRequest, fetcher: Optional[Fetcher] = None) -> Iter
             "changed_pct": round(changed_km2 / area_km2 * 100.0, 2) if area_km2 else 0.0,
             "resolution_m": round(grid.meters_per_pixel(center_lat), 1),
             "threshold": round(detection.threshold, 4),
+            "model": detection.model_metadata,
             "provenance": PROVENANCE,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
