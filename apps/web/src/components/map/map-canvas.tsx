@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
+if (typeof window !== "undefined") {
+  maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+}
+
 export interface MapFeature {
   type: "Feature";
   geometry: { type: "Polygon"; coordinates: number[][][] };
