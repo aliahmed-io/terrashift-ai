@@ -5,13 +5,51 @@ import { motion } from "motion/react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion as motionTokens } from "@/tokens";
 
-// Real Sentinel-2 Cloudless bi-temporal tile over Amazon deforestation hotspot (Rondônia, Brazil)
-const T1_IMG = "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/11/1079/666.jpg";
-const T2_IMG = "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/11/1079/666.jpg";
+// Real Sentinel-2 Cloudless bi-temporal tiles over Saudi Arabia (Vision 2030 mega-projects & greening)
+const KSA_HERO_SCENES = [
+  {
+    id: "riyadh",
+    label: "New Riyadh · ROSHN & King Salman Park",
+    coords: "24.835°N, 46.745°E · KSA",
+    t1Label: "2018 · Baseline Desert & Airfield",
+    t2Label: "2024 · Urban Districts & Green Canopy",
+    t1Img: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/12/1756/2579.jpg",
+    t2Img: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/12/1756/2579.jpg",
+  },
+  {
+    id: "neom",
+    label: "NEOM · The Line & Spine Corridor",
+    coords: "28.095°N, 35.085°E · Tabuk, KSA",
+    t1Label: "2018 · Untouched Tabuk Basin",
+    t2Label: "2024 · Linear Excavation & Basecamps",
+    t1Img: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/12/1714/2447.jpg",
+    t2Img: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/12/1714/2447.jpg",
+  },
+  {
+    id: "redsea",
+    label: "Red Sea Global · Shura Island",
+    coords: "25.395°N, 36.935°E · Umluj, KSA",
+    t1Label: "2018 · Uninhabited Coral Atoll",
+    t2Label: "2024 · 3.3km Causeway & Lagoon Resorts",
+    t1Img: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/12/1749/2468.jpg",
+    t2Img: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/12/1749/2468.jpg",
+  },
+  {
+    id: "aljouf",
+    label: "Al-Jouf · Green Pivot Oasis",
+    coords: "29.985°N, 38.355°E · Al-Jouf, KSA",
+    t1Label: "2018 · Baseline Arid Basin",
+    t2Label: "2024 · Center-Pivot Afforestation",
+    t1Img: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/11/845/1242.jpg",
+    t2Img: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/11/845/1242.jpg",
+  },
+] as const;
 
 export function Hero() {
   const containerRef = useRef<HTMLElement>(null);
   const [sliderPos, setSliderPos] = useState(50);
+  const [activeSceneIdx, setActiveSceneIdx] = useState(0);
+  const activeScene = KSA_HERO_SCENES[activeSceneIdx] ?? KSA_HERO_SCENES[0];
   const isDragging = useRef(false);
 
   // Smooth mouse move tracking over container
@@ -74,27 +112,27 @@ export function Hero() {
   return (
     <section
       ref={containerRef}
-      aria-label="Sentinel-2 bi-temporal change detection preview"
+      aria-label="Sentinel-2 bi-temporal change detection preview over Saudi Arabia"
       className="relative isolate h-dvh min-h-[680px] w-full touch-pan-y overflow-hidden bg-ink-950 select-none"
     >
-      {/* 1. Base Layer (2018 Sentinel-2 Cloudless Baseline) */}
+      {/* 1. Base Layer (2018 Sentinel-2 Cloudless Baseline over KSA) */}
       <div className="absolute inset-0 size-full">
         <img
-          src={T1_IMG}
-          alt="Sentinel-2 2018 cloudless satellite view of Amazon frontier"
+          src={activeScene.t1Img}
+          alt={`Sentinel-2 2018 baseline satellite view of ${activeScene.label}`}
           className="size-full object-cover brightness-90 filter"
         />
         <div className="absolute inset-0 bg-ink-950/25" />
       </div>
 
-      {/* 2. Target Layer (2024 Sentinel-2 Cloudless Target) with interactive clip-path */}
+      {/* 2. Target Layer (2024 Sentinel-2 Cloudless Target over KSA) with interactive clip-path */}
       <div
         className="absolute inset-0 size-full"
         style={{ clipPath: `inset(0 0 0 ${sliderPos}%)` }}
       >
         <img
-          src={T2_IMG}
-          alt="Sentinel-2 2024 cloudless satellite view showing deforestation expansion"
+          src={activeScene.t2Img}
+          alt={`Sentinel-2 2024 target satellite view of ${activeScene.label}`}
           className="size-full object-cover brightness-95 filter"
         />
         {/* Synthetic amber scar highlight glow on 2024 changes */}
@@ -128,13 +166,13 @@ export function Hero() {
 
         {/* Floating Year Pills */}
         <div className="pointer-events-none absolute top-24 -translate-x-full pr-3 hidden sm:block">
-          <span className="rounded-full border border-bone-100/15 bg-ink-950/85 px-3 py-1 font-mono text-[10px] tracking-widest text-bone-200 uppercase backdrop-blur">
-            2018 · Baseline Canopy
+          <span className="rounded-full border border-bone-100/15 bg-ink-950/85 px-3 py-1 font-mono text-[10px] tracking-widest text-bone-200 uppercase backdrop-blur whitespace-nowrap">
+            {activeScene.t1Label}
           </span>
         </div>
         <div className="pointer-events-none absolute top-24 translate-x-full pl-3 hidden sm:block">
-          <span className="rounded-full border border-signal-400/40 bg-ink-950/85 px-3 py-1 font-mono text-[10px] tracking-widest text-signal-400 uppercase backdrop-blur">
-            2024 · Detected Scars
+          <span className="rounded-full border border-signal-400/40 bg-ink-950/85 px-3 py-1 font-mono text-[10px] tracking-widest text-signal-400 uppercase backdrop-blur whitespace-nowrap">
+            {activeScene.t2Label}
           </span>
         </div>
       </div>
@@ -145,11 +183,27 @@ export function Hero() {
 
       {/* 5. Hero Content Typography */}
       <div className="relative z-20 flex h-full flex-col justify-end px-6 pb-14 lg:px-16 lg:pb-20">
-        <motion.div {...reveal(0.1)} className="flex items-center gap-3">
+        <motion.div {...reveal(0.1)} className="flex flex-wrap items-center gap-3">
           <span className="size-2 rounded-full bg-signal-400 animate-pulse shadow-[0_0_8px_#FFB020]" />
           <p className="font-mono text-xs tracking-[0.25em] text-signal-400 uppercase">
-            Copernicus Sentinel-2 · Cloudless Intelligence
+            Copernicus Sentinel-2 · {activeScene.coords}
           </p>
+          <div className="flex flex-wrap items-center gap-1.5 ms-0 sm:ms-3">
+            {KSA_HERO_SCENES.map((scene, idx) => (
+              <button
+                key={scene.id}
+                type="button"
+                onClick={() => setActiveSceneIdx(idx)}
+                className={`rounded-full border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider transition-colors ${
+                  idx === activeSceneIdx
+                    ? "border-signal-400 bg-signal-400/20 text-signal-400 font-bold"
+                    : "border-white/15 bg-ink-950/70 text-bone-300 hover:border-signal-400/40 hover:text-bone-100"
+                }`}
+              >
+                {scene.label}
+              </button>
+            ))}
+          </div>
         </motion.div>
 
         <motion.h1

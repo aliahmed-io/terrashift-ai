@@ -23,6 +23,78 @@ export interface HotspotPreset {
 
 export const HOTSPOT_PRESETS: readonly HotspotPreset[] = [
   {
+    id: "riyadh",
+    name: "New Riyadh: ROSHN Sedra & King Salman Park",
+    location: "Riyadh, Saudi Arabia",
+    description:
+      "Vision 2030 urban mega-district development, Sports Boulevard, and Green Riyadh canopy expansion.",
+    yearT1: 2018,
+    yearT2: 2024,
+    center: [46.745, 24.835],
+    zoom: 12.5,
+    polygon: [
+      [46.715, 24.815],
+      [46.775, 24.815],
+      [46.775, 24.855],
+      [46.715, 24.855],
+      [46.715, 24.815],
+    ],
+  },
+  {
+    id: "neom",
+    name: "NEOM: The Line & Spine Corridor",
+    location: "Tabuk, Saudi Arabia",
+    description:
+      "170 km linear city foundation trench excavation, high-speed spine infrastructure, and logistics basecamps.",
+    yearT1: 2018,
+    yearT2: 2024,
+    center: [35.085, 28.095],
+    zoom: 12.5,
+    polygon: [
+      [35.055, 28.075],
+      [35.115, 28.075],
+      [35.115, 28.115],
+      [35.055, 28.115],
+      [35.055, 28.075],
+    ],
+  },
+  {
+    id: "redsea",
+    name: "Red Sea Global: Shura Island & Causeway",
+    location: "Umluj / Tabuk, Saudi Arabia",
+    description:
+      "3.3 km coastal sea-bridge causeway, regenerative coral lagoon resorts, and coastal habitat engineering.",
+    yearT1: 2018,
+    yearT2: 2024,
+    center: [36.935, 25.395],
+    zoom: 12.5,
+    polygon: [
+      [36.905, 25.375],
+      [36.965, 25.375],
+      [36.965, 25.415],
+      [36.905, 25.415],
+      [36.905, 25.375],
+    ],
+  },
+  {
+    id: "aljouf",
+    name: "Al-Jouf Green Initiative Pivot Oasis",
+    location: "Al-Jouf, Saudi Arabia",
+    description:
+      "High-contrast desert afforestation and circular center-pivot agricultural expansion across northern KSA.",
+    yearT1: 2018,
+    yearT2: 2024,
+    center: [38.355, 29.985],
+    zoom: 12,
+    polygon: [
+      [38.325, 29.965],
+      [38.385, 29.965],
+      [38.385, 30.005],
+      [38.325, 30.005],
+      [38.325, 29.965],
+    ],
+  },
+  {
     id: "rondonia",
     name: "Rondônia Amazon Frontier",
     location: "Brazil",

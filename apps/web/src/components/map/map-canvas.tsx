@@ -165,7 +165,7 @@ export function MapCanvas({
   onSelectFeature,
   compareMode = false,
   basemapSource = "s2",
-  center = [-62.905, -9.702],
+  center = [46.745, 24.835],
   zoom = 12.5,
   onCameraMove,
 }: MapCanvasProps) {
