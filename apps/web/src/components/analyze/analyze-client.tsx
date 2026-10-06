@@ -233,6 +233,34 @@ export function AnalyzeClient() {
     };
   }, [locale]);
 
+  // Support deep linking from /watchlist (?lat=...&lon=...&t1=...&t2=...)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const latStr = params.get("lat");
+    const lonStr = params.get("lon");
+    const t1Str = params.get("t1");
+    const t2Str = params.get("t2");
+    if (latStr && lonStr) {
+      const lat = Number(latStr);
+      const lon = Number(lonStr);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        const c: [number, number] = [lon, lat];
+        setMapCenter(c);
+        setCameraCenter(c);
+        setMapZoom(12.5);
+        setPolygon(buildBoxAroundCenter(c));
+        setSelectedPreset(null);
+      }
+    }
+    if (t1Str && Number.isFinite(Number(t1Str))) {
+      setYearT1(Number(t1Str));
+    }
+    if (t2Str && Number.isFinite(Number(t2Str))) {
+      setYearT2(Number(t2Str));
+    }
+  }, []);
+
   // Close hotspot dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -598,9 +626,46 @@ export function AnalyzeClient() {
           </div>
         </div>
 
-        {/* Center Section: Global Location Search */}
-        <div className="mx-4 hidden max-w-sm flex-1 md:block">
-          <LocationSearch onSelectLocation={handleSelectLocation} />
+        {/* Center Section: Global Location Search + Platform Suite Switcher */}
+        <div className="mx-3 hidden flex-1 items-center justify-center gap-3 md:flex">
+          <div className="w-full max-w-xs">
+            <LocationSearch onSelectLocation={handleSelectLocation} />
+          </div>
+          <nav
+            aria-label="Platform Modules"
+            className="hidden xl:flex items-center gap-1 rounded-lg border border-white/10 bg-ink-900/80 p-1 text-[11px]"
+          >
+            <Link
+              href="/benchmarks"
+              className="rounded px-2 py-1 text-bone-300 transition-colors hover:bg-white/10 hover:text-bone-100"
+            >
+              Benchmarks & XAI
+            </Link>
+            <Link
+              href="/timeline"
+              className="rounded px-2 py-1 text-bone-300 transition-colors hover:bg-white/10 hover:text-bone-100"
+            >
+              BFAST Timeline
+            </Link>
+            <Link
+              href="/lab"
+              className="rounded px-2 py-1 text-bone-300 transition-colors hover:bg-white/10 hover:text-bone-100"
+            >
+              Image Pair Lab
+            </Link>
+            <Link
+              href="/carbon"
+              className="rounded px-2 py-1 text-bone-300 transition-colors hover:bg-white/10 hover:text-bone-100"
+            >
+              Carbon & UHI
+            </Link>
+            <Link
+              href="/watchlist"
+              className="rounded px-2 py-1 text-bone-300 transition-colors hover:bg-white/10 hover:text-bone-100"
+            >
+              STAC Watchlist
+            </Link>
+          </nav>
         </div>
 
         {/* Right Section: View Controls, Basemap, AI Architecture, Language */}

@@ -124,3 +124,55 @@ def test_stream_endpoint_emits_progress_then_result(monkeypatch: pytest.MonkeyPa
 
 def test_health() -> None:
     assert TestClient(app).get("/healthz").json()["status"] == "healthy"
+
+
+def test_ablation_study_returns_4_models_and_xai_stages() -> None:
+    from terrashift.inference.ablation import run_ablation_study
+
+    f = make_fetcher(True)
+    rgb1 = f(2018, 12, 100, 100)
+    rgb2 = f(2024, 12, 100, 100)
+    valid = np.ones(rgb1.shape[:2], dtype=bool)
+    res = run_ablation_study(rgb1, rgb2, valid, 2018, 2024)
+    assert len(res["methods"]) == 4
+    assert len(res["xai_stages"]) == 4
+    assert res["methods"][-1]["id"] == "fc_siam_diff"
+
+
+def test_pair_lab_endpoint_evaluates_ground_truth() -> None:
+    client = TestClient(app)
+    res = client.post("/v1/lab/analyze", json={"sample_id": "levir_urban_1"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["blob_count"] >= 1
+    assert data["ground_truth_eval"]["has_ground_truth"] is True
+    assert data["ground_truth_eval"]["f1_score"] > 0.85
+
+
+def test_carbon_flux_endpoint_computes_pools_and_uhi(monkeypatch: pytest.MonkeyPatch) -> None:
+    from terrashift.acquisition import tiles
+
+    f = make_fetcher(True)
+    rgb1 = f(2018, 12, 100, 100)
+    rgb2 = f(2024, 12, 100, 100)
+    monkeypatch.setattr(tiles, "fetch_mosaic", lambda year, grid: rgb1 if year == 2018 else rgb2)
+    monkeypatch.setattr(tiles, "polygon_mask", lambda ring, grid: np.ones((256, 256), dtype=bool))
+    client = TestClient(app)
+    res = client.post(
+        "/v1/carbon",
+        json={
+            "polygon": RING,
+            "year_t1": 2018,
+            "year_t2": 2024,
+            "biome_id": "tropical_rainforest",
+            "pool_mode": "biomass_soil",
+            "carbon_price_usd": 40.0,
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert len(data["pools"]) == 4
+    assert data["gross_emissions_tco2e"] >= 0
+    assert "uhi" in data
+
+

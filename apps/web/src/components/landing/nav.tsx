@@ -17,10 +17,22 @@ export function Nav() {
   return (
     <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-between px-6 py-4 lg:px-16 backdrop-blur-md bg-ink-950/40 border-b border-bone-100/5">
       <Wordmark />
-      <nav aria-label="Primary" className="flex items-center gap-6 font-mono text-xs tracking-widest uppercase">
-        <a href="#story" className="text-bone-300 hover:text-signal-400 hidden transition-colors sm:block">
-          Story
-        </a>
+      <nav aria-label="Primary" className="flex items-center gap-4 lg:gap-6 font-mono text-xs tracking-widest uppercase">
+        <Link href="/benchmarks" className="text-bone-300 hover:text-signal-400 hidden transition-colors md:block">
+          Benchmarks
+        </Link>
+        <Link href="/timeline" className="text-bone-300 hover:text-signal-400 hidden transition-colors md:block">
+          Timeline
+        </Link>
+        <Link href="/lab" className="text-bone-300 hover:text-signal-400 hidden transition-colors lg:block">
+          Image Lab
+        </Link>
+        <Link href="/carbon" className="text-bone-300 hover:text-signal-400 hidden transition-colors lg:block">
+          Carbon & UHI
+        </Link>
+        <Link href="/watchlist" className="text-bone-300 hover:text-signal-400 hidden transition-colors sm:block">
+          STAC Atlas
+        </Link>
         <Link
           href="/analyze"
           className="rounded-full border border-signal-400/50 bg-signal-400/10 px-5 py-2 font-bold text-signal-400 backdrop-blur transition-all hover:bg-signal-400 hover:text-ink-950 shadow-[0_0_16px_rgba(255,176,32,0.2)]"

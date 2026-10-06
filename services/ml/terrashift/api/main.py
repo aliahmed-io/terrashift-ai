@@ -132,3 +132,82 @@ def download_model_weights() -> Response:
         headers={"Content-Disposition": "attachment; filename=siamese_unet_checkpoint.pt"},
     )
 
+
+@app.post("/v1/ablation")
+def run_ablation_endpoint(req: AnalyzeRequest) -> Dict[str, Any]:
+    """Run 4-way model ablation (L1-RGB, Spectral-Otsu, FC-EF, FC-Siam-diff) & XAI stage extraction."""
+    from terrashift.acquisition import tiles
+    from terrashift.inference.ablation import run_ablation_study
+
+    ring = [list(p) for p in req.polygon]
+    if ring[0] != ring[-1]:
+        ring.append(ring[0])
+    lons = [p[0] for p in ring]
+    lats = [p[1] for p in ring]
+    bbox = [min(lons), min(lats), max(lons), max(lats)]
+    try:
+        grid = tiles.plan_grid(bbox)
+        rgb1 = tiles.fetch_mosaic(req.year_t1, grid)
+        rgb2 = tiles.fetch_mosaic(req.year_t2, grid)
+        valid = tiles.polygon_mask(ring, grid)
+        if valid.sum() < 16:
+            valid[:] = True
+    except (AoiError, TileError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return run_ablation_study(rgb1, rgb2, valid, req.year_t1, req.year_t2)
+
+
+@app.post("/v1/timeseries")
+def run_timeseries_endpoint(req: AnalyzeRequest) -> Dict[str, Any]:
+    """Run BFAST multi-year time-series breakpoint analysis (2017-2024) and 2026-2030 spatial forecast."""
+    from terrashift.inference.timeseries import run_timeseries_study
+
+    try:
+        return run_timeseries_study([list(p) for p in req.polygon])
+    except (AoiError, TileError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/v1/lab/analyze")
+def run_lab_endpoint(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Run Siamese U-Net inference on custom uploaded Before/After images or LEVIR-CD/OSCD samples."""
+    from terrashift.inference.pair_lab import run_pair_lab_analysis
+
+    sample_id = payload.get("sample_id")
+    img1 = payload.get("image_t1_base64")
+    img2 = payload.get("image_t2_base64")
+    try:
+        return run_pair_lab_analysis(
+            sample_id=sample_id,
+            image_t1_base64=img1,
+            image_t2_base64=img2,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Image pair processing error: {exc}") from exc
+
+
+@app.post("/v1/carbon")
+def run_carbon_endpoint(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Run IPCC Tier-1 / WRI Carbon-Budget flux & Urban Heat Island analysis."""
+    from terrashift.inference.carbon import run_carbon_flux_analysis
+
+    polygon = payload.get(
+        "polygon",
+        [[-61.96, -10.89], [-61.91, -10.89], [-61.91, -10.84], [-61.96, -10.84], [-61.96, -10.89]],
+    )
+    t1_year = int(payload.get("year_t1", 2018))
+    t2_year = int(payload.get("year_t2", 2024))
+    biome_id = str(payload.get("biome_id", "tropical_rainforest"))
+    pool_mode = str(payload.get("pool_mode", "biomass_soil"))
+    carbon_price_usd = float(payload.get("carbon_price_usd", 35.0))
+    try:
+        return run_carbon_flux_analysis(
+            polygon=[list(p) for p in polygon],
+            t1_year=t1_year,
+            t2_year=t2_year,
+            biome_id=biome_id,
+            pool_mode=pool_mode,
+            carbon_price_usd=carbon_price_usd,
+        )
+    except (AoiError, TileError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
