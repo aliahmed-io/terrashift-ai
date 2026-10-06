@@ -42,6 +42,7 @@ interface MapCanvasProps {
   basemapSource?: "s2" | "mapbox" | undefined;
   center?: [number, number] | undefined;
   zoom?: number | undefined;
+  onCameraMove?: ((center: [number, number], zoom: number) => void) | undefined;
 }
 
 function buildMapStyle(year: number): maplibregl.StyleSpecification {
@@ -121,6 +122,39 @@ function buildMapStyle(year: number): maplibregl.StyleSpecification {
   };
 }
 
+function buildPolygonGeoJson(polygon: [number, number][] | null): GeoJSON.FeatureCollection {
+  if (!polygon || polygon.length < 3) {
+    return { type: "FeatureCollection", features: [] };
+  }
+  const ring =
+    polygon[0]?.[0] === polygon[polygon.length - 1]?.[0] &&
+    polygon[0]?.[1] === polygon[polygon.length - 1]?.[1]
+      ? polygon
+      : [...polygon, polygon[0] ?? [0, 0]];
+
+  return {
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        geometry: {
+          type: "Polygon",
+          coordinates: [ring],
+        },
+        properties: {},
+      },
+    ],
+  };
+}
+
+function updateRasterYear(map: maplibregl.Map | null, year: number) {
+  if (!map || !map.isStyleLoaded()) return;
+  const src = map.getSource("s2-cloudless") as maplibregl.RasterTileSource | undefined;
+  if (src && typeof src.setTiles === "function") {
+    src.setTiles([getEoxTileUrl(year)]);
+  }
+}
+
 export function MapCanvas({
   yearT1,
   yearT2,
@@ -135,11 +169,22 @@ export function MapCanvas({
   basemapSource = "s2",
   center = [-62.905, -9.702],
   zoom = 12.5,
+  onCameraMove,
 }: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const compareContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const compareMapRef = useRef<maplibregl.Map | null>(null);
+
+  // Latest prop refs to avoid unnecessary effect re-runs
+  const yearT1Ref = useRef(yearT1);
+  yearT1Ref.current = yearT1;
+  const polygonRef = useRef(polygon);
+  polygonRef.current = polygon;
+  const basemapSourceRef = useRef(basemapSource);
+  basemapSourceRef.current = basemapSource;
+  const onCameraMoveRef = useRef(onCameraMove);
+  onCameraMoveRef.current = onCameraMove;
 
   // Drawing state
   const [activeVertices, setActiveVertices] = useState<[number, number][]>([]);
@@ -214,30 +259,16 @@ export function MapCanvas({
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
+    map.on("moveend", () => {
+      const c = map.getCenter();
+      onCameraMoveRef.current?.([c.lng, c.lat], map.getZoom());
+    });
+
     map.on("load", () => {
       // 1. AOI polygon source & layers
       map.addSource("aoi-polygon-source", {
         type: "geojson",
-        data: {
-          type: "FeatureCollection",
-          features: polygon
-            ? [
-                {
-                  type: "Feature",
-                  geometry: {
-                    type: "Polygon",
-                    coordinates: [
-                      polygon[0]?.[0] === polygon[polygon.length - 1]?.[0] &&
-                      polygon[0]?.[1] === polygon[polygon.length - 1]?.[1]
-                        ? polygon
-                        : [...polygon, polygon[0] ?? [0, 0]],
-                    ],
-                  },
-                  properties: {},
-                },
-              ]
-            : [],
-        },
+        data: buildPolygonGeoJson(polygonRef.current),
       });
 
       map.addLayer({
@@ -246,7 +277,7 @@ export function MapCanvas({
         source: "aoi-polygon-source",
         paint: {
           "fill-color": "#FFB020",
-          "fill-opacity": 0.12,
+          "fill-opacity": 0.14,
         },
       });
 
@@ -367,7 +398,6 @@ export function MapCanvas({
 
     mapRef.current = map;
 
-    // Attach ResizeObserver to guarantee WebGL canvas stays sharp and full-bleed
     const ro = new ResizeObserver(() => {
       map.resize();
     });
@@ -379,6 +409,28 @@ export function MapCanvas({
       mapRef.current = null;
     };
   }, []);
+
+  // Fly camera when preset or geocoding search updates `center` and `zoom`
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.flyTo({
+      center,
+      zoom,
+      bearing: 0,
+      pitch: 0,
+      duration: 1200,
+      essential: true,
+    });
+    compareMapRef.current?.flyTo({
+      center,
+      zoom,
+      bearing: 0,
+      pitch: 0,
+      duration: 1200,
+      essential: true,
+    });
+  }, [center[0], center[1], zoom]);
 
   // Initialize Secondary Map for Compare Mode (Year T1)
   useEffect(() => {
@@ -398,7 +450,7 @@ export function MapCanvas({
 
     const compareMap = new maplibregl.Map({
       container: compareContainerRef.current,
-      style: buildMapStyle(yearT1),
+      style: buildMapStyle(yearT1Ref.current),
       center: [mainCenter.lng, mainCenter.lat],
       zoom: mainZoom,
       minZoom: 1,
@@ -418,43 +470,24 @@ export function MapCanvas({
     compareMap.touchZoomRotate.disableRotation();
 
     compareMap.on("load", () => {
-      if (polygon && polygon.length >= 3) {
-        compareMap.addSource("compare-aoi-source", {
-          type: "geojson",
-          data: {
-            type: "FeatureCollection",
-            features: [
-              {
-                type: "Feature",
-                geometry: {
-                  type: "Polygon",
-                  coordinates: [
-                    polygon[0]?.[0] === polygon[polygon.length - 1]?.[0] &&
-                    polygon[0]?.[1] === polygon[polygon.length - 1]?.[1]
-                      ? polygon
-                      : [...polygon, polygon[0] ?? [0, 0]],
-                  ],
-                },
-                properties: {},
-              },
-            ],
-          },
-        });
-        compareMap.addLayer({
-          id: "compare-aoi-fill",
-          type: "fill",
-          source: "compare-aoi-source",
-          paint: { "fill-color": "#FFB020", "fill-opacity": 0.12 },
-        });
-        compareMap.addLayer({
-          id: "compare-aoi-stroke",
-          type: "line",
-          source: "compare-aoi-source",
-          paint: { "line-color": "#FFB020", "line-width": 2, "line-dasharray": [4, 2] },
-        });
-      }
+      compareMap.addSource("compare-aoi-source", {
+        type: "geojson",
+        data: buildPolygonGeoJson(polygonRef.current),
+      });
+      compareMap.addLayer({
+        id: "compare-aoi-fill",
+        type: "fill",
+        source: "compare-aoi-source",
+        paint: { "fill-color": "#FFB020", "fill-opacity": 0.14 },
+      });
+      compareMap.addLayer({
+        id: "compare-aoi-stroke",
+        type: "line",
+        source: "compare-aoi-source",
+        paint: { "line-color": "#FFB020", "line-width": 2, "line-dasharray": [4, 2] },
+      });
 
-      if (basemapSource === "mapbox") {
+      if (basemapSourceRef.current === "mapbox") {
         if (compareMap.getLayer("s2-layer")) {
           compareMap.setLayoutProperty("s2-layer", "visibility", "none");
         }
@@ -486,47 +519,31 @@ export function MapCanvas({
       compareMap.remove();
       compareMapRef.current = null;
     };
-  }, [compareMode, yearT1, syncMaps, polygon, basemapSource]);
+  }, [compareMode, syncMaps]);
 
-  // Update Raster Tile Year when yearT2 changes on primary map
+  // Update Raster Tile Year when yearT1 or yearT2 changes in-place without losing GeoJSON layers
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    const source = map.getSource("s2-cloudless") as maplibregl.RasterTileSource | undefined;
-    if (source) {
-      map.setStyle(buildMapStyle(yearT2));
-    }
+    updateRasterYear(mapRef.current, yearT2);
   }, [yearT2]);
 
-  // Update AOI Polygon layer
   useEffect(() => {
+    updateRasterYear(compareMapRef.current, yearT1);
+  }, [yearT1]);
+
+  // Update AOI Polygon layer on both maps
+  useEffect(() => {
+    const geojson = buildPolygonGeoJson(polygon);
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    const src = map.getSource("aoi-polygon-source") as maplibregl.GeoJSONSource | undefined;
-    if (!src) return;
-
-    if (polygon && polygon.length >= 3) {
-      const ring =
-        polygon[0]?.[0] === polygon[polygon.length - 1]?.[0] &&
-        polygon[0]?.[1] === polygon[polygon.length - 1]?.[1]
-          ? polygon
-          : [...polygon, polygon[0] ?? [0, 0]];
-
-      src.setData({
-        type: "FeatureCollection",
-        features: [
-          {
-            type: "Feature",
-            geometry: {
-              type: "Polygon",
-              coordinates: [ring],
-            },
-            properties: {},
-          },
-        ],
-      });
-    } else {
-      src.setData({ type: "FeatureCollection", features: [] });
+    if (map && map.isStyleLoaded()) {
+      const src = map.getSource("aoi-polygon-source") as maplibregl.GeoJSONSource | undefined;
+      src?.setData(geojson);
+    }
+    const compareMap = compareMapRef.current;
+    if (compareMap && compareMap.isStyleLoaded()) {
+      const compareSrc = compareMap.getSource("compare-aoi-source") as
+        | maplibregl.GeoJSONSource
+        | undefined;
+      compareSrc?.setData(geojson);
     }
   }, [polygon]);
 
@@ -543,7 +560,7 @@ export function MapCanvas({
     }
   }, [features]);
 
-  // Fly to selected feature or center
+  // Fly to selected feature
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded() || selectedFeatureId == null) return;

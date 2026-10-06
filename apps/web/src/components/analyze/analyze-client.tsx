@@ -56,15 +56,145 @@ interface AnalysisResult {
 }
 
 type AnalysisStatus = "idle" | "running" | "done" | "error";
+type Locale = "en" | "ar";
+
+const UI_STRINGS: Record<
+  Locale,
+  {
+    studio: string;
+    selectHotspot: string;
+    globalHotspots: string;
+    sentinel2: string;
+    highRes: string;
+    splitActive: string;
+    splitView: string;
+    siameseModel: string;
+    baseline: string;
+    target: string;
+    drawArea: string;
+    drawingActive: string;
+    frameView: string;
+    analyzeChanges: string;
+    hideInspector: string;
+    inspector: string;
+    auditReport: string;
+    inspect: string;
+    totalChanged: string;
+    ofTotalAoi: string;
+    polygonsDetected: string;
+    classDistribution: string;
+    detectedPolygons: string;
+    clickToFly: string;
+    confidence: string;
+    compilingPdf: string;
+    downloadPdf: string;
+    exportGeoJson: string;
+    close: string;
+  }
+> = {
+  en: {
+    studio: "Studio",
+    selectHotspot: "Select Hotspot",
+    globalHotspots: "Global Change Hotspots",
+    sentinel2: "Sentinel-2",
+    highRes: "High-Res Aerial",
+    splitActive: "Split Active",
+    splitView: "Split View",
+    siameseModel: "Siamese U-Net",
+    baseline: "Baseline",
+    target: "Target",
+    drawArea: "Draw Area",
+    drawingActive: "Drawing Active",
+    frameView: "Frame View",
+    analyzeChanges: "Analyze Changes",
+    hideInspector: "Hide Inspector",
+    inspector: "Inspector",
+    auditReport: "Bi-Temporal Audit Report",
+    inspect: "Inspect",
+    totalChanged: "Total Changed",
+    ofTotalAoi: "of total AOI",
+    polygonsDetected: "Polygons Detected",
+    classDistribution: "Class Distribution",
+    detectedPolygons: "Detected Polygons",
+    clickToFly: "Click to fly to",
+    confidence: "Confidence",
+    compilingPdf: "Compiling PDF…",
+    downloadPdf: "Download Audit Report (PDF)",
+    exportGeoJson: "Export GeoJSON Layer",
+    close: "Close",
+  },
+  ar: {
+    studio: "المرصد",
+    selectHotspot: "اختر منطقة رصد",
+    globalHotspots: "بؤر التغير العالمية",
+    sentinel2: "سنتينل-2",
+    highRes: "تصوير جوي فائق",
+    splitActive: "مقارنة مزدوجة",
+    splitView: "عرض مزدوج",
+    siameseModel: "الشبكة السيامية",
+    baseline: "الأساس",
+    target: "الهدف",
+    drawArea: "رسم نطاق",
+    drawingActive: "جاري الرسم",
+    frameView: "تحديد المشهد",
+    analyzeChanges: "تحليل التغيرات",
+    hideInspector: "إخفاء التقرير",
+    inspector: "النتائج",
+    auditReport: "تقرير التدقيق الزمني المزدوج",
+    inspect: "فحص النموذج",
+    totalChanged: "إجمالي المساحة المتغيرة",
+    ofTotalAoi: "من إجمالي النطاق",
+    polygonsDetected: "المضلعات المكتشفة",
+    classDistribution: "توزيع فئات التغير",
+    detectedPolygons: "المضلعات المرصودة",
+    clickToFly: "انقر للانتقال للموقع",
+    confidence: "درجة الثقة",
+    compilingPdf: "جاري إعداد التقرير…",
+    downloadPdf: "تحميل تقرير التدقيق (PDF)",
+    exportGeoJson: "تصدير طبقة GeoJSON",
+    close: "إغلاق",
+  },
+};
+
+function buildBoxAroundCenter(center: [number, number]): [number, number][] {
+  const [lon, lat] = center;
+  const dLon = 0.022;
+  const dLat = 0.02;
+  return [
+    [Number((lon - dLon).toFixed(6)), Number((lat - dLat).toFixed(6))],
+    [Number((lon + dLon).toFixed(6)), Number((lat - dLat).toFixed(6))],
+    [Number((lon + dLon).toFixed(6)), Number((lat + dLat).toFixed(6))],
+    [Number((lon - dLon).toFixed(6)), Number((lat + dLat).toFixed(6))],
+    [Number((lon - dLon).toFixed(6)), Number((lat - dLat).toFixed(6))],
+  ];
+}
+
+function isPolygonNearCamera(
+  polygon: [number, number][] | null,
+  camera: [number, number],
+): boolean {
+  if (!polygon || polygon.length < 3) return false;
+  const lons = polygon.map((p) => p[0]);
+  const lats = polygon.map((p) => p[1]);
+  const polyLon = (Math.min(...lons) + Math.max(...lons)) / 2;
+  const polyLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+  const dist = Math.hypot(polyLon - camera[0], polyLat - camera[1]);
+  return dist < 0.25;
+}
 
 export function AnalyzeClient() {
+  const [locale, setLocale] = useState<Locale>("en");
+  const t = UI_STRINGS[locale];
+
   const [yearT1, setYearT1] = useState(2018);
   const [yearT2, setYearT2] = useState(2024);
   const [polygon, setPolygon] = useState<[number, number][] | null>(() => {
     const preset = HOTSPOT_PRESETS[0];
     return preset ? [...preset.polygon] : null;
   });
-  const [selectedPreset, setSelectedPreset] = useState<HotspotPreset | null>(() => HOTSPOT_PRESETS[0] ?? null);
+  const [selectedPreset, setSelectedPreset] = useState<HotspotPreset | null>(
+    () => HOTSPOT_PRESETS[0] ?? null,
+  );
   const [hotspotMenuOpen, setHotspotMenuOpen] = useState(false);
   const [basemapSource, setBasemapSource] = useState<"s2" | "mapbox">("s2");
 
@@ -84,12 +214,24 @@ export function AnalyzeClient() {
   // Map viewport control
   const [mapCenter, setMapCenter] = useState<[number, number]>([-62.905, -9.702]);
   const [mapZoom, setMapZoom] = useState<number>(12.5);
+  const [cameraCenter, setCameraCenter] = useState<[number, number]>([-62.905, -9.702]);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const hotspotDropdownRef = useRef<HTMLDivElement>(null);
 
   const aoiAreaKm2 = polygon && polygon.length >= 3 ? calculatePolygonAreaKm2(polygon) : 0;
   const isOversized = aoiAreaKm2 > MAX_AOI_KM2;
+  const polygonInView = isPolygonNearCamera(polygon, cameraCenter);
+
+  // Sync document directionality for Arabic RTL support (Rule #17)
+  useEffect(() => {
+    document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
+    document.documentElement.lang = locale;
+    return () => {
+      document.documentElement.dir = "ltr";
+      document.documentElement.lang = "en";
+    };
+  }, [locale]);
 
   // Close hotspot dropdown on outside click
   useEffect(() => {
@@ -112,6 +254,7 @@ export function AnalyzeClient() {
     setYearT1(preset.yearT1);
     setYearT2(preset.yearT2);
     setMapCenter(preset.center);
+    setCameraCenter(preset.center);
     setMapZoom(preset.zoom);
     setResult(null);
     setStatus("idle");
@@ -123,25 +266,49 @@ export function AnalyzeClient() {
 
   // Handle Geocoding location selection
   const handleSelectLocation = useCallback((loc: GeocodeLocation) => {
-    setMapCenter([loc.lon, loc.lat]);
-    setMapZoom(12);
+    const newCenter: [number, number] = [loc.lon, loc.lat];
+    setMapCenter(newCenter);
+    setCameraCenter(newCenter);
+    setMapZoom(12.5);
     setSelectedPreset(null);
-    const deltaLon = 0.04;
-    const deltaLat = 0.03;
-    setPolygon([
-      [loc.lon - deltaLon, loc.lat - deltaLat],
-      [loc.lon + deltaLon, loc.lat - deltaLat],
-      [loc.lon + deltaLon, loc.lat + deltaLat],
-      [loc.lon - deltaLon, loc.lat + deltaLat],
-      [loc.lon - deltaLon, loc.lat - deltaLat],
-    ]);
+    setPolygon(buildBoxAroundCenter(newCenter));
     setResult(null);
     setStatus("idle");
+    setErrorMessage(null);
+  }, []);
+
+  // Snap AOI box to current camera viewport
+  const frameCurrentView = useCallback(() => {
+    const newPoly = buildBoxAroundCenter(cameraCenter);
+    setPolygon(newPoly);
+    setSelectedPreset(null);
+    setResult(null);
+    setStatus("idle");
+    setErrorMessage(null);
+  }, [cameraCenter]);
+
+  const handleCameraMove = useCallback((c: [number, number]) => {
+    setCameraCenter(c);
   }, []);
 
   // Stream analysis execution
   const runAnalysis = async () => {
-    if (!polygon || polygon.length < 3 || isOversized || status === "running") return;
+    if (status === "running") return;
+
+    // If user panned to a new area on Earth away from the old polygon (or cleared the polygon),
+    // automatically frame the current viewport so we analyze what is actually on screen!
+    let activePolygon = polygon;
+    if (!activePolygon || activePolygon.length < 3 || !isPolygonNearCamera(activePolygon, cameraCenter)) {
+      activePolygon = buildBoxAroundCenter(cameraCenter);
+      setPolygon(activePolygon);
+      setSelectedPreset(null);
+    }
+
+    const activeAreaKm2 = calculatePolygonAreaKm2(activePolygon);
+    if (activeAreaKm2 > MAX_AOI_KM2) {
+      setErrorMessage(`Selected area (${activeAreaKm2.toFixed(1)} km²) exceeds the 100 km² limit.`);
+      return;
+    }
 
     setStatus("running");
     setProgress(5);
@@ -154,12 +321,67 @@ export function AnalyzeClient() {
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
+    let completed = false;
+
+    const processSseBlock = (block: string) => {
+      const dataLines = block
+        .split(/\r?\n/)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trim());
+
+      if (dataLines.length === 0) return;
+      const dataRaw = dataLines.join("\n");
+
+      try {
+        const parsed = JSON.parse(dataRaw);
+        if (parsed.error) {
+          const msg =
+            typeof parsed.error === "string"
+              ? parsed.error
+              : parsed.error.message ?? "Analysis pipeline failed";
+          setErrorMessage(msg);
+          setStatus("error");
+          completed = true;
+          return;
+        }
+
+        if (parsed.done && parsed.result) {
+          setResult(parsed.result as AnalysisResult);
+          setStatus("done");
+          setProgress(100);
+          setStepLabel("Inference complete");
+          setDrawerOpen(true);
+          completed = true;
+          return;
+        }
+
+        if (parsed.type === "FeatureCollection" && parsed.metadata) {
+          setResult(parsed as AnalysisResult);
+          setStatus("done");
+          setProgress(100);
+          setStepLabel("Inference complete");
+          setDrawerOpen(true);
+          completed = true;
+          return;
+        }
+
+        if (typeof parsed.progress === "number" || typeof parsed.pct === "number") {
+          const pct = Number(parsed.progress ?? parsed.pct ?? 10);
+          const label = parsed.label ?? parsed.step ?? "Processing satellite imagery";
+          setProgress(pct);
+          setStepLabel(typeof label === "string" ? `${label}…` : "Processing satellite imagery…");
+        }
+      } catch {
+        // Ignore malformed JSON chunk
+      }
+    };
+
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          polygon,
+          polygon: activePolygon,
           yearT1,
           yearT2,
         }),
@@ -167,7 +389,12 @@ export function AnalyzeClient() {
       });
 
       if (!res.ok) {
-        throw new Error(`Server returned HTTP ${res.status}`);
+        const text = await res.text().catch(() => "");
+        processSseBlock(text);
+        if (!completed) {
+          throw new Error(`Server returned HTTP ${res.status}`);
+        }
+        return;
       }
 
       if (!res.body) {
@@ -183,42 +410,29 @@ export function AnalyzeClient() {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop() ?? "";
+        const blocks = buffer.split(/\r?\n\r?\n/);
+        buffer = blocks.pop() ?? "";
 
-        for (const block of lines) {
-          if (!block.trim()) continue;
-          const eventMatch = block.match(/^event:\s*(\w+)/m);
-          const dataMatch = block.match(/^data:\s*(.+)$/m);
-
-          if (!eventMatch || !dataMatch) continue;
-          const eventType = eventMatch[1];
-          const dataRaw = dataMatch[1]?.trim() ?? "{}";
-
-          try {
-            const parsed = JSON.parse(dataRaw);
-            if (eventType === "progress") {
-              setStepLabel(parsed.step ?? "Processing satellite imagery…");
-              setProgress(Number(parsed.pct ?? 10));
-            } else if (eventType === "result") {
-              setResult(parsed as AnalysisResult);
-              setStatus("done");
-              setProgress(100);
-              setStepLabel("Inference complete");
-              setDrawerOpen(true);
-            } else if (eventType === "error") {
-              setErrorMessage(parsed.error ?? "Analysis pipeline failed");
-              setStatus("error");
-            }
-          } catch {
-            // Ignore malformed chunk
+        for (const block of blocks) {
+          if (block.trim()) {
+            processSseBlock(block);
           }
         }
+      }
+
+      if (buffer.trim()) {
+        processSseBlock(buffer);
+      }
+
+      if (!completed) {
+        setErrorMessage("Analysis stream ended before completion. Please try again.");
+        setStatus("error");
       }
     } catch (err: unknown) {
       if ((err as Error)?.name !== "AbortError") {
         setErrorMessage(
-          (err as Error)?.message || "Failed to contact analysis service. Check network connection.",
+          (err as Error)?.message ||
+            "Failed to contact analysis service. Verify ML backend is running.",
         );
         setStatus("error");
       }
@@ -260,7 +474,7 @@ export function AnalyzeClient() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert("Failed to generate PDF audit report. Verify ML backend service is running.");
+      setErrorMessage("Failed to generate PDF audit report. Verify ML backend service is running.");
     } finally {
       setGeneratingPdf(false);
     }
@@ -279,7 +493,7 @@ export function AnalyzeClient() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-ink-950 text-bone-100">
-      {/* 1. Unified Application Header (No overlapping pills) */}
+      {/* 1. Unified Application Header */}
       <header className="z-20 flex h-14 w-full shrink-0 items-center justify-between border-b border-white/10 bg-ink-950/95 px-4 backdrop-blur-md">
         {/* Left Section: Brand & Hotspot Selector */}
         <div className="flex items-center gap-3">
@@ -289,7 +503,7 @@ export function AnalyzeClient() {
             aria-label="Back to TerraShift Home"
           >
             <svg
-              className="size-4 shrink-0"
+              className="size-4 shrink-0 rtl:rotate-180"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -302,7 +516,7 @@ export function AnalyzeClient() {
             </svg>
             <span className="font-semibold tracking-tight text-bone-100 text-sm">TerraShift</span>
             <span className="hidden rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-bone-300 sm:inline-block">
-              Studio
+              {t.studio}
             </span>
           </Link>
 
@@ -332,7 +546,7 @@ export function AnalyzeClient() {
                 <circle cx="12" cy="10" r="3" />
               </svg>
               <span className="max-w-[130px] truncate sm:max-w-[180px]">
-                {selectedPreset ? selectedPreset.name : "Select Hotspot"}
+                {selectedPreset ? selectedPreset.name : t.selectHotspot}
               </span>
               <svg
                 className="size-3 text-bone-400 shrink-0"
@@ -354,7 +568,7 @@ export function AnalyzeClient() {
                 className="absolute start-0 top-full mt-1.5 z-40 w-72 rounded-xl border border-white/10 bg-ink-900/95 p-1.5 shadow-2xl backdrop-blur-xl"
               >
                 <li className="px-2.5 py-1 text-[10px] font-medium tracking-wider text-bone-400 uppercase">
-                  Global Change Hotspots
+                  {t.globalHotspots}
                 </li>
                 {HOTSPOT_PRESETS.map((p) => (
                   <li key={p.id} role="option" aria-selected={selectedPreset?.id === p.id}>
@@ -373,7 +587,9 @@ export function AnalyzeClient() {
                           {p.yearT1}→{p.yearT2}
                         </span>
                       </div>
-                      <p className="mt-0.5 text-[11px] text-bone-400 line-clamp-1">{p.description}</p>
+                      <p className="mt-0.5 text-[11px] text-bone-400 line-clamp-1">
+                        {p.description}
+                      </p>
                     </button>
                   </li>
                 ))}
@@ -387,7 +603,7 @@ export function AnalyzeClient() {
           <LocationSearch onSelectLocation={handleSelectLocation} />
         </div>
 
-        {/* Right Section: View Controls, Basemap, AI Architecture */}
+        {/* Right Section: View Controls, Basemap, AI Architecture, Language */}
         <div className="flex items-center gap-2">
           {/* Basemap Segmented Toggle */}
           <div className="hidden sm:flex items-center rounded-lg border border-white/10 bg-ink-900/80 p-0.5 text-xs">
@@ -400,7 +616,7 @@ export function AnalyzeClient() {
                   : "text-bone-400 hover:text-bone-200"
               }`}
             >
-              Sentinel-2
+              {t.sentinel2}
             </button>
             <button
               type="button"
@@ -411,7 +627,7 @@ export function AnalyzeClient() {
                   : "text-bone-400 hover:text-bone-200"
               }`}
             >
-              High-Res Aerial
+              {t.highRes}
             </button>
           </div>
 
@@ -425,7 +641,9 @@ export function AnalyzeClient() {
                 : "border-white/10 bg-ink-900/80 text-bone-200 hover:border-signal-400/40 hover:text-signal-400"
             }`}
             aria-pressed={compareMode}
-            aria-label={compareMode ? "Switch to single view" : "Switch to side-by-side split compare"}
+            aria-label={
+              compareMode ? "Switch to single view" : "Switch to side-by-side split compare"
+            }
           >
             <svg
               className="size-3.5"
@@ -440,7 +658,7 @@ export function AnalyzeClient() {
               <rect width="18" height="18" x="3" y="3" rx="2" />
               <path d="M12 3v18" />
             </svg>
-            <span className="hidden sm:inline">{compareMode ? "Split Active" : "Split View"}</span>
+            <span className="hidden sm:inline">{compareMode ? t.splitActive : t.splitView}</span>
           </button>
 
           {/* AI Architecture Modal Trigger */}
@@ -467,7 +685,17 @@ export function AnalyzeClient() {
               <path d="M12 4v3" />
               <path d="M12 17v3" />
             </svg>
-            <span className="hidden sm:inline">Siamese U-Net</span>
+            <span className="hidden sm:inline">{t.siameseModel}</span>
+          </button>
+
+          {/* Bilingual EN / AR Switcher (Rule #17) */}
+          <button
+            type="button"
+            onClick={() => setLocale(locale === "en" ? "ar" : "en")}
+            className="rounded-lg border border-white/10 bg-ink-900/80 px-2.5 py-1.5 text-xs font-medium text-bone-200 transition-colors hover:border-signal-400/40 hover:text-signal-400 focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:outline-none"
+            aria-label={locale === "en" ? "Switch to Arabic" : "Switch to English"}
+          >
+            {locale === "en" ? "عربي" : "EN"}
           </button>
         </div>
       </header>
@@ -488,9 +716,10 @@ export function AnalyzeClient() {
           basemapSource={basemapSource}
           center={mapCenter}
           zoom={mapZoom}
+          onCameraMove={handleCameraMove}
         />
 
-        {/* 3. Bottom Control Dock (Clean & Unified, No Scattered Pills) */}
+        {/* 3. Bottom Control Dock */}
         <div className="pointer-events-none absolute bottom-6 inset-x-0 z-20 flex justify-center px-4">
           <div className="pointer-events-auto flex max-w-4xl w-full flex-col items-center gap-2">
             {/* Error Notification */}
@@ -548,8 +777,11 @@ export function AnalyzeClient() {
               {/* Temporal Selectors */}
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5">
-                  <label htmlFor="year-t1" className="text-[11px] font-medium text-bone-400 uppercase tracking-wider">
-                    Baseline
+                  <label
+                    htmlFor="year-t1"
+                    className="text-[11px] font-medium text-bone-400 uppercase tracking-wider"
+                  >
+                    {t.baseline}
                   </label>
                   <select
                     id="year-t1"
@@ -572,7 +804,7 @@ export function AnalyzeClient() {
                 </div>
 
                 <svg
-                  className="size-3.5 text-bone-400"
+                  className="size-3.5 text-bone-400 rtl:rotate-180"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -586,8 +818,11 @@ export function AnalyzeClient() {
                 </svg>
 
                 <div className="flex items-center gap-1.5">
-                  <label htmlFor="year-t2" className="text-[11px] font-medium text-signal-400 uppercase tracking-wider">
-                    Target
+                  <label
+                    htmlFor="year-t2"
+                    className="text-[11px] font-medium text-signal-400 uppercase tracking-wider"
+                  >
+                    {t.target}
                   </label>
                   <select
                     id="year-t2"
@@ -610,13 +845,13 @@ export function AnalyzeClient() {
 
               <div className="h-6 w-px bg-white/10" aria-hidden="true" />
 
-              {/* AOI Drawing Tools */}
+              {/* AOI Drawing & Viewport Framing Tools */}
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setIsDrawing(!isDrawing)}
                   disabled={status === "running"}
-                  className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:outline-none ${
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:outline-none ${
                     isDrawing
                       ? "border border-signal-400 bg-signal-400 text-ink-950 font-semibold shadow-sm"
                       : "border border-white/10 bg-ink-900 text-bone-200 hover:border-signal-400/40 hover:text-signal-400"
@@ -636,8 +871,35 @@ export function AnalyzeClient() {
                     <path d="m18 5-3-3L6 11l-3 7 7-3Z" />
                     <path d="m15 8 3 3" />
                   </svg>
-                  <span>{isDrawing ? "Drawing Active" : "Draw Area"}</span>
+                  <span>{isDrawing ? t.drawingActive : t.drawArea}</span>
                 </button>
+
+                {!polygonInView && (
+                  <button
+                    type="button"
+                    onClick={frameCurrentView}
+                    disabled={status === "running"}
+                    className="flex items-center gap-1.5 rounded-lg border border-signal-400/40 bg-signal-400/10 px-2.5 py-1.5 text-xs font-medium text-signal-400 hover:bg-signal-400/20 transition-colors focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:outline-none"
+                    title="Snap analysis boundary to current map view"
+                  >
+                    <svg
+                      className="size-3.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+                      <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+                      <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+                      <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+                    </svg>
+                    <span>{t.frameView}</span>
+                  </button>
+                )}
 
                 {polygon && (
                   <div className="flex items-center gap-1.5 rounded-lg border border-white/5 bg-ink-900/60 px-2.5 py-1 text-xs">
@@ -703,9 +965,9 @@ export function AnalyzeClient() {
                 <button
                   type="button"
                   onClick={runAnalysis}
-                  disabled={!polygon || polygon.length < 3 || isOversized}
+                  disabled={isOversized}
                   className={`flex items-center gap-2 rounded-xl px-5 py-2 text-xs font-semibold tracking-wide transition-all focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:outline-none ${
-                    !polygon || polygon.length < 3 || isOversized
+                    isOversized
                       ? "cursor-not-allowed bg-ink-900 text-bone-400 border border-white/5"
                       : "bg-signal-400 text-ink-950 hover:bg-signal-400/90 active:scale-95 shadow-[0_0_20px_rgba(255,176,32,0.35)]"
                   }`}
@@ -722,7 +984,7 @@ export function AnalyzeClient() {
                   >
                     <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                   </svg>
-                  <span>Analyze Changes</span>
+                  <span>{t.analyzeChanges}</span>
                 </button>
               )}
 
@@ -752,7 +1014,11 @@ export function AnalyzeClient() {
                     <rect width="18" height="18" x="3" y="3" rx="2" />
                     <path d="M15 3v18" />
                   </svg>
-                  <span>{drawerOpen ? "Hide Inspector" : `Inspector (${result.metadata.polygon_count})`}</span>
+                  <span>
+                    {drawerOpen
+                      ? t.hideInspector
+                      : `${t.inspector} (${result.metadata.polygon_count})`}
+                  </span>
                 </button>
               )}
             </div>
@@ -767,9 +1033,9 @@ export function AnalyzeClient() {
             id="inspector-drawer"
             role="region"
             aria-label="Change detection audit drawer"
-            initial={{ opacity: 0, x: 400 }}
+            initial={{ opacity: 0, x: locale === "ar" ? -400 : 400 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 400 }}
+            exit={{ opacity: 0, x: locale === "ar" ? -400 : 400 }}
             transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
             className="absolute top-14 end-0 z-30 h-[calc(100vh-3.5rem)] w-full max-w-md border-s border-white/10 bg-ink-950/95 p-6 shadow-2xl backdrop-blur-2xl overflow-y-auto"
           >
@@ -777,7 +1043,7 @@ export function AnalyzeClient() {
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div>
                 <span className="text-[11px] font-medium tracking-wider text-signal-400 uppercase">
-                  Bi-Temporal Audit Report
+                  {t.auditReport}
                 </span>
                 <h2 className="text-xl font-semibold text-bone-100 tabular-nums">
                   {result.metadata.year_t1} → {result.metadata.year_t2}
@@ -820,7 +1086,7 @@ export function AnalyzeClient() {
                 onClick={() => setAiModalOpen(true)}
                 className="rounded-md px-2.5 py-1 text-xs font-medium text-signal-400 underline hover:text-bone-100 transition-colors focus-visible:ring-1 focus-visible:ring-signal-400 focus-visible:outline-none"
               >
-                Inspect
+                {t.inspect}
               </button>
             </div>
 
@@ -828,19 +1094,19 @@ export function AnalyzeClient() {
             <div className="mt-5 grid grid-cols-2 gap-3">
               <div className="rounded-xl border border-white/10 bg-ink-900/60 p-3.5">
                 <span className="text-[11px] font-medium text-bone-400 uppercase tracking-wider">
-                  Total Changed
+                  {t.totalChanged}
                 </span>
                 <p className="mt-1 text-xl font-bold text-signal-400 tabular-nums">
                   {formatArea(result.metadata.total_changed_m2)}
                 </p>
                 <span className="text-[11px] text-bone-300 tabular-nums">
-                  {result.metadata.changed_pct}% of total AOI
+                  {result.metadata.changed_pct}% {t.ofTotalAoi}
                 </span>
               </div>
 
               <div className="rounded-xl border border-white/10 bg-ink-900/60 p-3.5">
                 <span className="text-[11px] font-medium text-bone-400 uppercase tracking-wider">
-                  Polygons Detected
+                  {t.polygonsDetected}
                 </span>
                 <p className="mt-1 text-xl font-bold text-bone-100 tabular-nums">
                   {result.metadata.polygon_count}
@@ -854,7 +1120,7 @@ export function AnalyzeClient() {
             {/* Change Categories Breakdown */}
             <div className="mt-6">
               <h3 className="text-xs font-semibold text-bone-300 uppercase tracking-wider">
-                Class Distribution
+                {t.classDistribution}
               </h3>
               <div className="mt-2.5 space-y-2">
                 {[
@@ -904,9 +1170,9 @@ export function AnalyzeClient() {
             <div className="mt-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-semibold text-bone-300 uppercase tracking-wider">
-                  Detected Polygons
+                  {t.detectedPolygons}
                 </h3>
-                <span className="text-[11px] text-bone-400">Click to fly to</span>
+                <span className="text-[11px] text-bone-400">{t.clickToFly}</span>
               </div>
               <div className="mt-2.5 max-h-48 space-y-1.5 overflow-y-auto pe-1">
                 {result.features.slice(0, 20).map((f) => (
@@ -925,7 +1191,7 @@ export function AnalyzeClient() {
                         Polygon #{f.properties.id} · {f.properties.label}
                       </span>
                       <span className="text-[10px] text-bone-400 tabular-nums">
-                        Confidence: {(f.properties.confidence * 100).toFixed(0)}%
+                        {t.confidence}: {(f.properties.confidence * 100).toFixed(0)}%
                       </span>
                     </div>
                     <span className="text-xs text-signal-400 font-medium tabular-nums">
@@ -957,7 +1223,7 @@ export function AnalyzeClient() {
                   <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
                   <polyline points="14 2 14 8 20 8" />
                 </svg>
-                <span>{generatingPdf ? "Compiling PDF…" : "Download Audit Report (PDF)"}</span>
+                <span>{generatingPdf ? t.compilingPdf : t.downloadPdf}</span>
               </button>
 
               <button
@@ -979,7 +1245,7 @@ export function AnalyzeClient() {
                   <polyline points="2 17 12 22 22 17" />
                   <polyline points="2 12 12 17 22 12" />
                 </svg>
-                <span>Export GeoJSON Layer</span>
+                <span>{t.exportGeoJson}</span>
               </button>
             </div>
           </motion.aside>
@@ -1003,7 +1269,10 @@ export function AnalyzeClient() {
               <div className="flex items-center justify-between border-b border-white/10 pb-5">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="size-2 rounded-full bg-signal-400 animate-ping" aria-hidden="true" />
+                    <span
+                      className="size-2 rounded-full bg-signal-400 animate-ping"
+                      aria-hidden="true"
+                    />
                     <span className="text-xs font-semibold text-signal-400 uppercase tracking-wider">
                       Senior Project Deep Vision Architecture
                     </span>
@@ -1074,26 +1343,44 @@ export function AnalyzeClient() {
 
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="rounded-2xl border border-white/10 bg-ink-900/40 p-4">
-                    <span className="text-xs text-signal-400 font-bold">1 · Shared Weights Encoder</span>
-                    <h4 className="mt-1.5 text-sm font-semibold text-bone-100">Symmetric Invariance</h4>
+                    <span className="text-xs text-signal-400 font-bold">
+                      1 · Shared Weights Encoder
+                    </span>
+                    <h4 className="mt-1.5 text-sm font-semibold text-bone-100">
+                      Symmetric Invariance
+                    </h4>
                     <p className="mt-2 text-xs text-bone-300 leading-relaxed">
-                      Both date tensors T₁ and T₂ pass through an identical feature extraction backbone. This mathematical symmetry ensures identical response to vegetation seasonality and solar azimuth.
+                      Both date tensors T₁ and T₂ pass through an identical feature extraction
+                      backbone. This mathematical symmetry ensures identical response to vegetation
+                      seasonality and solar azimuth.
                     </p>
                   </div>
 
                   <div className="rounded-2xl border border-white/10 bg-ink-900/40 p-4">
-                    <span className="text-xs text-signal-400 font-bold">2 · Multi-Scale Difference</span>
-                    <h4 className="mt-1.5 text-sm font-semibold text-bone-100">Skip Fusion Layers</h4>
+                    <span className="text-xs text-signal-400 font-bold">
+                      2 · Multi-Scale Difference
+                    </span>
+                    <h4 className="mt-1.5 text-sm font-semibold text-bone-100">
+                      Skip Fusion Layers
+                    </h4>
                     <p className="mt-2 text-xs text-bone-300 leading-relaxed">
-                      At each spatial resolution, feature maps are fused via absolute difference |f₁ - f₂| and 1×1 bottleneck convolutions to isolate genuine anthropogenic structural changes.
+                      At each spatial resolution, feature maps are fused via absolute difference
+                      |f₁ - f₂| and 1×1 bottleneck convolutions to isolate genuine anthropogenic
+                      structural changes.
                     </p>
                   </div>
 
                   <div className="rounded-2xl border border-white/10 bg-ink-900/40 p-4">
-                    <span className="text-xs text-signal-400 font-bold">3 · BCE + Soft Dice Loss</span>
-                    <h4 className="mt-1.5 text-sm font-semibold text-bone-100">Sparse Target Handling</h4>
+                    <span className="text-xs text-signal-400 font-bold">
+                      3 · BCE + Soft Dice Loss
+                    </span>
+                    <h4 className="mt-1.5 text-sm font-semibold text-bone-100">
+                      Sparse Target Handling
+                    </h4>
                     <p className="mt-2 text-xs text-bone-300 leading-relaxed">
-                      Land-cover changes occupy less than 5% of a satellite scene. Combining Binary Cross-Entropy with Soft Dice Loss prevents background class bias and sharpens boundary delineation.
+                      Land-cover changes occupy less than 5% of a satellite scene. Combining Binary
+                      Cross-Entropy with Soft Dice Loss prevents background class bias and sharpens
+                      boundary delineation.
                     </p>
                   </div>
                 </div>
@@ -1102,7 +1389,8 @@ export function AnalyzeClient() {
               {/* Actions: Download PyTorch Checkpoint */}
               <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-5">
                 <div className="text-xs text-bone-300">
-                  Checkpoint file: <code className="text-signal-400">siamese_unet_checkpoint.pt</code> (8.45&nbsp;MB)
+                  Checkpoint file:{" "}
+                  <code className="text-signal-400">siamese_unet_checkpoint.pt</code> (8.45&nbsp;MB)
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -1133,7 +1421,7 @@ export function AnalyzeClient() {
                     onClick={() => setAiModalOpen(false)}
                     className="rounded-xl border border-white/20 px-5 py-2.5 text-xs font-medium text-bone-200 hover:text-bone-100 transition-colors focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:outline-none"
                   >
-                    Close
+                    {t.close}
                   </button>
                 </div>
               </div>
