@@ -410,12 +410,15 @@ export function MapCanvas({
     };
   }, []);
 
+  const centerLon = center[0];
+  const centerLat = center[1];
+
   // Fly camera when preset or geocoding search updates `center` and `zoom`
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     map.flyTo({
-      center,
+      center: [centerLon, centerLat],
       zoom,
       bearing: 0,
       pitch: 0,
@@ -423,14 +426,14 @@ export function MapCanvas({
       essential: true,
     });
     compareMapRef.current?.flyTo({
-      center,
+      center: [centerLon, centerLat],
       zoom,
       bearing: 0,
       pitch: 0,
       duration: 1200,
       essential: true,
     });
-  }, [center[0], center[1], zoom]);
+  }, [centerLon, centerLat, zoom]);
 
   // Initialize Secondary Map for Compare Mode (Year T1)
   useEffect(() => {

@@ -99,6 +99,7 @@ export function LocationSearch({ onSelectLocation }: LocationSearchProps) {
           type="text"
           role="combobox"
           aria-expanded={open}
+          aria-controls="location-search-listbox"
           aria-haspopup="listbox"
           aria-label="Search global coordinates or region"
           name="location-search"
