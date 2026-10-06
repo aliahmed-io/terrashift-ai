@@ -43,6 +43,14 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       dir="ltr"
       className={`${instrument.variable} ${spaceGrotesk.variable} ${jetbrains.variable}`}
     >
+      <head>
+        <link rel="preconnect" href="https://server.arcgisonline.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://services.arcgisonline.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://a.tiles.maps.eox.at" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://b.tiles.maps.eox.at" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://c.tiles.maps.eox.at" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://d.tiles.maps.eox.at" crossOrigin="anonymous" />
+      </head>
       <body className="bg-ink-950 text-bone-100 min-h-dvh antialiased selection:bg-signal-400 selection:text-ink-950">
         <Providers>{children}</Providers>
       </body>

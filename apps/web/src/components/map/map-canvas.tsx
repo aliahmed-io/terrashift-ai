@@ -6,7 +6,8 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import {
   calculatePolygonAreaKm2,
   formatArea,
-  getEoxTileUrl,
+  getEoxTileUrls,
+  getHighResTileUrls,
   MAX_AOI_KM2,
 } from "@/lib/tiles";
 
@@ -47,27 +48,16 @@ interface MapCanvasProps {
 
 function buildMapStyle(year: number): maplibregl.StyleSpecification {
   const sources: maplibregl.StyleSpecification["sources"] = {
-    "esri-base": {
-      type: "raster",
-      tiles: [
-        "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      ],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: "Esri, Maxar, Earthstar Geographics",
-    },
     "s2-cloudless": {
       type: "raster",
-      tiles: [getEoxTileUrl(year)],
+      tiles: getEoxTileUrls(year),
       tileSize: 256,
-      maxzoom: 15,
+      maxzoom: 13,
       attribution: "Sentinel-2 cloudless by EOX IT Services GmbH",
     },
     "mapbox-satellite": {
       type: "raster",
-      tiles: [
-        "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      ],
+      tiles: getHighResTileUrls(),
       tileSize: 256,
       maxzoom: 19,
       attribution: "Esri, Maxar, Earthstar Geographics",
@@ -76,14 +66,10 @@ function buildMapStyle(year: number): maplibregl.StyleSpecification {
 
   const layers: maplibregl.StyleSpecification["layers"] = [
     {
-      id: "esri-base-layer",
-      type: "raster",
-      source: "esri-base",
-      minzoom: 0,
-      maxzoom: 22,
+      id: "orbital-bg",
+      type: "background",
       paint: {
-        "raster-opacity": 1,
-        "raster-fade-duration": 0,
+        "background-color": "#04070B",
       },
     },
     {
@@ -91,24 +77,23 @@ function buildMapStyle(year: number): maplibregl.StyleSpecification {
       type: "raster",
       source: "s2-cloudless",
       minzoom: 0,
-      maxzoom: 22,
+      maxzoom: 14,
       paint: {
         "raster-opacity": 1,
-        "raster-fade-duration": 200,
+        "raster-fade-duration": 0,
+        "raster-resampling": "linear",
       },
     },
     {
       id: "mapbox-layer",
       type: "raster",
       source: "mapbox-satellite",
-      minzoom: 0,
+      minzoom: 13,
       maxzoom: 22,
-      layout: {
-        visibility: "none",
-      },
       paint: {
-        "raster-opacity": 1,
-        "raster-fade-duration": 200,
+        "raster-opacity": ["interpolate", ["linear"], ["zoom"], 13, 0, 13.5, 1],
+        "raster-fade-duration": 0,
+        "raster-resampling": "linear",
       },
     },
   ];
@@ -149,7 +134,22 @@ function updateRasterYear(map: maplibregl.Map | null, year: number) {
   if (!map || !map.isStyleLoaded()) return;
   const src = map.getSource("s2-cloudless") as maplibregl.RasterTileSource | undefined;
   if (src && typeof src.setTiles === "function") {
-    src.setTiles([getEoxTileUrl(year)]);
+    src.setTiles(getEoxTileUrls(year));
+  }
+}
+
+function applyBasemapMode(map: maplibregl.Map | null, mode: "s2" | "mapbox") {
+  if (!map || !map.isStyleLoaded()) return;
+  if (map.getLayer("s2-layer")) {
+    map.setLayoutProperty("s2-layer", "visibility", mode === "s2" ? "visible" : "none");
+  }
+  if (map.getLayer("mapbox-layer")) {
+    map.setLayerZoomRange("mapbox-layer", mode === "mapbox" ? 0 : 13, 22);
+    map.setPaintProperty(
+      "mapbox-layer",
+      "raster-opacity",
+      mode === "mapbox" ? 1 : ["interpolate", ["linear"], ["zoom"], 13, 0, 13.5, 1],
+    );
   }
 }
 
@@ -177,6 +177,8 @@ export function MapCanvas({
   // Latest prop refs to avoid unnecessary effect re-runs
   const yearT1Ref = useRef(yearT1);
   yearT1Ref.current = yearT1;
+  const appliedYearT1Ref = useRef(yearT1);
+  const appliedYearT2Ref = useRef(yearT2);
   const polygonRef = useRef(polygon);
   polygonRef.current = polygon;
   const basemapSourceRef = useRef(basemapSource);
@@ -213,21 +215,8 @@ export function MapCanvas({
 
   // Update Basemap layer visibility on primary and compare maps
   useEffect(() => {
-    const updateVisibility = (map: maplibregl.Map | null) => {
-      if (!map || !map.isStyleLoaded()) return;
-      if (map.getLayer("s2-layer")) {
-        map.setLayoutProperty("s2-layer", "visibility", basemapSource === "s2" ? "visible" : "none");
-      }
-      if (map.getLayer("mapbox-layer")) {
-        map.setLayoutProperty(
-          "mapbox-layer",
-          "visibility",
-          basemapSource === "mapbox" ? "visible" : "none",
-        );
-      }
-    };
-    updateVisibility(mapRef.current);
-    updateVisibility(compareMapRef.current);
+    applyBasemapMode(mapRef.current, basemapSource);
+    applyBasemapMode(compareMapRef.current, basemapSource);
   }, [basemapSource]);
 
   // Initialize Primary Map (Year T2 or main)
@@ -240,7 +229,12 @@ export function MapCanvas({
       center,
       zoom,
       minZoom: 1,
-      maxZoom: 21,
+      maxZoom: 19,
+      fadeDuration: 0,
+      maxTileCacheSize: 1200,
+      maxTileCacheZoomLevels: 8,
+      refreshExpiredTiles: false,
+      cancelPendingTileRequestsWhileZooming: true,
       scrollZoom: true,
       dragPan: true,
       dragRotate: false,
@@ -253,6 +247,8 @@ export function MapCanvas({
       attributionControl: false,
     });
 
+    map.scrollZoom.setWheelZoomRate(1 / 200);
+    map.scrollZoom.setZoomRate(1 / 85);
     map.touchZoomRotate.disableRotation();
     map.on("error", () => {
       // Suppress transient tile network errors from triggering Next.js console error overlay
@@ -458,7 +454,12 @@ export function MapCanvas({
       center: [mainCenter.lng, mainCenter.lat],
       zoom: mainZoom,
       minZoom: 1,
-      maxZoom: 21,
+      maxZoom: 19,
+      fadeDuration: 0,
+      maxTileCacheSize: 1200,
+      maxTileCacheZoomLevels: 8,
+      refreshExpiredTiles: false,
+      cancelPendingTileRequestsWhileZooming: true,
       scrollZoom: true,
       dragPan: true,
       dragRotate: false,
@@ -470,7 +471,10 @@ export function MapCanvas({
       doubleClickZoom: false,
       attributionControl: false,
     });
+    appliedYearT1Ref.current = yearT1Ref.current;
 
+    compareMap.scrollZoom.setWheelZoomRate(1 / 200);
+    compareMap.scrollZoom.setZoomRate(1 / 85);
     compareMap.touchZoomRotate.disableRotation();
     compareMap.on("error", () => {
       // Suppress transient tile network errors from triggering Next.js console error overlay
@@ -494,14 +498,7 @@ export function MapCanvas({
         paint: { "line-color": "#FFB020", "line-width": 2, "line-dasharray": [4, 2] },
       });
 
-      if (basemapSourceRef.current === "mapbox") {
-        if (compareMap.getLayer("s2-layer")) {
-          compareMap.setLayoutProperty("s2-layer", "visibility", "none");
-        }
-        if (compareMap.getLayer("mapbox-layer")) {
-          compareMap.setLayoutProperty("mapbox-layer", "visibility", "visible");
-        }
-      }
+      applyBasemapMode(compareMap, basemapSourceRef.current);
     });
 
     compareMapRef.current = compareMap;
@@ -528,12 +525,16 @@ export function MapCanvas({
     };
   }, [compareMode, syncMaps]);
 
-  // Update Raster Tile Year when yearT1 or yearT2 changes in-place without losing GeoJSON layers
+  // Update Raster Tile Year when yearT1 or yearT2 changes in-place without flushing cache on mount
   useEffect(() => {
+    if (appliedYearT2Ref.current === yearT2) return;
+    appliedYearT2Ref.current = yearT2;
     updateRasterYear(mapRef.current, yearT2);
   }, [yearT2]);
 
   useEffect(() => {
+    if (appliedYearT1Ref.current === yearT1) return;
+    appliedYearT1Ref.current = yearT1;
     updateRasterYear(compareMapRef.current, yearT1);
   }, [yearT1]);
 

@@ -97,8 +97,23 @@ export function getEoxTileUrl(year: number): string {
   return `https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-${y}_3857/default/g/{z}/{y}/{x}.jpg`;
 }
 
+export function getEoxTileUrls(year: number): string[] {
+  const y = Math.max(MIN_YEAR, Math.min(MAX_YEAR, year));
+  return ["a", "b", "c", "d"].map(
+    (sub) =>
+      `https://${sub}.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-${y}_3857/default/g/{z}/{y}/{x}.jpg`,
+  );
+}
+
 export function getHighResTileUrl(): string {
-  return "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+  return "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+}
+
+export function getHighResTileUrls(): string[] {
+  return [
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  ];
 }
 
 export function getMapboxStyleUrl(): string {
