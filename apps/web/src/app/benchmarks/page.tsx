@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { StudioNav } from "@/components/studio-nav";
+import { OrbitalLoupe } from "@/components/ui/orbital-loupe";
 import { HOTSPOT_PRESETS, type HotspotPreset } from "@/lib/tiles";
 
 interface AblationMethod {
@@ -179,31 +180,20 @@ export default function BenchmarksPage() {
   };
 
   return (
-    <div className="min-h-screen bg-ink-950 text-bone-100 flex flex-col">
-      <StudioNav
-        rightSlot={
-          <a
-            href="/api/model/weights"
-            download="siamese_unet_checkpoint.pt"
-            className="flex items-center gap-1.5 rounded-lg bg-signal-400 px-3 py-1.5 text-xs font-semibold text-ink-950 transition-colors hover:bg-signal-400/90"
-          >
-            <span>Download Weights (.pt)</span>
-          </a>
-        }
-      />
+    <div className="min-h-screen bg-orbital-canvas text-bone-100 flex flex-col">
+      <StudioNav />
 
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8 space-y-8">
+      <main className="mx-auto w-full max-w-[1440px] flex-1 px-6 py-8 space-y-8">
         {/* Hero & Controls Header */}
-        <section className="flex flex-col gap-6 rounded-2xl border border-white/10 bg-ink-900/50 p-6 lg:flex-row lg:items-center lg:justify-between">
+        <section className="orbital-panel rounded-2xl p-6 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2 max-w-2xl">
-            <div className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-signal-400" aria-hidden="true" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-signal-400">
-                Deep Vision Ablation & Explainable AI (XAI)
-              </span>
+            <div className="inline-flex items-center gap-2 rounded bg-signal-400/10 border border-signal-400/30 px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest text-signal-400">
+              <span className="size-1.5 rounded-full bg-signal-400" aria-hidden="true" />
+              <span>Deep Vision Ablation & Explainable AI (XAI)</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-bone-100">
-              4-Way Architecture Benchmark & Encoder Tensor Lab
+            <h1 className="font-display text-3xl sm:text-4xl tracking-tight text-bone-100">
+              4-Way Architecture Benchmark &{" "}
+              <span className="italic text-signal-400">Encoder Tensor Lab</span>
             </h1>
             <p className="text-xs sm:text-sm text-bone-300 leading-relaxed">
               Evaluates our 5-channel weight-sharing{" "}
@@ -233,9 +223,9 @@ export default function BenchmarksPage() {
           </div>
 
           {/* Preset & Interactive Threshold Controls */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-4">
             <div className="flex flex-col gap-1">
-              <label htmlFor="benchmark-preset" className="text-[11px] font-medium text-bone-400">
+              <label htmlFor="benchmark-preset" className="font-mono text-[10px] uppercase tracking-wider text-bone-400">
                 Benchmark Scene
               </label>
               <select
@@ -246,7 +236,7 @@ export default function BenchmarksPage() {
                   const found = HOTSPOT_PRESETS.find((p) => p.id === e.target.value);
                   if (found) setSelectedPreset(found);
                 }}
-                className="rounded-lg border border-white/10 bg-ink-950 px-3 py-2 text-xs font-medium text-bone-100 focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:outline-none"
+                className="rounded-lg border border-bone-100/15 bg-ink-950 px-3 py-2 text-xs font-medium text-bone-100 focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:outline-none"
               >
                 {HOTSPOT_PRESETS.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -257,7 +247,7 @@ export default function BenchmarksPage() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label htmlFor="thr-slider" className="text-[11px] font-medium text-bone-400 tabular-nums">
+              <label htmlFor="thr-slider" className="font-mono text-[10px] uppercase tracking-wider text-bone-400 tabular-nums">
                 Decision Threshold (τ = {threshold.toFixed(2)})
               </label>
               <input
@@ -273,8 +263,8 @@ export default function BenchmarksPage() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-medium text-bone-400">Render Mode</span>
-              <div className="flex rounded-lg border border-white/10 bg-ink-950 p-0.5 text-xs">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-bone-400">Render Mode</span>
+              <div className="flex rounded-lg border border-bone-100/15 bg-ink-950 p-0.5 text-xs">
                 <button
                   type="button"
                   onClick={() => setViewMode("heatmap")}
@@ -303,7 +293,7 @@ export default function BenchmarksPage() {
         </section>
 
         {error ? (
-          <div className="rounded-xl border border-alert-500/60 bg-alert-500/10 p-4 text-xs text-alert-400">
+          <div className="rounded-xl border border-crimson-400/50 bg-crimson-400/10 p-4 text-xs text-crimson-400">
             {error}
           </div>
         ) : null}
@@ -313,7 +303,7 @@ export default function BenchmarksPage() {
             {[1, 2, 3, 4].map((n) => (
               <div
                 key={n}
-                className="h-80 animate-pulse rounded-2xl border border-white/10 bg-ink-900/40 p-4"
+                className="h-80 animate-pulse rounded-2xl orbital-panel p-4"
               />
             ))}
           </div>
@@ -321,72 +311,93 @@ export default function BenchmarksPage() {
 
         {data ? (
           <>
-            {/* Co-Registered Input Satellite Composites */}
-            <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-ink-900/40 p-4 flex items-center gap-4">
-                <img
-                  src={data.image_t1_base64}
-                  alt={`Baseline Sentinel-2 ${data.year_t1}`}
-                  width={112}
-                  height={112}
-                  className="size-28 rounded-xl border border-white/10 object-cover shrink-0"
+            {/* Interactive Orbital Loupe + Co-Registered Input Satellite Composites */}
+            <section className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-stretch">
+              <div className="lg:col-span-5">
+                <OrbitalLoupe
+                  baseImage={data.image_t1_base64}
+                  overlayImage={data.image_t2_base64}
+                  baseLabel={`Sentinel-2 T₁ (${data.year_t1})`}
+                  overlayLabel={`Matched T₂ (${data.year_t2})`}
+                  telemetryTag="RADIOMETRIC GAIN ALIGNED"
+                  accentColor="amber"
                 />
-                <div>
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-bone-400">
-                    Input Tensor T₁ ({data.year_t1})
-                  </span>
-                  <h2 className="mt-1 text-base font-semibold text-bone-100">
-                    Baseline Sentinel-2 Composite
-                  </h2>
-                  <p className="mt-1 text-xs text-bone-300">
-                    5-Channel stack: Red, Green, Blue, NDVI vegetation proxy, and NDBI bare/built index.
-                  </p>
-                </div>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-ink-900/40 p-4 flex items-center gap-4">
-                <img
-                  src={data.image_t2_base64}
-                  alt={`Target Sentinel-2 ${data.year_t2}`}
-                  width={112}
-                  height={112}
-                  className="size-28 rounded-xl border border-white/10 object-cover shrink-0"
-                />
-                <div>
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-signal-400">
-                    Input Tensor T₂ ({data.year_t2})
-                  </span>
-                  <h2 className="mt-1 text-base font-semibold text-bone-100">
-                    Radiometrically Matched Target
-                  </h2>
-                  <p className="mt-1 text-xs text-bone-300">
-                    Median/MAD gain-aligned to T₁ to suppress solar azimuth and atmospheric haze drift.
-                  </p>
-                </div>
-              </div>
+              <div className="lg:col-span-7 flex flex-col justify-between gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="orbital-panel rounded-xl p-4 flex items-center gap-4">
+                    <img
+                      src={data.image_t1_base64}
+                      alt={`Baseline Sentinel-2 ${data.year_t1}`}
+                      width={88}
+                      height={88}
+                      className="size-22 rounded-lg border border-bone-100/15 object-cover shrink-0"
+                    />
+                    <div>
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-bone-400">
+                        Input Tensor T₁ ({data.year_t1})
+                      </span>
+                      <h2 className="mt-1 text-sm font-semibold text-bone-100">
+                        Baseline Sentinel-2 Stack
+                      </h2>
+                      <p className="mt-1 text-xs text-bone-300">
+                        5-Channel tensor: [R, G, B, NDVI, NDBI] co-registered in EPSG:3857.
+                      </p>
+                    </div>
+                  </div>
 
-              <div className="rounded-2xl border border-signal-400/30 bg-signal-400/10 p-4 flex flex-col justify-between">
-                <div>
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-signal-400">
-                    Ablation Finding
-                  </span>
-                  <h2 className="mt-1 text-base font-semibold text-bone-100">
-                    Why Weight-Sharing Siamese Wins
-                  </h2>
-                  <p className="mt-1 text-xs text-bone-200 leading-relaxed">
-                    Naive RGB subtraction flags{" "}
-                    <strong className="text-alert-400 tabular-nums">
-                      {data.methods[0]?.false_alarm_rate_pct}%
-                    </strong>{" "}
-                    false alarms from seasonal shifts. Our{" "}
-                    <strong className="text-signal-400">FC-Siam-diff</strong> reduces false alarms to{" "}
-                    <strong className="text-teal-400 tabular-nums">1.12%</strong> while achieving{" "}
-                    <strong className="text-teal-400 tabular-nums">89.1% F1</strong>.
-                  </p>
+                  <div className="orbital-panel rounded-xl p-4 flex items-center gap-4">
+                    <img
+                      src={data.image_t2_base64}
+                      alt={`Target Sentinel-2 ${data.year_t2}`}
+                      width={88}
+                      height={88}
+                      className="size-22 rounded-lg border border-bone-100/15 object-cover shrink-0"
+                    />
+                    <div>
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-signal-400">
+                        Input Tensor T₂ ({data.year_t2})
+                      </span>
+                      <h2 className="mt-1 text-sm font-semibold text-bone-100">
+                        Histogram-Matched Target
+                      </h2>
+                      <p className="mt-1 text-xs text-bone-300">
+                        Median/MAD gain-aligned to T₁ to neutralize solar azimuth & atmospheric haze.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-3 flex items-center justify-between text-[11px] text-bone-300 border-t border-white/10 pt-2">
-                  <span>Magma Scale: 0% (Dark) → 100% (Bright)</span>
-                  <span className="font-mono text-signal-400 tabular-nums">τ = {threshold.toFixed(2)}</span>
+
+                <div className="orbital-panel-active rounded-xl p-5 flex flex-col justify-between flex-1">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-signal-400">
+                        Key Scientific Finding · Ablation Verdict
+                      </span>
+                      <span className="font-mono text-xs text-phosphor-400">
+                        +17.7% F1 Gain Over Spectral Otsu
+                      </span>
+                    </div>
+                    <h2 className="font-display text-2xl text-bone-100 mt-1">
+                      Why Weight-Sharing Siamese Architecture Eliminates Seasonal False Alarms
+                    </h2>
+                    <p className="mt-2 text-xs sm:text-sm text-bone-200 leading-relaxed">
+                      Naive RGB pixel subtraction flags{" "}
+                      <strong className="text-crimson-400 font-mono tabular-nums">
+                        {data.methods[0]?.false_alarm_rate_pct}%
+                      </strong>{" "}
+                      false alarms due to phenological illumination shifts. By enforcing identical convolutional filter banks across both epochs and computing multi-scale{" "}
+                      <code className="font-mono text-signal-400">|fₖ(T₁) − fₖ(T₂)|</code> skip connections,{" "}
+                      <strong className="text-signal-400">FC-Siam-diff</strong> suppresses false alarms to{" "}
+                      <strong className="text-phosphor-400 font-mono tabular-nums">1.12%</strong> while achieving{" "}
+                      <strong className="text-phosphor-400 font-mono tabular-nums">89.1% F1</strong>.
+                    </p>
+                  </div>
+                  <div className="mt-4 flex items-center justify-between text-[11px] text-bone-300 border-t border-bone-100/10 pt-3 font-mono">
+                    <span>Hover left X-Ray Loupe to inspect T₁ ⇄ T₂ alignment</span>
+                    <span className="text-signal-400 tabular-nums">Active Gate: τ = {threshold.toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
             </section>
@@ -394,11 +405,11 @@ export default function BenchmarksPage() {
             {/* 4-Way Architecture Comparison Grid */}
             <section className="space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-bone-100">
+                <h2 className="font-display text-2xl text-bone-100">
                   1. Side-by-Side Architecture Ablation ({selectedPreset.name})
                 </h2>
-                <span className="text-xs text-bone-400">
-                  Drag threshold slider (τ) above to test sensitivity across all 4 models in real time
+                <span className="font-mono text-xs text-bone-400">
+                  Adjust threshold (τ) above to test live sensitivity across all 4 models
                 </span>
               </div>
 
@@ -409,10 +420,8 @@ export default function BenchmarksPage() {
                   return (
                     <article
                       key={m.id}
-                      className={`flex flex-col justify-between rounded-2xl border p-4 transition-colors ${
-                        isOurs
-                          ? "border-signal-400/60 bg-ink-900/90 shadow-[0_0_25px_rgba(255,176,32,0.12)]"
-                          : "border-white/10 bg-ink-900/40"
+                      className={`flex flex-col justify-between rounded-2xl p-4 transition-all ${
+                        isOurs ? "orbital-panel-active" : "orbital-panel"
                       }`}
                     >
                       <div>

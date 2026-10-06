@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, type ChangeEvent } from "react";
 import { StudioNav } from "@/components/studio-nav";
+import { OrbitalLoupe } from "@/components/ui/orbital-loupe";
 
 interface LabBlob {
   id: number;
@@ -140,33 +141,20 @@ export default function LabPage() {
   };
 
   return (
-    <div className="min-h-screen bg-ink-950 text-bone-100 flex flex-col">
-      <StudioNav
-        rightSlot={
-          data ? (
-            <a
-              href={data.overlay_base64}
-              download="terrashift-segmentation-overlay.png"
-              className="rounded-lg border border-white/15 bg-ink-900 px-3 py-1.5 text-xs font-medium text-bone-200 hover:border-signal-400/50 hover:text-signal-400 transition-colors"
-            >
-              Export Overlay (.png)
-            </a>
-          ) : null
-        }
-      />
+    <div className="min-h-screen bg-orbital-canvas text-bone-100 flex flex-col">
+      <StudioNav />
 
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8 space-y-8">
+      <main className="mx-auto w-full max-w-[1440px] flex-1 px-6 py-8 space-y-8">
         {/* Header */}
-        <section className="flex flex-col gap-6 rounded-2xl border border-white/10 bg-ink-900/50 p-6 lg:flex-row lg:items-center lg:justify-between">
+        <section className="orbital-panel rounded-2xl p-6 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2 max-w-2xl">
-            <div className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-signal-400" aria-hidden="true" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-signal-400">
-                Custom Image-Pair Sandbox & LEVIR-CD Ground-Truth Validator
-              </span>
+            <div className="inline-flex items-center gap-2 rounded bg-phosphor-400/10 border border-phosphor-400/30 px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest text-phosphor-400">
+              <span className="size-1.5 rounded-full bg-phosphor-400" aria-hidden="true" />
+              <span>Custom Image-Pair Sandbox & LEVIR-CD Ground-Truth Validator</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-bone-100">
-              Optical / Drone Pair Upload & Ground-Truth Confusion Matrix
+            <h1 className="font-display text-3xl sm:text-4xl tracking-tight text-bone-100">
+              Optical / Drone Pair Upload &{" "}
+              <span className="italic text-signal-400">Confusion Matrix Lab</span>
             </h1>
             <p className="text-xs sm:text-sm text-bone-300 leading-relaxed">
               Test the PyTorch Siamese U-Net on built-in{" "}
@@ -191,17 +179,27 @@ export default function LabPage() {
               <strong className="text-bone-100">any custom Before/After images</strong> from your computer.
             </p>
           </div>
+
+          {data ? (
+            <a
+              href={data.overlay_base64}
+              download="terrashift-segmentation-overlay.png"
+              className="inline-flex items-center gap-2 rounded-lg bg-signal-400 hover:bg-signal-500 px-4 py-2 text-xs font-semibold text-ink-950 transition-colors"
+            >
+              <span>Export Segmented Overlay (.png)</span>
+            </a>
+          ) : null}
         </section>
 
         {/* Benchmark Samples vs Custom Upload Grid */}
         <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* Left 7 cols: 1-Click Ground-Truth Samples */}
-          <div className="lg:col-span-7 rounded-2xl border border-white/10 bg-ink-900/40 p-5 space-y-4">
+          <div className="lg:col-span-7 orbital-panel rounded-2xl p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-bone-100">
+              <h2 className="font-display text-xl text-bone-100">
                 1. Select Benchmark Patch (with Known Ground-Truth Mask)
               </h2>
-              <span className="text-[11px] text-bone-400">256×256 Co-Registered Patches</span>
+              <span className="font-mono text-[11px] text-bone-400">256×256 Co-Registered Patches</span>
             </div>
 
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
@@ -213,14 +211,12 @@ export default function LabPage() {
                     type="button"
                     disabled={loading}
                     onClick={() => void runSample(s.id)}
-                    className={`rounded-xl border p-3.5 text-start transition-all ${
-                      active
-                        ? "border-signal-400 bg-signal-400/15 shadow-sm"
-                        : "border-white/10 bg-ink-950/60 hover:border-white/25"
+                    className={`rounded-xl p-3.5 text-start transition-all ${
+                      active ? "orbital-panel-active" : "orbital-panel hover:border-bone-100/25"
                     }`}
                   >
                     <span className="block text-xs font-semibold text-bone-100">{s.label}</span>
-                    <span className="mt-0.5 block text-[11px] text-bone-400">{s.subtitle}</span>
+                    <span className="mt-0.5 block font-mono text-[10px] text-bone-400">{s.subtitle}</span>
                   </button>
                 );
               })}
@@ -228,9 +224,9 @@ export default function LabPage() {
           </div>
 
           {/* Right 5 cols: Custom Before/After File Uploader */}
-          <div className="lg:col-span-5 rounded-2xl border border-white/10 bg-ink-900/40 p-5 flex flex-col justify-between space-y-4">
+          <div className="lg:col-span-5 orbital-panel rounded-2xl p-5 flex flex-col justify-between space-y-4">
             <div>
-              <h2 className="text-sm font-semibold text-bone-100">
+              <h2 className="font-display text-xl text-bone-100">
                 2. Or Upload Custom Before / After Pair (PNG / JPG)
               </h2>
               <p className="mt-0.5 text-[11px] text-bone-400">
@@ -238,11 +234,11 @@ export default function LabPage() {
               </p>
 
               <div className="mt-3 grid grid-cols-2 gap-3">
-                <label className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/20 bg-ink-950/60 p-3 text-center cursor-pointer hover:border-signal-400/60 transition-colors">
+                <label className="flex flex-col items-center justify-center rounded-xl border border-dashed border-bone-100/20 bg-ink-950/60 p-3 text-center cursor-pointer hover:border-signal-400/60 transition-colors">
                   <span className="text-xs font-medium text-bone-200">
-                    {customT1 ? "✓ T₁ Before Loaded" : "Select T₁ (Before)"}
+                    {customT1 ? "Loaded T₁ (Before)" : "Select T₁ (Before)"}
                   </span>
-                  <span className="mt-0.5 text-[10px] text-bone-400">PNG / JPG / WEBP</span>
+                  <span className="mt-0.5 font-mono text-[10px] text-bone-400">PNG / JPG / WEBP</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -251,11 +247,11 @@ export default function LabPage() {
                   />
                 </label>
 
-                <label className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/20 bg-ink-950/60 p-3 text-center cursor-pointer hover:border-signal-400/60 transition-colors">
+                <label className="flex flex-col items-center justify-center rounded-xl border border-dashed border-bone-100/20 bg-ink-950/60 p-3 text-center cursor-pointer hover:border-signal-400/60 transition-colors">
                   <span className="text-xs font-medium text-bone-200">
-                    {customT2 ? "✓ T₂ After Loaded" : "Select T₂ (After)"}
+                    {customT2 ? "Loaded T₂ (After)" : "Select T₂ (After)"}
                   </span>
-                  <span className="mt-0.5 text-[10px] text-bone-400">PNG / JPG / WEBP</span>
+                  <span className="mt-0.5 font-mono text-[10px] text-bone-400">PNG / JPG / WEBP</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -272,8 +268,8 @@ export default function LabPage() {
               disabled={!customT1 || !customT2 || loading}
               className={`w-full rounded-xl py-2.5 text-xs font-semibold transition-all ${
                 customT1 && customT2 && !loading
-                  ? "bg-signal-400 text-ink-950 hover:bg-signal-400/90"
-                  : "cursor-not-allowed bg-ink-950 text-bone-400 border border-white/5"
+                  ? "bg-signal-400 text-ink-950 hover:bg-signal-500"
+                  : "cursor-not-allowed bg-ink-950 text-bone-400 border border-bone-100/10"
               }`}
             >
               Run Siamese U-Net on Custom Pair
@@ -282,28 +278,28 @@ export default function LabPage() {
         </section>
 
         {error ? (
-          <div className="rounded-xl border border-alert-500/60 bg-alert-500/10 p-4 text-xs text-alert-400">
+          <div className="rounded-xl border border-crimson-400/50 bg-crimson-400/10 p-4 text-xs text-crimson-400">
             {error}
           </div>
         ) : null}
 
         {data ? (
           <>
-            {/* 4-Panel Visual Output Matrix */}
-            <section className="space-y-3">
+            {/* Interactive Dual X-Ray Loupe Inspection Row */}
+            <section className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-lg font-semibold text-bone-100">{data.meta.title}</h2>
-                  <p className="text-xs text-bone-400">
+                  <h2 className="font-display text-2xl text-bone-100">{data.meta.title}</h2>
+                  <p className="font-mono text-xs text-bone-400">
                     {data.meta.dataset} · {data.meta.resolution} · {data.blob_count} Discrete Change Objects ({data.changed_pct}% of scene)
                   </p>
                 </div>
 
                 {data.ground_truth_eval ? (
-                  <div className="flex items-center gap-3 rounded-xl border border-teal-400/40 bg-teal-400/10 px-4 py-2 text-xs tabular-nums">
+                  <div className="flex items-center gap-3 rounded-xl border border-phosphor-400/40 bg-phosphor-400/10 px-4 py-2 text-xs tabular-nums">
                     <span>
                       F1:{" "}
-                      <strong className="font-mono text-teal-400">
+                      <strong className="font-mono text-phosphor-400">
                         {(data.ground_truth_eval.f1_score * 100).toFixed(1)}%
                       </strong>
                     </span>
@@ -332,79 +328,45 @@ export default function LabPage() {
                 ) : null}
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-2xl border border-white/10 bg-ink-900/40 p-3.5 space-y-2">
-                  <span className="text-xs font-semibold text-bone-300">
-                    1. Input Patch T₁ (Before)
-                  </span>
-                  <img
-                    src={data.image_t1_base64}
-                    alt="Input patch T1 before"
-                    width={256}
-                    height={256}
-                    className="aspect-square w-full rounded-xl border border-white/10 object-cover"
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-ink-900/40 p-3.5 space-y-2">
-                  <span className="text-xs font-semibold text-bone-300">
-                    2. Input Patch T₂ (After)
-                  </span>
-                  <img
-                    src={data.image_t2_base64}
-                    alt="Input patch T2 after"
-                    width={256}
-                    height={256}
-                    className="aspect-square w-full rounded-xl border border-white/10 object-cover"
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-ink-900/40 p-3.5 space-y-2">
-                  <span className="text-xs font-semibold text-signal-400">
-                    3. Siamese Probability Field
-                  </span>
-                  <img
-                    src={data.heatmap_base64}
-                    alt="Continuous change probability heatmap"
-                    width={256}
-                    height={256}
-                    className="aspect-square w-full rounded-xl border border-white/10 object-cover"
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-signal-400/50 bg-ink-900/60 p-3.5 space-y-2">
-                  <span className="text-xs font-semibold text-teal-400">
-                    {data.ground_truth_eval
-                      ? "4. Ground-Truth Confusion Map"
-                      : "4. Segmented Change Overlay"}
-                  </span>
-                  <img
-                    src={
-                      data.ground_truth_eval
-                        ? data.ground_truth_eval.confusion_map_base64
-                        : data.overlay_base64
-                    }
-                    alt="Segmented change output"
-                    width={256}
-                    height={256}
-                    className="aspect-square w-full rounded-xl border border-white/10 object-cover"
-                  />
-                </div>
+              {/* Dual Interactive Orbital Loupes */}
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <OrbitalLoupe
+                  baseImage={data.image_t1_base64}
+                  overlayImage={data.heatmap_base64}
+                  baseLabel="Patch T₁ (Before)"
+                  overlayLabel="Siamese Probability Field"
+                  telemetryTag="TENSOR ACTIVATION"
+                  accentColor="amber"
+                />
+                <OrbitalLoupe
+                  baseImage={data.image_t2_base64}
+                  overlayImage={
+                    data.ground_truth_eval
+                      ? data.ground_truth_eval.confusion_map_base64
+                      : data.overlay_base64
+                  }
+                  baseLabel="Patch T₂ (After)"
+                  overlayLabel={
+                    data.ground_truth_eval ? "TP / FP / FN Confusion Matrix" : "Segmented Change Mask"
+                  }
+                  telemetryTag="PIXEL CONFUSION AUDIT"
+                  accentColor="phosphor"
+                />
               </div>
 
               {data.ground_truth_eval ? (
-                <div className="flex flex-wrap items-center gap-4 rounded-xl border border-white/10 bg-ink-900/30 px-4 py-2.5 text-xs text-bone-300">
+                <div className="flex flex-wrap items-center gap-4 orbital-panel rounded-xl px-4 py-2.5 text-xs text-bone-300 font-mono">
                   <span className="font-semibold text-bone-100">Confusion Matrix Legend:</span>
                   <span className="flex items-center gap-1.5">
-                    <span className="size-2.5 rounded-full bg-[#10B981]" />
+                    <span className="size-2.5 rounded-full bg-phosphor-400" />
                     True Positive (Correct Hit)
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="size-2.5 rounded-full bg-[#FF5240]" />
+                    <span className="size-2.5 rounded-full bg-crimson-400" />
                     False Positive (False Alarm)
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="size-2.5 rounded-full bg-[#3DD6C3]" />
+                    <span className="size-2.5 rounded-full bg-lagoon-400" />
                     False Negative (Missed Edge)
                   </span>
                 </div>

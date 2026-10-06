@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { StudioNav } from "@/components/studio-nav";
+import { OrbitalLoupe } from "@/components/ui/orbital-loupe";
 import { HOTSPOT_PRESETS, type HotspotPreset } from "@/lib/tiles";
 
 interface TimeSeriesObservation {
@@ -183,33 +184,27 @@ export default function TimelinePage() {
   };
 
   return (
-    <div className="min-h-screen bg-ink-950 text-bone-100 flex flex-col">
-      <StudioNav
-        rightSlot={
-          data ? (
-            <button
-              type="button"
-              onClick={exportCsv}
-              className="rounded-lg border border-white/15 bg-ink-900 px-3 py-1.5 text-xs font-medium text-bone-200 hover:border-signal-400/50 hover:text-signal-400 transition-colors"
-            >
-              Export CSV (2017–2030)
-            </button>
-          ) : null
-        }
-      />
+    <div className="min-h-screen bg-orbital-canvas text-bone-100 flex flex-col">
+      <StudioNav />
 
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8 space-y-8">
+      <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-8 sm:px-6 lg:px-8 space-y-8">
         {/* Header & Scene Selector */}
-        <section className="flex flex-col gap-6 rounded-2xl border border-white/10 bg-ink-900/50 p-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-2 max-w-2xl">
-            <div className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-teal-400" aria-hidden="true" />
-              <span className="text-xs font-semibold uppercase tracking-wider text-teal-400">
-                BFAST Multi-Temporal Monitoring & 2030 Forecasting
+        <section className="orbital-panel flex flex-col gap-6 rounded-2xl p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-3 max-w-3xl">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-400/30 bg-teal-400/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-teal-400">
+                <span className="size-1.5 rounded-full bg-teal-400" aria-hidden="true" />
+                BFAST // MULTI-TEMPORAL BREAKPOINT ENGINE
+              </span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-bone-400">
+                EPOCHS: 2017 → 2024 // HORIZON: 2030
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-bone-100">
-              Multi-Year Trajectory, Structural Breakpoints & 2030 Forecast
+            <h1 className="text-3xl sm:text-4xl lg:text-[42px] font-bold tracking-tight text-bone-100 leading-[1.08]">
+              Multi-Year Trajectory &{" "}
+              <span className="font-display italic font-normal text-teal-400">
+                2030 Spatial Contagion
+              </span>
             </h1>
             <p className="text-xs sm:text-sm text-bone-300 leading-relaxed">
               Acquires 5 multi-year Sentinel-2 composites (<strong className="text-bone-100">2017 → 2024</strong>), runs{" "}
@@ -226,9 +221,9 @@ export default function TimelinePage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex flex-col gap-1">
-              <label htmlFor="timeline-preset" className="text-[11px] font-medium text-bone-400">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="timeline-preset" className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-bone-400">
                 Monitored Region (AOI)
               </label>
               <select
@@ -248,6 +243,16 @@ export default function TimelinePage() {
                 ))}
               </select>
             </div>
+
+            {data ? (
+              <button
+                type="button"
+                onClick={exportCsv}
+                className="rounded-lg border border-signal-400/40 bg-signal-400/10 px-3.5 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-signal-400 hover:bg-signal-400 hover:text-ink-950 transition-colors"
+              >
+                Export CSV (2017–2030)
+              </button>
+            ) : null}
           </div>
         </section>
 
@@ -272,21 +277,21 @@ export default function TimelinePage() {
           <>
             {/* KPI & BFAST Structural Breakpoint Banner */}
             <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-2xl border border-signal-400/40 bg-signal-400/10 p-4">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-signal-400">
+              <div className="orbital-panel-active rounded-2xl p-4">
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-signal-400">
                   BFAST Structural Breakpoint
                 </span>
                 <p className="mt-1 text-2xl font-bold text-bone-100 tabular-nums">
                   Year {data.bfast_breakpoint.breakpoint_year}
                 </p>
-                <span className="text-[11px] text-bone-300 tabular-nums">
+                <span className="font-mono text-[11px] text-bone-300 tabular-nums">
                   MOSUM Stat: {data.bfast_breakpoint.mosum_statistic} (p ={" "}
                   {data.bfast_breakpoint.significance_p})
                 </span>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-ink-900/40 p-4">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-bone-400">
+              <div className="orbital-panel rounded-2xl p-4">
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-bone-400">
                   Peak Disturbance Velocity
                 </span>
                 <p className="mt-1 text-2xl font-bold text-signal-400 tabular-nums">
@@ -297,110 +302,125 @@ export default function TimelinePage() {
                 </span>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-ink-900/40 p-4">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-bone-400">
+              <div className="orbital-panel rounded-2xl p-4">
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-bone-400">
                   2024 Cumulative Change
                 </span>
                 <p className="mt-1 text-2xl font-bold text-teal-400 tabular-nums">
                   {data.observations[data.observations.length - 1]?.changed_km2}&nbsp;km²
                 </p>
-                <span className="text-[11px] text-bone-300 tabular-nums">
+                <span className="font-mono text-[11px] text-bone-300 tabular-nums">
                   {data.observations[data.observations.length - 1]?.changed_pct}% of {data.aoi_km2}&nbsp;km² AOI
                 </span>
               </div>
 
-              <div className="rounded-2xl border border-alert-500/40 bg-alert-500/10 p-4">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-alert-400">
+              <div className="orbital-panel rounded-2xl border-alert-500/40 bg-alert-500/10 p-4">
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-alert-400">
                   2030 Projected Footprint
                 </span>
                 <p className="mt-1 text-2xl font-bold text-alert-400 tabular-nums">
                   {data.forecasts[data.forecasts.length - 1]?.projected_km2}&nbsp;km²
                 </p>
-                <span className="text-[11px] text-bone-300 tabular-nums">
+                <span className="font-mono text-[11px] text-bone-300 tabular-nums">
                   {data.forecasts[data.forecasts.length - 1]?.projected_pct}% of AOI (+
                   {data.regression_slope_km2_yr}&nbsp;km²/yr trend)
                 </span>
               </div>
             </section>
 
-            {/* 1. Multi-Year Satellite Composite Filmstrip */}
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-bone-100">
-                  1. Multi-Year Sentinel-2 Composite Filmstrip (2017–2024)
-                </h2>
-                <span className="text-xs text-bone-400">
-                  Radiometrically aligned to 2017 baseline
-                </span>
+            {/* 1. Multi-Year Satellite Composite Filmstrip + Orbital Loupe */}
+            <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+              <div className="lg:col-span-4">
+                {data.observations[0] && data.observations[data.observations.length - 1] ? (
+                  <OrbitalLoupe
+                    baseImage={data.observations[0].thumbnail_base64}
+                    overlayImage={data.observations[data.observations.length - 1]!.thumbnail_base64}
+                    baseLabel={`EPOCH ${data.observations[0].year} // BASELINE`}
+                    overlayLabel={`EPOCH ${data.observations[data.observations.length - 1]!.year} // CURRENT`}
+                    telemetryTag={`Δ +${data.observations[data.observations.length - 1]!.changed_km2} KM²`}
+                    defaultMode="loupe"
+                  />
+                ) : null}
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                {data.observations.map((obs) => {
-                  const isBreak = obs.year === data.bfast_breakpoint.breakpoint_year;
-                  return (
-                    <div
-                      key={obs.year}
-                      className={`rounded-2xl border p-3.5 flex flex-col justify-between ${
-                        isBreak
-                          ? "border-signal-400 bg-signal-400/10 shadow-[0_0_20px_rgba(255,176,32,0.15)]"
-                          : "border-white/10 bg-ink-900/40"
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-sm font-bold text-bone-100 tabular-nums">
-                            {obs.year}
-                          </span>
-                          {isBreak ? (
-                            <span className="rounded bg-signal-400 px-1.5 py-0.5 text-[10px] font-bold uppercase text-ink-950">
-                              Breakpoint
+              <div className="lg:col-span-8 space-y-3 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-bone-100">
+                    1. Multi-Year Sentinel-2 Composite Filmstrip (2017–2024)
+                  </h2>
+                  <span className="font-mono text-[11px] uppercase tracking-wider text-bone-400">
+                    Radiometrically aligned to 2017 baseline
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
+                  {data.observations.map((obs) => {
+                    const isBreak = obs.year === data.bfast_breakpoint.breakpoint_year;
+                    return (
+                      <div
+                        key={obs.year}
+                        className={`rounded-2xl p-3 flex flex-col justify-between ${
+                          isBreak
+                            ? "orbital-panel-active"
+                            : "orbital-panel"
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-sm font-bold text-bone-100 tabular-nums">
+                              {obs.year}
                             </span>
-                          ) : (
-                            <span className="font-mono text-[11px] text-bone-400 tabular-nums">
-                              {obs.changed_pct}%
-                            </span>
-                          )}
+                            {isBreak ? (
+                              <span className="rounded bg-signal-400 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase text-ink-950">
+                                Breakpoint
+                              </span>
+                            ) : (
+                              <span className="font-mono text-[11px] text-bone-400 tabular-nums">
+                                {obs.changed_pct}%
+                              </span>
+                            )}
+                          </div>
+
+                          <img
+                            src={obs.thumbnail_base64}
+                            alt={`Sentinel-2 composite ${obs.year}`}
+                            width={180}
+                            height={180}
+                            className="mt-2.5 aspect-square w-full rounded-xl border border-white/10 object-cover"
+                          />
                         </div>
 
-                        <img
-                          src={obs.thumbnail_base64}
-                          alt={`Sentinel-2 composite ${obs.year}`}
-                          width={180}
-                          height={180}
-                          className="mt-2.5 aspect-square w-full rounded-xl border border-white/10 object-cover"
-                        />
-                      </div>
-
-                      <div className="mt-3 space-y-1 border-t border-white/10 pt-2.5 text-xs tabular-nums">
-                        <div className="flex justify-between">
-                          <span className="text-bone-400">Cumulative:</span>
-                          <span className="font-mono font-semibold text-bone-100">
-                            {obs.changed_km2}&nbsp;km²
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-bone-400">Velocity:</span>
-                          <span className="font-mono text-signal-400">
-                            +{obs.annual_velocity_km2_yr}&nbsp;km²/yr
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-[11px]">
-                          <span className="text-bone-400">NDVI / NDBI:</span>
-                          <span className="font-mono text-bone-300">
-                            {obs.mean_ndvi} / {obs.mean_ndbi}
-                          </span>
+                        <div className="mt-3 space-y-1 border-t border-white/10 pt-2.5 text-xs tabular-nums">
+                          <div className="flex justify-between">
+                            <span className="text-bone-400">Cumul:</span>
+                            <span className="font-mono font-semibold text-bone-100">
+                              {obs.changed_km2}&nbsp;km²
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-bone-400">Vel:</span>
+                            <span className="font-mono text-signal-400">
+                              +{obs.annual_velocity_km2_yr}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-[11px]">
+                            <span className="text-bone-400">NDVI:</span>
+                            <span className="font-mono text-bone-300">
+                              {obs.mean_ndvi}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </section>
 
             {/* 2. Trajectory Chart & 2030 Spatial Contagion Map */}
             <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
               {/* Left 7 cols: Trajectory + Forecast Table */}
-              <div className="lg:col-span-7 rounded-2xl border border-white/10 bg-ink-900/40 p-6 flex flex-col justify-between space-y-6">
+              <div className="lg:col-span-7 orbital-panel rounded-2xl p-6 flex flex-col justify-between space-y-6">
                 <div>
                   <span className="text-xs font-semibold uppercase tracking-wider text-signal-400">
                     Temporal Regression & 95% Confidence Cone

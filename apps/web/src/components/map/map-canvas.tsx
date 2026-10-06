@@ -46,7 +46,6 @@ interface MapCanvasProps {
 }
 
 function buildMapStyle(year: number): maplibregl.StyleSpecification {
-  const mapboxToken = process.env["NEXT_PUBLIC_MAPBOX_TOKEN"];
   const sources: maplibregl.StyleSpecification["sources"] = {
     "carto-dark": {
       type: "raster",
@@ -64,6 +63,15 @@ function buildMapStyle(year: number): maplibregl.StyleSpecification {
       tileSize: 256,
       maxzoom: 14,
       attribution: "Sentinel-2 cloudless by EOX IT Services GmbH",
+    },
+    "mapbox-satellite": {
+      type: "raster",
+      tiles: [
+        "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: "Esri, Maxar, Earthstar Geographics",
     },
   };
 
@@ -86,20 +94,7 @@ function buildMapStyle(year: number): maplibregl.StyleSpecification {
         "raster-fade-duration": 200,
       },
     },
-  ];
-
-  if (mapboxToken) {
-    sources["mapbox-satellite"] = {
-      type: "raster",
-      tiles: [
-        `https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.png?access_token=${mapboxToken}`,
-      ],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: "© Mapbox © OpenStreetMap",
-    };
-
-    layers.push({
+    {
       id: "mapbox-layer",
       type: "raster",
       source: "mapbox-satellite",
@@ -112,8 +107,8 @@ function buildMapStyle(year: number): maplibregl.StyleSpecification {
         "raster-opacity": 0.95,
         "raster-fade-duration": 200,
       },
-    });
-  }
+    },
+  ];
 
   return {
     version: 8,
@@ -256,6 +251,9 @@ export function MapCanvas({
     });
 
     map.touchZoomRotate.disableRotation();
+    map.on("error", () => {
+      // Suppress transient tile network errors from triggering Next.js console error overlay
+    });
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
@@ -471,6 +469,9 @@ export function MapCanvas({
     });
 
     compareMap.touchZoomRotate.disableRotation();
+    compareMap.on("error", () => {
+      // Suppress transient tile network errors from triggering Next.js console error overlay
+    });
 
     compareMap.on("load", () => {
       compareMap.addSource("compare-aoi-source", {

@@ -2,76 +2,148 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { motion } from "motion/react";
 
-export interface StudioNavItem {
-  href: string;
-  label: string;
-  badge?: string;
-}
+const NAV_ITEMS = [
+  { href: "/analyze", label: "GIS Map Studio", code: "01" },
+  { href: "/benchmarks", label: "Ablation & XAI", code: "02" },
+  { href: "/timeline", label: "BFAST Timeline", code: "03" },
+  { href: "/lab", label: "Image Pair Lab", code: "04" },
+  { href: "/carbon", label: "Carbon & UHI", code: "05" },
+  { href: "/watchlist", label: "STAC Watchlist", code: "06" },
+] as const;
 
-export const STUDIO_NAV_ITEMS: readonly StudioNavItem[] = [
-  { href: "/analyze", label: "GIS Studio" },
-  { href: "/benchmarks", label: "Ablation & XAI" },
-  { href: "/timeline", label: "Time-Series" },
-  { href: "/lab", label: "Image Lab" },
-  { href: "/carbon", label: "Carbon & ESG" },
-  { href: "/watchlist", label: "Case Atlas" },
-];
-
-interface StudioNavProps {
-  rightSlot?: ReactNode;
-}
-
-export function StudioNav({ rightSlot }: StudioNavProps) {
+export function StudioNav() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 w-full shrink-0 items-center justify-between border-b border-white/10 bg-ink-950/95 px-4 backdrop-blur-md">
-      <div className="flex items-center gap-3 overflow-x-auto no-scrollbar">
-        <Link
-          href="/"
-          className="flex items-center gap-2 rounded-lg p-1 text-bone-200 transition-colors hover:text-signal-400 focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:outline-none shrink-0"
-          aria-label="Back to TerraShift Home"
-        >
-          <svg
-            className="size-4 shrink-0"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-          <span className="font-semibold tracking-tight text-bone-100 text-sm">TerraShift</span>
-        </Link>
-
-        <div className="h-4 w-px bg-white/10 shrink-0" aria-hidden="true" />
-
-        <nav aria-label="Platform sections" className="flex items-center gap-1">
-          {STUDIO_NAV_ITEMS.map((item) => {
-            const active = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`rounded-lg px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:outline-none ${
-                  active
-                    ? "bg-signal-400/15 text-signal-400 border border-signal-400/40"
-                    : "text-bone-300 hover:bg-white/5 hover:text-bone-100 border border-transparent"
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+    <header className="sticky top-0 z-50 border-b border-bone-100/10 bg-ink-950/90 backdrop-blur-xl">
+      {/* Top Orbital Telemetry Micro-Bar */}
+      <div className="border-b border-bone-100/5 bg-ink-900/70 px-6 py-1">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between font-mono text-[10px] tracking-widest uppercase text-bone-400">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 text-phosphor-400">
+              <span className="size-1.5 rounded-full bg-phosphor-400 shadow-[0_0_8px_#00F5A0]" />
+              ORBITAL TELEMETRY LOCKED
+            </span>
+            <span className="hidden sm:inline text-bone-400/50">|</span>
+            <span className="hidden sm:inline">SENTINEL-2 L2A · 10M MULTI-SPECTRAL</span>
+          </div>
+          <div className="flex items-center gap-4 tabular-nums">
+            <span className="hidden md:inline">TENSOR ENGINE: FC-SIAM-DIFF (5-CH)</span>
+            <span className="text-signal-400">SUN-SYNC 786 KM</span>
+          </div>
+        </div>
       </div>
 
-      {rightSlot ? <div className="flex items-center gap-2 shrink-0 ms-3">{rightSlot}</div> : null}
+      {/* Main Command Navigation Bar */}
+      <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-6 gap-4">
+        <div className="flex items-center gap-6">
+          <Link
+            href="/"
+            className="group flex items-center gap-2.5 text-bone-100 hover:text-signal-400 transition-colors"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                className="opacity-80"
+              />
+              <path d="M12 2v20" stroke="#FFB020" strokeWidth="1.8" />
+              <path
+                d="M2 12h20"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeDasharray="2 2"
+              />
+            </svg>
+            <div className="flex flex-col">
+              <span className="font-mono text-xs font-semibold tracking-[0.22em] uppercase leading-none">
+                TerraShift
+              </span>
+              <span className="font-mono text-[9px] tracking-widest text-bone-400 uppercase mt-0.5">
+                Orbital Intelligence
+              </span>
+            </div>
+          </Link>
+
+          <nav aria-label="Studio Navigation" className="hidden lg:flex items-center gap-1">
+            {NAV_ITEMS.map((item) => {
+              const active = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    active ? "text-ink-950 font-semibold" : "text-bone-300 hover:text-bone-100"
+                  }`}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="orbital-nav-pill"
+                      transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                      className="absolute inset-0 rounded-lg bg-signal-400 shadow-[0_0_20px_rgba(255,176,32,0.35)]"
+                    />
+                  )}
+                  <span className="relative z-10 flex items-center gap-1.5">
+                    <span
+                      className={`font-mono text-[10px] ${
+                        active ? "text-ink-950/75" : "text-bone-400"
+                      }`}
+                    >
+                      {item.code}
+                    </span>
+                    <span>{item.label}</span>
+                  </span>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <a
+            href="/api/model/weights"
+            download="siamese_unet_checkpoint.pt"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ink-900 hover:bg-ink-800 border border-bone-100/15 text-xs font-mono text-bone-200 transition-colors"
+          >
+            <span className="size-1.5 rounded-full bg-signal-400" />
+            <span>Weights (.pt)</span>
+          </a>
+          <Link
+            href="/analyze"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-signal-400 hover:bg-signal-500 text-ink-950 font-semibold text-xs transition-all shadow-[0_0_18px_rgba(255,176,32,0.25)]"
+          >
+            <span>Open Map Studio</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Mobile Navigation Strip */}
+      <nav
+        aria-label="Mobile Studio Navigation"
+        className="flex lg:hidden items-center gap-1.5 overflow-x-auto px-4 py-2 border-t border-bone-100/10"
+      >
+        {NAV_ITEMS.map((item) => {
+          const active = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`shrink-0 px-2.5 py-1 rounded-md text-xs font-mono transition-colors ${
+                active
+                  ? "bg-signal-400 text-ink-950 font-semibold"
+                  : "text-bone-300 bg-ink-900/80 border border-bone-100/10"
+              }`}
+            >
+              {item.code} · {item.label}
+            </Link>
+          );
+        })}
+      </nav>
     </header>
   );
 }
