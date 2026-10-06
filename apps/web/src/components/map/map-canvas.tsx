@@ -47,21 +47,20 @@ interface MapCanvasProps {
 
 function buildMapStyle(year: number): maplibregl.StyleSpecification {
   const sources: maplibregl.StyleSpecification["sources"] = {
-    "carto-dark": {
+    "esri-base": {
       type: "raster",
       tiles: [
-        "https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
-        "https://b.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
-        "https://c.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
+        "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       ],
       tileSize: 256,
-      attribution: "CartoDB Dark Matter",
+      maxzoom: 19,
+      attribution: "Esri, Maxar, Earthstar Geographics",
     },
     "s2-cloudless": {
       type: "raster",
       tiles: [getEoxTileUrl(year)],
       tileSize: 256,
-      maxzoom: 14,
+      maxzoom: 15,
       attribution: "Sentinel-2 cloudless by EOX IT Services GmbH",
     },
     "mapbox-satellite": {
@@ -77,11 +76,15 @@ function buildMapStyle(year: number): maplibregl.StyleSpecification {
 
   const layers: maplibregl.StyleSpecification["layers"] = [
     {
-      id: "carto-base",
+      id: "esri-base-layer",
       type: "raster",
-      source: "carto-dark",
+      source: "esri-base",
       minzoom: 0,
       maxzoom: 22,
+      paint: {
+        "raster-opacity": 1,
+        "raster-fade-duration": 0,
+      },
     },
     {
       id: "s2-layer",
@@ -90,7 +93,7 @@ function buildMapStyle(year: number): maplibregl.StyleSpecification {
       minzoom: 0,
       maxzoom: 22,
       paint: {
-        "raster-opacity": 0.95,
+        "raster-opacity": 1,
         "raster-fade-duration": 200,
       },
     },
@@ -104,7 +107,7 @@ function buildMapStyle(year: number): maplibregl.StyleSpecification {
         visibility: "none",
       },
       paint: {
-        "raster-opacity": 0.95,
+        "raster-opacity": 1,
         "raster-fade-duration": 200,
       },
     },
