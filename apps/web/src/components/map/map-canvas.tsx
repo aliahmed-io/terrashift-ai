@@ -12,6 +12,10 @@ import {
 } from "@/lib/tiles";
 import { OrbitalSwathHud } from "@/components/map/orbital-swath-hud";
 
+if (typeof window !== "undefined") {
+  maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+}
+
 export interface MapFeatureProperties {
   id: number;
   area_m2: number;
