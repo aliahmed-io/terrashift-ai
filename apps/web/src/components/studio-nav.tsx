@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, type ReactNode, type FormEvent } from "react";
 
 const STUDIO_LINKS = [
-  { href: "/", label: "Command Deck" },
-  { href: "/analyze", label: "Map Studio" },
+  { href: "/", label: "Orbital Deck", badge: "Live" },
+  { href: "/analyze", label: "Tasking & Map Studio", badge: "Primary" },
   { href: "/benchmarks", label: "Model Benchmarks & XAI" },
   { href: "/timeline", label: "BFAST Timeline" },
   { href: "/lab", label: "Image Pair Lab" },
@@ -16,90 +16,116 @@ const STUDIO_LINKS = [
 
 export interface StudioNavProps {
   readonly rightSlot?: ReactNode;
+  readonly onQuickSearch?: ((query: string) => void) | undefined;
 }
 
-export function StudioNav({ rightSlot }: StudioNavProps = {}) {
+export function StudioNav({ rightSlot, onQuickSearch }: StudioNavProps = {}) {
   const pathname = usePathname();
-  const [utcTime, setUtcTime] = useState("12:44:09.82 Z");
+  const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    const updateClock = () => {
-      const now = new Date();
-      setUtcTime(`${now.toISOString().substring(11, 22)} Z`);
-    };
-    updateClock();
-    const id = setInterval(updateClock, 500);
-    return () => clearInterval(id);
-  }, []);
+  const handleSearchSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (!q) return;
+    if (onQuickSearch) {
+      onQuickSearch(q);
+    } else {
+      router.push(`/analyze?q=${encodeURIComponent(q)}`);
+    }
+  };
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-[#04070B]/85 backdrop-blur-xl border-b border-[#334155]/30 shadow-2xl">
-      {/* Telemetry Ticker Top Banner (from Stitch Design) */}
-      <div className="hidden lg:flex items-center justify-between px-4 py-1 border-b border-[#334155]/25 bg-[#0D1424]/40 text-[10px] font-mono tracking-widest text-[#94A3B8]">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 text-[#FFB020]">
-            <span className="size-1.5 rounded-full bg-[#FFB020] animate-ping" aria-hidden="true" />
-            ORBITAL LEO S2-A OVERPASS ACTIVE
-          </span>
-          <span className="text-[#334155]">|</span>
-          <span>LAT: 24.8350° N</span>
-          <span>LON: 46.7450° E</span>
-          <span className="text-[#334155]">|</span>
-          <span>ALTITUDE: 786.2 KM</span>
-          <span>INCL: 98.62°</span>
-          <span>SWATH: 290 KM</span>
-        </div>
-        <div className="flex items-center gap-4 text-[11px] font-mono tabular-nums">
-          <span className="text-[#38E8FF]">SUN ELEV: 64.2°</span>
-          <span className="text-[#00F5A0]">GSD: 10m/px BOA</span>
-          <span className="text-[#F0F4F8]">UTC: {utcTime}</span>
-        </div>
-      </div>
-
-      {/* Main Command Nav */}
-      <div className="flex justify-between items-center w-full px-4 py-2.5 backdrop-blur-md">
-        {/* Brand Cluster */}
-        <div className="flex items-center gap-5">
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 group focus-visible:outline-none"
-          >
-            <div className="relative size-8 rounded-lg bg-[#0D1424]/90 border border-[#FFB020]/40 flex items-center justify-center text-[#FFB020] shadow-[0_0_15px_rgba(255,176,32,0.3)] group-hover:border-[#FFB020] transition-colors">
+    <header className="sticky top-0 z-50 w-full bg-[#0F4C6C] text-white shadow-[0_4px_20px_rgba(8,47,68,0.45)] border-b border-white/15">
+      <div className="flex h-13 w-full items-center justify-between px-4 sm:px-6">
+        {/* Left Cluster: User Avatar Badge + Brand + Inline Navigation (Ref 1) */}
+        <div className="flex items-center gap-4">
+          <div className="relative flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setProfileOpen((v) => !v)}
+              className="group relative flex items-center gap-2 focus-visible:outline-none"
+              aria-label="Open mission operator profile and active alerts"
+              aria-expanded={profileOpen}
+            >
+              <span className="relative flex size-8.5 items-center justify-center rounded-full border-2 border-white/90 bg-[#0B3B54] text-white transition-transform group-hover:scale-105">
+                <svg
+                  className="size-4.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                {/* Warm-Sand Notification Badge (Ref 1) */}
+                <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-[#F4C396] text-[10px] font-bold text-[#082F44] shadow-xs">
+                  2
+                </span>
+              </span>
               <svg
-                className="size-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                className="size-2.5 text-white/80 transition-transform group-hover:text-white"
+                viewBox="0 0 12 12"
+                fill="currentColor"
                 aria-hidden="true"
               >
-                <path d="M13 7 9 3 5 7l4 4" />
-                <path d="m17 11 4 4-4 4-4-4" />
-                <path d="m8 12 4 4 6-6-4-4Z" />
-                <path d="m16 8 3-3" />
-                <path d="M9 21a6 6 0 0 0-6-6" />
+                <path d="M2 4l4 5 4-5H2z" />
               </svg>
-              <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-[#00F5A0]" />
-            </div>
-            <div className="flex flex-col">
-              <span className="leading-none text-xs tracking-widest text-[#FFB020] font-bold uppercase">
-                TERRASHIFT AI
-              </span>
-              <span className="mt-0.5 text-[9px] font-mono tracking-widest text-[#94A3B8] uppercase">
-                SOLARIS // KSA 2030
-              </span>
-            </div>
+            </button>
+
+            {profileOpen ? (
+              <div className="absolute left-0 top-full mt-2 w-72 rounded-xl bg-white p-3.5 text-[#111827] shadow-2xl border border-[#E6EAEE] z-50">
+                <div className="flex items-center justify-between border-b border-[#E6EAEE] pb-2.5">
+                  <div>
+                    <p className="text-xs font-semibold text-[#111827]">KSA Vision 2030 Desk</p>
+                    <p className="text-[11px] text-[#64707D]">2 Active Change Alerts Ready</p>
+                  </div>
+                  <span className="rounded-md bg-[#E0F2FE] px-2 py-0.5 text-[10px] font-semibold text-[#0284C7]">
+                    Active
+                  </span>
+                </div>
+                <div className="mt-2.5 space-y-1.5 text-xs">
+                  <Link
+                    href="/analyze"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center justify-between rounded-lg bg-[#F3F5F7] px-2.5 py-2 hover:bg-[#E6EAEE] transition-colors"
+                  >
+                    <span className="font-medium text-[#111827]">Riyadh ROSHN Sedra</span>
+                    <span className="font-mono text-[11px] font-semibold text-[#00875A]">89% prob</span>
+                  </Link>
+                  <Link
+                    href="/watchlist"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center justify-between rounded-lg bg-[#F3F5F7] px-2.5 py-2 hover:bg-[#E6EAEE] transition-colors"
+                  >
+                    <span className="font-medium text-[#111827]">NEOM Spine Corridor</span>
+                    <span className="font-mono text-[11px] font-semibold text-[#0284C7]">94% prob</span>
+                  </Link>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-white hover:opacity-90 transition-opacity focus-visible:outline-none"
+          >
+            <span className="text-sm font-semibold tracking-tight">TerraShift</span>
+            <span className="hidden sm:inline-block rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium text-[#36C5D8]">
+              Earth Intelligence
+            </span>
           </Link>
 
-          <div className="hidden xl:block h-6 w-px bg-[#334155]/35" aria-hidden="true" />
+          <div className="hidden lg:block h-4 w-px bg-white/20" aria-hidden="true" />
 
-          {/* Navigation Links */}
-          <nav
-            aria-label="Mission Modules"
-            className="flex items-center gap-4 xl:gap-5 overflow-x-auto py-0.5"
-          >
+          {/* Desktop Module Links */}
+          <nav aria-label="Primary Navigation" className="hidden lg:flex items-center gap-1">
             {STUDIO_LINKS.map((link) => {
               const active =
                 link.href === "/"
@@ -109,15 +135,12 @@ export function StudioNav({ rightSlot }: StudioNavProps = {}) {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`whitespace-nowrap pb-1 text-xs tracking-wider uppercase transition-colors flex items-center gap-1.5 ${
+                  className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
                     active
-                      ? "text-[#FFB020] border-b-2 border-[#FFB020] font-bold"
-                      : "text-[#94A3B8] hover:text-[#F0F4F8] font-medium border-b-2 border-transparent"
+                      ? "bg-white/18 text-white font-semibold shadow-2xs"
+                      : "text-white/75 hover:text-white hover:bg-white/10 font-medium"
                   }`}
                 >
-                  {active ? (
-                    <span className="size-1.5 rounded-full bg-[#FFB020]" aria-hidden="true" />
-                  ) : null}
                   {link.label}
                 </Link>
               );
@@ -125,36 +148,112 @@ export function StudioNav({ rightSlot }: StudioNavProps = {}) {
           </nav>
         </div>
 
-        {/* Action Cluster */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Right Cluster: Underlined Search + Custom Slot + === MENU (Exact Ref 1 pattern) */}
+        <div className="flex items-center gap-4 sm:gap-5">
           {rightSlot}
-          <a
-            href="/api/model"
-            download="siamese_unet_levircd.pt"
-            title="Download trained PyTorch FC-Siam-diff weights (.pt)"
-            className="hidden sm:flex items-center gap-2 bg-[#0D1424]/80 border border-[#334155]/40 hover:border-[#00F5A0]/50 px-2.5 py-1.5 rounded text-[11px] font-mono text-[#94A3B8] transition-colors"
-          >
-            <span className="size-2 rounded-full bg-[#00F5A0] animate-pulse" aria-hidden="true" />
-            <span className="text-[#F0F4F8] font-semibold">Weights v4.2-FC-Siam</span>
-            <span className="text-[#FFB020] text-[10px]">42.8ms</span>
-          </a>
 
-          <Link
-            href="/analyze"
-            className="bg-[#FFB020] text-[#04070B] font-bold text-xs uppercase tracking-wider px-3.5 py-2 rounded flex items-center gap-1.5 shadow-[0_0_20px_rgba(255,176,32,0.35)] hover:brightness-110 active:scale-[0.98] transition-all"
+          <form onSubmit={handleSearchSubmit} className="hidden sm:flex items-center">
+            <label htmlFor="petrol-nav-search" className="sr-only">
+              Search coordinates or region
+            </label>
+            <div className="flex items-center gap-2 border-b border-white/70 pb-1 focus-within:border-[#36C5D8] transition-colors">
+              <svg
+                className="size-3.5 text-white/85"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+              <input
+                id="petrol-nav-search"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search"
+                className="w-32 lg:w-44 bg-transparent text-xs text-white placeholder:text-white/65 focus:outline-none"
+              />
+            </div>
+          </form>
+
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="flex items-center gap-2 rounded-md px-2 py-1 text-xs font-semibold tracking-wider text-white hover:bg-white/10 transition-colors focus-visible:outline-none"
+            aria-expanded={menuOpen}
+            aria-label="Toggle platform navigation menu"
           >
             <svg
-              className="size-3.5"
+              className="size-4"
               viewBox="0 0 24 24"
-              fill="currentColor"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
               aria-hidden="true"
             >
-              <path d="M8 5v14l11-7z" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="15" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
-            <span>Execute Inference</span>
-          </Link>
+            <span className="tracking-widest">MENU</span>
+          </button>
         </div>
       </div>
+
+      {/* Slide-Down Porcelain & Petrol Navigation Drawer */}
+      {menuOpen ? (
+        <div className="border-t border-white/15 bg-[#0B3B54]/98 px-6 py-4 backdrop-blur-xl shadow-2xl">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {STUDIO_LINKS.map((link) => {
+                const active =
+                  link.href === "/"
+                    ? pathname === "/"
+                    : pathname === link.href || pathname?.startsWith(`${link.href}/`);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMenuOpen(false)}
+                    className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs transition-colors ${
+                      active
+                        ? "bg-white text-[#0F4C6C] font-semibold shadow-sm"
+                        : "bg-white/10 text-white hover:bg-white/20 font-medium"
+                    }`}
+                  >
+                    <span>{link.label}</span>
+                    {"badge" in link && link.badge ? (
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                          active
+                            ? "bg-[#0F4C6C]/15 text-[#0F4C6C]"
+                            : "bg-[#36C5D8]/20 text-[#36C5D8]"
+                        }`}
+                      >
+                        {link.badge}
+                      </span>
+                    ) : null}
+                  </Link>
+                );
+              })}
+            </div>
+            <a
+              href="/api/model"
+              download="siamese_unet_levircd.pt"
+              className="inline-flex items-center gap-2 rounded-lg bg-[#00875A] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#006E49] transition-colors shadow-sm"
+            >
+              <span>Download PyTorch Weights (8.45 MB)</span>
+            </a>
+          </div>
+        </div>
+      ) : null}
     </header>
   );
 }

@@ -1,843 +1,564 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { StudioNav } from "@/components/studio-nav";
+import { OrbitalSwathHud } from "@/components/map/orbital-swath-hud";
 import { KSA_MISSION_SITES, type KsaMissionSite } from "@/data/ksaMissionData";
 
-type SpectralBandMode = "ndvi" | "rgb" | "ndbi" | "gradcam";
-
-const SPECTRAL_BANDS: readonly { id: SpectralBandMode; label: string; isCyan?: boolean }[] = [
-  { id: "ndvi", label: "NDVI & Urban Heat" },
-  { id: "rgb", label: "True Color (B04-03-02)" },
-  { id: "ndbi", label: "NDBI Built-Up" },
-  { id: "gradcam", label: "Grad-CAM++ Saliency", isCyan: true },
-] as const;
-
-function getSpectralFilterStyle(mode: SpectralBandMode): string {
-  switch (mode) {
-    case "ndvi":
-      return "brightness-105 contrast-115 saturate-125";
-    case "rgb":
-      return "brightness-100 contrast-105 saturate-95 hue-rotate-[-12deg]";
-    case "ndbi":
-      return "brightness-105 contrast-125 saturate-150 hue-rotate-[32deg]";
-    case "gradcam":
-      return "brightness-110 contrast-135 saturate-160 hue-rotate-[175deg]";
-  }
+interface ShowcaseLayerState {
+  titles: boolean;
+  indicators: boolean;
+  aoi: boolean;
+  protectedAreas: boolean;
+  restrictedAreas: boolean;
 }
 
 export function StitchCommandDeck() {
-  const [selectedSiteId, setSelectedSiteId] = useState<string>(KSA_MISSION_SITES[0]!.id);
-  const [spectralMode, setSpectralMode] = useState<SpectralBandMode>("ndvi");
-  const [sliderPos, setSliderPos] = useState<number>(50);
-  const [countdownStr, setCountdownStr] = useState<string>("04h : 18m : 22s");
+  const [siteIdx, setSiteIdx] = useState<number>(0);
+  const site: KsaMissionSite = KSA_MISSION_SITES[siteIdx] ?? KSA_MISSION_SITES[0]!;
 
-  const activeSite: KsaMissionSite =
-    KSA_MISSION_SITES.find((s) => s.id === selectedSiteId) ?? KSA_MISSION_SITES[0]!;
+  const [activeYear, setActiveYear] = useState<number>(2024);
+  const [basemapMode, setBasemapMode] = useState<"s2" | "mapbox">("s2");
+  const [swathZoom, setSwathZoom] = useState<number>(1);
+  const [swathOpacity, setSwathOpacity] = useState<number>(1.0);
+  const [showMgrs, setShowMgrs] = useState<boolean>(false);
+  const [activePinIndex, setActivePinIndex] = useState<number>(0);
+  const [cardMinimized, setCardMinimized] = useState<boolean>(false);
 
-  useEffect(() => {
-    let totalSeconds = 4 * 3600 + 18 * 60 + 22;
-    const id = setInterval(() => {
-      if (totalSeconds > 0) {
-        totalSeconds -= 1;
-        const h = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
-        const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
-        const s = String(totalSeconds % 60).padStart(2, "0");
-        setCountdownStr(`${h}h : ${m}m : ${s}s`);
-      }
-    }, 1000);
-    return () => clearInterval(id);
-  }, []);
+  const [layers, setLayers] = useState<ShowcaseLayerState>({
+    titles: true,
+    indicators: true,
+    aoi: true,
+    protectedAreas: false,
+    restrictedAreas: false,
+  });
 
-  const studioAnalyzeHref = `/analyze?lat=${activeSite.lat}&lon=${activeSite.lon}&t1=2018&t2=2024`;
+  const toggleLayer = (key: keyof ShowcaseLayerState) => {
+    setLayers((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const cycleSite = () => {
+    setSiteIdx((prev) => (prev + 1) % KSA_MISSION_SITES.length);
+  };
+
+  const cycleYear = () => {
+    setActiveYear((y) => (y === 2024 ? 2018 : 2024));
+  };
+
+  // Warm-Sand Indicator Pins on the Showcase Canvas (Ref 1)
+  const showcasePins = [
+    {
+      code: "JJV-16541",
+      xPct: 58,
+      yPct: 56,
+      probability: 75,
+      subtitle: "Probability of mining / grading happening",
+      area: site.pillBadge,
+    },
+    {
+      code: "KSA-24819",
+      xPct: 28,
+      yPct: 34,
+      probability: 89,
+      subtitle: "Probability of structural change happening",
+      area: "14.2 km²",
+    },
+    {
+      code: "SRD-19042",
+      xPct: 34,
+      yPct: 68,
+      probability: 82,
+      subtitle: "Probability of corridor excavation",
+      area: "8.6 km²",
+    },
+    {
+      code: "ORB-30911",
+      xPct: 86,
+      yPct: 24,
+      probability: 68,
+      subtitle: "Probability of surface / canopy shift",
+      area: "5.1 km²",
+    },
+  ];
+
+  const selectedPin = showcasePins[activePinIndex] ?? showcasePins[0]!;
+  const radius = 25;
+  const circumference = 2 * Math.PI * radius;
+  const probOffset = circumference - (selectedPin.probability / 100) * circumference;
 
   return (
-    <div className="min-h-screen bg-[#04070B] text-[#F0F4F8] hud-grid flex flex-col selection:bg-[#FFB020] selection:text-[#04070B]">
-      {/* 1. Top Orbital Telemetry HUD Navbar */}
-      <StudioNav />
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#0C1014] text-white select-none">
+      {/* 1. Reference 1 Petrol-Blue Command Header */}
+      <StudioNav
+        rightSlot={
+          <Link
+            href="/analyze"
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-[#00875A] px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#006E49] transition-colors"
+          >
+            <span>Open Map Studio</span>
+          </Link>
+        }
+      />
 
-      {/* 2. Sub-Header KSA AOI Selector & Geodetic Ribbon */}
-      <section className="border-b border-[#334155]/30 bg-[#090E17]/80 backdrop-blur-md px-4 py-2.5 z-30">
-        <div className="max-w-[1920px] mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
-          {/* Quick-Switcher Horizontal Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-            <span className="text-[10px] uppercase font-mono tracking-widest text-[#FFB020] font-bold flex items-center gap-1 me-1 shrink-0">
-              <svg
-                className="size-3.5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                aria-hidden="true"
-              >
-                <polygon points="3 11 22 2 13 21 11 13 3 11" />
-              </svg>
-              AOI:
-            </span>
+      {/* 2. Full-Bleed Satellite Canvas combining Reference 1, 2, and 3 */}
+      <main className="relative flex-1 w-full overflow-hidden bg-[#0C1014]">
+        {/* Full-Viewport High-Resolution Satellite Backdrop */}
+        <div
+          style={{
+            transform: `scale(${swathZoom})`,
+          }}
+          className="absolute inset-0 transition-transform duration-500 ease-out"
+        >
+          <img
+            src={activeYear === 2018 ? site.baseImage : site.overlayImage}
+            alt={`${site.pillTitle} orbital satellite pass`}
+            className="size-full object-cover brightness-[0.82] contrast-[1.08]"
+          />
+          <div className="absolute inset-0 bg-radial from-transparent via-[#0C1014]/20 to-[#0C1014]/70" />
+        </div>
 
-            {KSA_MISSION_SITES.map((site) => {
-              const isSelected = site.id === activeSite.id;
-              return (
-                <button
-                  key={site.id}
-                  type="button"
-                  onClick={() => setSelectedSiteId(site.id)}
-                  className={`px-3 py-1.5 rounded font-mono text-[11px] whitespace-nowrap flex items-center gap-2 transition-all ${
-                    isSelected
-                      ? "bg-[#FFB020]/15 text-[#FFB020] border border-[#FFB020]/50 font-semibold shadow-[0_0_12px_rgba(255,176,32,0.2)]"
-                      : "bg-[#0D1424]/50 hover:bg-[#0D1424] text-[#94A3B8] hover:text-[#F0F4F8] border border-[#334155]/30"
-                  }`}
-                >
-                  {isSelected ? (
-                    <span className="size-1.5 rounded-full bg-[#FFB020]" aria-hidden="true" />
-                  ) : null}
-                  <span>{site.pillTitle}</span>
-                  <span
-                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                      isSelected
-                        ? "bg-[#FFB020] text-[#04070B]"
-                        : site.pillBadgeTone === "cyan"
-                          ? "text-[#38E8FF]"
-                          : site.pillBadgeTone === "emerald"
-                            ? "text-[#00F5A0]"
-                            : "text-[#94A3B8]"
-                    }`}
+        {/* ===================================================================
+            CENTER-LEFT: ANGLED ORBITAL SWATH FOOTPRINT + 1px LEADER-LINE HUD (Exact Reference 3)
+           =================================================================== */}
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center lg:pl-64">
+          <div className="relative flex items-center">
+            {/* Angled Cyan Swath Capture Frame with 4-Corner LAT/LON Readouts (Ref 3) */}
+            {layers.aoi ? (
+              <div className="relative flex flex-col items-center">
+                {/* Top Floating Area Pill + Home Button (Ref 2) */}
+                <div className="pointer-events-auto mb-4 flex items-center gap-1.5 z-20">
+                  <button
+                    type="button"
+                    onClick={() => setSwathZoom(1)}
+                    className="flex size-7 items-center justify-center rounded-md bg-white text-[#111827] shadow-md hover:bg-[#F3F5F7]"
+                    aria-label="Reset swath zoom"
                   >
+                    <svg
+                      className="size-3.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                      <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>
+                  </button>
+                  <span className="rounded-md bg-white px-2.5 py-1 text-xs font-semibold text-[#111827] shadow-md tabular-nums">
                     {site.pillBadge}
                   </span>
+                  {showMgrs ? (
+                    <span className="rounded-md bg-[#0F4C6C] px-2 py-1 font-mono text-[11px] font-semibold text-white shadow-md">
+                      {site.mgrs}
+                    </span>
+                  ) : null}
+                </div>
+
+                {/* Tilted Satellite Swath Square (Exact Reference 3 Geometry) */}
+                <div className="relative size-60 sm:size-76 md:size-84 flex items-center justify-center">
+                  {/* Subtle Diagonal Orbital Track Lines (Ref 3) */}
+                  <div
+                    className="pointer-events-none absolute -top-48 -bottom-48 left-1/2 w-px -rotate-11 bg-white/15"
+                    aria-hidden="true"
+                  />
+
+                  <div
+                    style={{ opacity: swathOpacity }}
+                    className="relative size-56 sm:size-68 -rotate-11 border border-white/75 bg-[#36C5D8]/24 shadow-[0_0_50px_rgba(54,197,216,0.22)] backdrop-blur-[1px] transition-opacity"
+                  >
+                    {/* Internal Swath Atmospheric Texture */}
+                    <img
+                      src={site.overlayImage}
+                      alt=""
+                      aria-hidden="true"
+                      className="size-full object-cover mix-blend-screen opacity-55 contrast-125"
+                    />
+                    <div className="absolute inset-0 bg-linear-to-br from-[#36C5D8]/35 via-transparent to-[#0F4C6C]/40" />
+
+                    {/* 4 Glowing White Corner Nodes + LAT/LON Readouts (Exact Ref 3) */}
+                    {/* Top-Left Vertex */}
+                    <span className="absolute -top-1.5 -left-1.5 size-2.5 rounded-full bg-white shadow-[0_0_8px_#fff]" />
+                    {layers.titles ? (
+                      <span className="absolute -top-6 -left-24 rotate-11 font-mono text-[10px] tracking-wider text-white/65 tabular-nums">
+                        LAT {(site.lat + 0.02).toFixed(4)} LON {(site.lon - 0.03).toFixed(4)}
+                      </span>
+                    ) : null}
+
+                    {/* Top-Right Vertex */}
+                    <span className="absolute -top-1.5 -right-1.5 size-2.5 rounded-full bg-white shadow-[0_0_8px_#fff]" />
+                    {layers.titles ? (
+                      <span className="absolute -top-6 -right-16 rotate-11 font-mono text-[10px] tracking-wider text-white/65 tabular-nums">
+                        LAT {(site.lat + 0.02).toFixed(4)} LON {(site.lon + 0.03).toFixed(4)}
+                      </span>
+                    ) : null}
+
+                    {/* Bottom-Left Vertex */}
+                    <span className="absolute -bottom-1.5 -left-1.5 size-2.5 rounded-full bg-white shadow-[0_0_8px_#fff]" />
+                    {layers.titles ? (
+                      <span className="absolute -bottom-6 -left-20 rotate-11 font-mono text-[10px] tracking-wider text-white/65 tabular-nums">
+                        LAT {(site.lat - 0.02).toFixed(4)} LON {(site.lon - 0.03).toFixed(4)}
+                      </span>
+                    ) : null}
+
+                    {/* Bottom-Right Vertex */}
+                    <span className="absolute -bottom-1.5 -right-1.5 size-2.5 rounded-full bg-white shadow-[0_0_8px_#fff]" />
+                    {layers.titles ? (
+                      <span className="absolute -bottom-6 -right-24 rotate-11 font-mono text-[10px] tracking-wider text-white/65 tabular-nums">
+                        LAT {(site.lat - 0.02).toFixed(4)} LON {(site.lon + 0.03).toFixed(4)}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Bottom Floating Parameter Pills (Exact Ref 2 Pattern) */}
+                <div className="pointer-events-auto mt-5 flex items-center gap-1.5 z-20">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSwathOpacity((o) => (o === 1.0 ? 0.65 : o === 0.65 ? 0.35 : 1.0))
+                    }
+                    className="flex items-center gap-1 rounded-md bg-white/95 px-2.5 py-1 text-[11px] font-medium text-[#111827] shadow-md hover:bg-white tabular-nums"
+                  >
+                    <span>Opacity: {swathOpacity.toFixed(1)}</span>
+                    <span className="text-[9px] text-[#64707D]">↕</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSwathZoom((z) => (z === 1 ? 1.18 : 1))}
+                    className="flex items-center gap-1 rounded-md bg-white/95 px-2.5 py-1 text-[11px] font-medium text-[#111827] shadow-md hover:bg-white"
+                  >
+                    <span>Zoom: {swathZoom > 1 ? "1:1" : "2:1"}</span>
+                    <span className="text-[9px] text-[#64707D]">↕</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowMgrs((v) => !v)}
+                    className="flex items-center gap-1 rounded-md bg-white/95 px-2.5 py-1 text-[11px] font-medium text-[#111827] shadow-md hover:bg-white"
+                  >
+                    <span>Show MGRS: {showMgrs ? "On" : "Off"}</span>
+                    <span className="text-[9px] text-[#64707D]">↕</span>
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {/* 1px Leader-Line Connected Orbital Swath HUD (Exact Reference 3) */}
+            <div className="hidden md:block">
+              <OrbitalSwathHud
+                locationLabel={`${site.pillTitle.toUpperCase()}, KSA`}
+                year={activeYear}
+                basemapSource={basemapMode}
+                onToggleBasemap={() => setBasemapMode((m) => (m === "s2" ? "mapbox" : "s2"))}
+                onCyclePreset={cycleSite}
+                onCycleYear={cycleYear}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ===================================================================
+            WARM-SAND INDICATOR PINS & PETROL-BLUE RADIAL POPOVER (Exact Reference 1)
+           =================================================================== */}
+        {layers.indicators ? (
+          <div className="pointer-events-none absolute inset-0 z-10">
+            {showcasePins.map((pin, idx) => {
+              const active = idx === activePinIndex;
+              return (
+                <button
+                  key={pin.code}
+                  type="button"
+                  onClick={() => setActivePinIndex(idx)}
+                  style={{ left: `${pin.xPct}%`, top: `${pin.yPct}%` }}
+                  className={`pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 flex size-7.5 items-center justify-center rounded-full bg-[#F4C396] text-[#432810] shadow-[0_4px_14px_rgba(0,0,0,0.65)] transition-transform hover:scale-115 ${
+                    active ? "ring-2 ring-white scale-110" : ""
+                  }`}
+                  aria-label={`Select indicator ${pin.code}`}
+                >
+                  <svg
+                    className="size-3.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M14.5 3.5c2.5 1 4.5 3 5.5 5.5" />
+                    <path d="M9.5 3.5c-2.5 1-4.5 3-5.5 5.5" />
+                    <path d="m14 10-9.5 9.5" />
+                    <path d="m10 10 9.5 9.5" />
+                  </svg>
+                </button>
+              );
+            })}
+
+            {/* Floating Petrol-Blue Radial Probability Callout Card (Exact Ref 1) */}
+            <div
+              style={{
+                left: `min(calc(100vw - 240px), calc(${selectedPin.xPct}% + 18px))`,
+                top: `min(calc(100vh - 220px), calc(${selectedPin.yPct}% + 6px))`,
+              }}
+              className="pointer-events-auto hidden sm:block absolute z-20 w-54 bg-[#0F4C6C] px-4 py-3.5 text-center text-white shadow-[0_20px_44px_rgba(0,0,0,0.75)] border border-white/15 transition-all duration-300"
+            >
+              <p className="font-sans text-sm font-bold tracking-wide text-white">
+                {selectedPin.code}
+              </p>
+
+              <div className="my-2 flex items-center justify-center">
+                <div className="relative flex size-15 items-center justify-center">
+                  <svg className="size-15 -rotate-90" viewBox="0 0 64 64">
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r={radius}
+                      fill="none"
+                      stroke="rgba(255,255,255,0.85)"
+                      strokeWidth="4.5"
+                    />
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r={radius}
+                      fill="none"
+                      stroke="#36C5D8"
+                      strokeWidth="4.5"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={probOffset}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <span className="absolute font-sans text-xs font-bold text-white tabular-nums">
+                    {selectedPin.probability}%
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-[11px] font-medium text-white/90 leading-snug">
+                {selectedPin.subtitle}
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        {/* ===================================================================
+            LEFT FLOATING PORCELAIN TASKING & DEEP RESOLUTION CARD (Exact Reference 2)
+           =================================================================== */}
+        <aside
+          aria-label="Mission Tasking and Deep Resolution Catalog"
+          className="pointer-events-auto absolute top-4 start-4 z-20 w-[calc(100vw-2rem)] max-w-[348px]"
+        >
+          <div className="overflow-hidden rounded-2xl bg-white text-[#111827] shadow-[0_24px_48px_-12px_rgba(8,47,68,0.55)] border border-[#E6EAEE]">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[#E6EAEE] px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-[#111827]">Deep Resolution Imagery</span>
+                <span className="rounded-md bg-[#E0F2FE] px-2 py-0.5 text-[10px] font-semibold text-[#0284C7]">
+                  Active
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCardMinimized((v) => !v)}
+                className="flex size-6 items-center justify-center rounded-full bg-[#F3F5F7] text-xs font-bold text-[#3A4450] hover:bg-[#E6EAEE]"
+                aria-label={cardMinimized ? "Expand panel" : "Minimize panel"}
+              >
+                {cardMinimized ? "+" : "−"}
+              </button>
+            </div>
+
+            {!cardMinimized ? (
+              <div className="p-4 space-y-3.5">
+                {/* Mission Selector Box */}
+                <div className="rounded-xl bg-[#F3F5F7] px-3.5 py-2.5">
+                  <span className="block text-[10px] font-medium text-[#64707D]">
+                    Vision 2030 & Global Coverage Order
+                  </span>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {KSA_MISSION_SITES.map((m, idx) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setSiteIdx(idx)}
+                        className={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
+                          siteIdx === idx
+                            ? "bg-[#111827] text-white"
+                            : "bg-white text-[#3A4450] hover:bg-[#E6EAEE]"
+                        }`}
+                      >
+                        {m.pillTitle}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Scene List Items with Real Satellite Thumbnails (Ref 2 Right Screen) */}
+                <div className="divide-y divide-[#E6EAEE]">
+                  <div className="flex items-start gap-3 pb-3">
+                    <img
+                      src={site.overlayImage}
+                      alt={`${site.pillTitle} 2024 pass`}
+                      className="h-14 w-20 shrink-0 rounded-lg object-cover border border-[#E6EAEE]"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#111827]">Oct 07, 2024</span>
+                        <span className="flex size-4.5 items-center justify-center rounded-full bg-[#DCFCE7] text-[10px] font-bold text-[#00875A]">
+                          ✓
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#64707D] tabular-nums">
+                        {site.pillBadge} · ☁ {site.cloudCover}
+                      </p>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <Link
+                          href="/analyze"
+                          className="rounded-md bg-[#E0F2FE] px-2 py-0.5 text-[10px] font-semibold text-[#0284C7] hover:brightness-95"
+                        >
+                          Raw Files (24MB)
+                        </Link>
+                        <Link
+                          href="/analyze"
+                          className="rounded-md bg-[#EDE9FE] px-2 py-0.5 text-[10px] font-semibold text-[#6D28D9] hover:brightness-95"
+                        >
+                          S2 (1,3MB)
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 pt-3">
+                    <img
+                      src={site.baseImage}
+                      alt={`${site.pillTitle} 2018 baseline pass`}
+                      className="h-14 w-20 shrink-0 rounded-lg object-cover border border-[#E6EAEE]"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#111827]">Feb 19, 2018</span>
+                        <span className="flex size-4.5 items-center justify-center rounded-full bg-[#FEF3C7] text-[10px] text-[#D97706]">
+                          ◷
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#64707D] tabular-nums">
+                        Baseline Reference · ☁ 0%
+                      </p>
+                      <div className="mt-1">
+                        <span className="inline-block rounded-md bg-[#FEF3C7] px-2 py-0.5 text-[10px] font-semibold text-[#D97706]">
+                          Siamese F1: {site.benchmarks.f1}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Emerald Green Primary CTA (Exact Ref 2 Footer) */}
+                <div className="border-t border-[#E6EAEE] pt-3">
+                  <div className="mb-2 flex items-center justify-between text-xs">
+                    <span className="text-[#64707D]">Detected footprint:</span>
+                    <span className="font-bold text-[#111827] tabular-nums">
+                      {site.pillBadge} ({site.bfast.breakMagnitude})
+                    </span>
+                  </div>
+                  <Link
+                    href="/analyze"
+                    className="flex w-full items-center justify-center rounded-xl bg-[#00875A] py-3 text-xs font-bold text-white shadow-md hover:bg-[#006E49] transition-colors"
+                  >
+                    Launch Interactive Map Studio
+                  </Link>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </aside>
+
+        {/* ===================================================================
+            RIGHT-EDGE WIREFRAME [ + | − ] ZOOM CONTROL (Exact Reference 1)
+           =================================================================== */}
+        <div className="pointer-events-auto absolute right-5 top-1/2 -translate-y-1/2 z-20 flex flex-col border border-white/85 bg-[#0C1014]/35 backdrop-blur-xs shadow-lg">
+          <button
+            type="button"
+            onClick={() => setSwathZoom((z) => Math.min(1.4, Number((z + 0.12).toFixed(2))))}
+            className="flex size-8 items-center justify-center border-b border-white/75 text-lg font-light text-white hover:bg-white/20 transition-colors"
+            aria-label="Zoom in"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            onClick={() => setSwathZoom((z) => Math.max(1.0, Number((z - 0.12).toFixed(2))))}
+            className="flex size-8 items-center justify-center text-lg font-light text-white hover:bg-white/20 transition-colors"
+            aria-label="Zoom out"
+          >
+            −
+          </button>
+        </div>
+
+        {/* ===================================================================
+            BOTTOM HORIZONTAL LAYER CHECKLIST BAR (Exact Reference 1)
+           =================================================================== */}
+        <div className="pointer-events-none absolute bottom-5 inset-x-0 z-20 flex justify-center px-4">
+          <div
+            role="group"
+            aria-label="Showcase map layers"
+            className="pointer-events-auto flex flex-wrap items-center justify-center shadow-[0_16px_40px_rgba(0,0,0,0.75)]"
+          >
+            {(
+              [
+                { key: "titles", label: "Titles" },
+                { key: "indicators", label: "Mining & Change Indicators" },
+                { key: "aoi", label: "Areas of Interest" },
+                { key: "protectedAreas", label: "Protected areas" },
+                { key: "restrictedAreas", label: "Restricted areas" },
+              ] as const
+            ).map(({ key, label }) => {
+              const checked = layers[key];
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={checked}
+                  onClick={() => toggleLayer(key)}
+                  className={`flex items-center gap-2.5 px-5 py-2.5 text-xs font-medium transition-all cursor-pointer focus-visible:outline-none ${
+                    checked
+                      ? "z-10 -my-1 border-2 border-white bg-white/35 py-3.5 font-semibold text-white backdrop-blur-md shadow-lg"
+                      : "border border-white/70 bg-[#0C1014]/55 text-white/90 hover:bg-white/15 backdrop-blur-xs"
+                  }`}
+                >
+                  <span
+                    className={`flex size-4 items-center justify-center border ${
+                      checked
+                        ? "border-white bg-white text-[#0F4C6C]"
+                        : "border-white/85 bg-transparent"
+                    }`}
+                    aria-hidden="true"
+                  >
+                    {checked ? (
+                      <svg
+                        className="size-3"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : null}
+                  </span>
+                  <span>{label}</span>
                 </button>
               );
             })}
           </div>
-
-          {/* Telemetry Coordinates Ribbon */}
-          <div className="hidden md:flex items-center gap-3 font-mono text-[11px] text-[#94A3B8]">
-            <span className="bg-[#04070B]/70 border border-[#334155]/30 px-2.5 py-1 rounded">
-              <span className="text-[#94A3B8]">CRS:</span>{" "}
-              <span className="text-[#38E8FF] font-bold">{activeSite.crs}</span>
-            </span>
-            <span className="bg-[#04070B]/70 border border-[#334155]/30 px-2.5 py-1 rounded">
-              <span className="text-[#94A3B8]">CLOUD:</span>{" "}
-              <span className="text-[#00F5A0] font-bold">{activeSite.cloudCover}</span>
-            </span>
-            <span className="bg-[#04070B]/70 border border-[#334155]/30 px-2.5 py-1 rounded">
-              <span className="text-[#94A3B8]">DEPTH:</span>{" "}
-              <span className="text-[#FFB020] font-bold">{activeSite.depth}</span>
-            </span>
-          </div>
         </div>
-      </section>
-
-      {/* Main Mission Workspace */}
-      <main className="max-w-[1920px] w-full mx-auto px-4 py-4 space-y-4 flex-1">
-        {/* 3. Hero Multi-Spectral Split-Curtain Viewport */}
-        <section
-          id="viewport-hero"
-          className="relative rounded-xl border border-[#334155]/40 bg-[#090E17] overflow-hidden shadow-2xl"
-        >
-          {/* Top Viewport Control Bar Overlay */}
-          <div className="absolute top-0 inset-x-0 z-20 flex flex-wrap items-center justify-between gap-3 p-3.5 bg-gradient-to-b from-[#04070B]/95 via-[#04070B]/70 to-transparent backdrop-blur-sm">
-            {/* AOI Target Header */}
-            <div className="flex items-center gap-2.5">
-              <span className="p-1.5 rounded bg-[#FFB020]/20 text-[#FFB020] border border-[#FFB020]/35">
-                <svg
-                  className="size-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  aria-hidden="true"
-                >
-                  <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-                  <circle cx="12" cy="10" r="3" />
-                </svg>
-              </span>
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-[#F0F4F8]">
-                    {activeSite.targetHeader}
-                  </h1>
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#00F5A0]/15 text-[#00F5A0] border border-[#00F5A0]/35">
-                    {activeSite.mgrs}
-                  </span>
-                </div>
-                <p className="text-[10px] font-mono text-[#94A3B8]">
-                  {activeSite.acquisitionSubtitle}
-                </p>
-              </div>
-            </div>
-
-            {/* Spectral Layer Switcher */}
-            <div className="flex flex-wrap items-center gap-1.5 bg-[#0D1424]/90 border border-[#334155]/40 p-1 rounded-lg backdrop-blur-md">
-              {SPECTRAL_BANDS.map((band) => {
-                const active = spectralMode === band.id;
-                return (
-                  <button
-                    key={band.id}
-                    type="button"
-                    onClick={() => setSpectralMode(band.id)}
-                    className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors flex items-center gap-1.5 ${
-                      active
-                        ? "bg-[#FFB020] text-[#04070B] font-bold shadow-[0_0_10px_rgba(255,176,32,0.3)]"
-                        : band.isCyan
-                          ? "text-[#38E8FF] hover:bg-[#38E8FF]/10 font-medium"
-                          : "text-[#94A3B8] hover:text-[#F0F4F8] font-medium"
-                    }`}
-                  >
-                    {band.isCyan ? (
-                      <span
-                        className={`size-1.5 rounded-full ${
-                          active ? "bg-[#04070B]" : "bg-[#38E8FF]"
-                        }`}
-                        aria-hidden="true"
-                      />
-                    ) : null}
-                    {band.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Corner HUD Reticle Graphics */}
-          <div className="pointer-events-none absolute inset-x-0 top-16 bottom-14 z-10 px-4 py-2 flex flex-col justify-between">
-            <div className="flex justify-between items-start">
-              <div className="text-[10px] font-mono text-[#94A3B8]/80 border-t border-s border-[#FFB020]/50 pt-1 ps-1.5">
-                FRAME: 1024x1024 TILED // {spectralMode.toUpperCase()}
-              </div>
-              <div className="text-[10px] font-mono text-[#94A3B8]/80 border-t border-e border-[#FFB020]/50 pt-1 pe-1.5 text-end">
-                {activeSite.frameCoords}
-              </div>
-            </div>
-            <div className="flex justify-between items-end">
-              <div className="flex items-center gap-3 bg-[#04070B]/85 border border-[#334155]/40 px-2.5 py-1 rounded text-[10px] font-mono">
-                <span>SCALE BAR:</span>
-                <div className="w-24 h-1.5 bg-[#334155]/60 flex">
-                  <div className="w-1/2 bg-[#F0F4F8]" />
-                  <div className="w-1/2 bg-[#04070B]" />
-                </div>
-                <span>0 — 5.0 KM</span>
-              </div>
-              <div className="flex items-center gap-2 bg-[#04070B]/85 border border-[#334155]/40 px-2.5 py-1 rounded text-[10px] font-mono text-[#FFB020]">
-                <span>▲ ORBIT PASS: ASCENDING</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Split Curtain Viewport Canvas Container */}
-          <div className="relative w-full h-[500px] md:h-[600px] overflow-hidden select-none bg-[#04070B]">
-            {/* Left Side: Temporal Anchor T0 (2018 Pre-Development Baseline) */}
-            <div className="absolute inset-0 size-full">
-              <img
-                src={activeSite.baseImage}
-                alt={`${activeSite.pillTitle} 2018 Sentinel-2 baseline`}
-                className="size-full object-cover object-center brightness-95 contrast-105"
-              />
-              <div className="absolute bottom-14 start-6 z-10 bg-[#04070B]/90 backdrop-blur-md border border-[#334155]/50 px-3 py-1.5 rounded">
-                <span className="text-[10px] font-mono text-[#94A3B8] uppercase tracking-wider block">
-                  Temporal Anchor T₀
-                </span>
-                <span className="text-xs font-mono font-bold text-[#F0F4F8]">
-                  {activeSite.anchorT0Label}
-                </span>
-              </div>
-            </div>
-
-            {/* Right Side: Neural Inferred T1 (2024 Multispectral Change Overlay clipped via clipPath) */}
-            <div
-              className="absolute inset-0 size-full"
-              style={{ clipPath: `inset(0 0 0 ${sliderPos}%)` }}
-            >
-              <img
-                src={activeSite.overlayImage}
-                alt={`${activeSite.pillTitle} 2024 AI Multispectral Change Detection`}
-                className={`size-full object-cover object-center transition-all duration-300 ${getSpectralFilterStyle(
-                  spectralMode,
-                )}`}
-              />
-              <div className="absolute bottom-14 end-6 z-10 bg-[#04070B]/90 backdrop-blur-md border border-[#FFB020]/50 px-3 py-1.5 rounded shadow-[0_0_15px_rgba(255,176,32,0.2)]">
-                <span className="text-[10px] font-mono text-[#FFB020] uppercase tracking-wider block">
-                  Neural Inferred T₁ · {spectralMode.toUpperCase()}
-                </span>
-                <span className="text-xs font-mono font-bold text-[#FFB020]">
-                  {activeSite.inferredT1Label}
-                </span>
-              </div>
-            </div>
-
-            {/* Interactive Split Laser Divider Line & Central Drag Handle */}
-            <div
-              className="absolute top-0 bottom-0 z-20 pointer-events-none flex items-center justify-center -translate-x-1/2"
-              style={{ left: `${sliderPos}%` }}
-            >
-              <div className="w-[2px] h-full bg-gradient-to-b from-[#FFB020] via-[#38E8FF] to-[#FFB020] shadow-[0_0_12px_#FFB020]" />
-              <div className="absolute size-12 rounded-full bg-[#090E17] border-2 border-[#FFB020] flex items-center justify-center text-[#FFB020] shadow-[0_0_20px_rgba(255,176,32,0.6)]">
-                <span className="text-[10px] font-mono font-bold tracking-tighter">◄ │ ►</span>
-              </div>
-            </div>
-
-            {/* Range Slider Input Overlaid (Seamless touch/mouse dragging across viewport) */}
-            <input
-              aria-label="Split-Curtain Slider 2018 vs 2024"
-              type="range"
-              min={5}
-              max={95}
-              value={sliderPos}
-              onChange={(e) => setSliderPos(Number(e.target.value))}
-              className="absolute inset-0 size-full opacity-0 cursor-ew-resize z-30"
-            />
-          </div>
-
-          {/* Bottom Floating Telemetry & Controls Strip */}
-          <div className="border-t border-[#334155]/30 bg-[#0D1424]/50 backdrop-blur-md p-3 flex flex-wrap items-center justify-between gap-4">
-            {/* Legend Pill Indicators */}
-            <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
-              <div className="flex items-center gap-2">
-                <span className="size-3 rounded bg-[#00F5A0] shadow-[0_0_8px_#00F5A0]" />
-                <span className="text-[#F0F4F8]">Green Infrastructure (+ΔNDVI &gt; 0.35)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="size-3 rounded bg-[#FFB020] shadow-[0_0_8px_#FFB020]" />
-                <span className="text-[#F0F4F8]">Urban Expansion (+ΔNDBI Built-Up)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="size-3 rounded bg-[#FF3B5C] shadow-[0_0_8px_#FF3B5C]" />
-                <span className="text-[#F0F4F8]">Thermal Heat Concentration (+ΔLST &gt; 3.2°C)</span>
-              </div>
-            </div>
-
-            {/* Tactical Viewport Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-              <button
-                type="button"
-                onClick={() => setSliderPos(50)}
-                className="px-2.5 py-1.5 rounded bg-[#04070B]/80 border border-[#334155]/40 hover:border-[#FFB020]/50 text-[#94A3B8] hover:text-[#F0F4F8] transition-colors"
-              >
-                Recenter Curtain (50%)
-              </button>
-              <Link
-                href="/lab"
-                className="px-2.5 py-1.5 rounded bg-[#04070B]/80 border border-[#334155]/40 hover:border-[#FFB020]/50 text-[#94A3B8] hover:text-[#F0F4F8] transition-colors"
-              >
-                Open Image Pair Lab
-              </Link>
-              <Link
-                href={studioAnalyzeHref}
-                className="px-3 py-1.5 rounded bg-[#04070B]/90 border border-[#38E8FF]/45 hover:bg-[#38E8FF]/15 text-[#38E8FF] font-semibold flex items-center gap-1.5 transition-colors"
-              >
-                <span>Open Live GIS Map Studio ({activeSite.pillTitle.split(" ")[0]}) →</span>
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* 4. Bento Command Grid (Deep Analytical Telemetry) */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* PANEL A: SIAMESE U-NET AI INFERENCE BENCHMARKS (4 cols) */}
-          <div
-            id="benchmarks"
-            className="lg:col-span-4 rounded-xl border border-[#334155]/35 bg-[#090E17] p-4 backdrop-blur-xl relative overflow-hidden flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between border-b border-[#334155]/25 pb-3 mb-4">
-                <div className="flex items-center gap-2">
-                  <span className="p-1.5 rounded bg-[#FFB020]/20 text-[#FFB020] border border-[#FFB020]/30">
-                    <svg
-                      className="size-3.5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      aria-hidden="true"
-                    >
-                      <rect x="4" y="4" width="16" height="16" rx="2" />
-                      <rect x="9" y="9" width="6" height="6" />
-                      <path d="M15 2v2M9 2v2M20 15h2M20 9h2M15 20v2M9 20v2M2 15h2M2 9h2" />
-                    </svg>
-                  </span>
-                  <div>
-                    <h2 className="font-bold text-xs uppercase tracking-wider text-[#F0F4F8]">
-                      SIAMESE NEURAL BACKBONE
-                    </h2>
-                    <p className="text-[10px] font-mono text-[#94A3B8]">
-                      FC-Siam-diff vs STANet vs BIT-CD
-                    </p>
-                  </div>
-                </div>
-                <Link
-                  href="/benchmarks"
-                  className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#00F5A0]/15 text-[#00F5A0] border border-[#00F5A0]/30 font-semibold hover:bg-[#00F5A0]/25 transition-colors"
-                >
-                  OPEN XAI LAB →
-                </Link>
-              </div>
-
-              {/* Primary KPI Metric Cards */}
-              <div className="grid grid-cols-2 gap-2.5 mb-4">
-                <div className="p-3 rounded-lg bg-[#0D1424]/50 border border-[#334155]/25">
-                  <div className="text-[10px] font-mono text-[#94A3B8]">CHANGE IOU</div>
-                  <div className="flex items-baseline gap-1.5 mt-1">
-                    <span className="text-2xl font-mono font-bold text-[#00F5A0] tabular-nums">
-                      {activeSite.benchmarks.iou}
-                    </span>
-                    <span className="text-[10px] font-mono text-[#00F5A0]">
-                      {activeSite.benchmarks.iouDelta}
-                    </span>
-                  </div>
-                  <div className="w-full h-1 bg-[#0D1424] rounded-full mt-2 overflow-hidden">
-                    <div
-                      className="h-full bg-[#00F5A0] rounded-full transition-all duration-500"
-                      style={{ width: activeSite.benchmarks.iou }}
-                    />
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-[#0D1424]/50 border border-[#334155]/25">
-                  <div className="text-[10px] font-mono text-[#94A3B8]">F1-SCORE</div>
-                  <div className="flex items-baseline gap-1.5 mt-1">
-                    <span className="text-2xl font-mono font-bold text-[#38E8FF] tabular-nums">
-                      {activeSite.benchmarks.f1}
-                    </span>
-                    <span className="text-[10px] font-mono text-[#38E8FF]">
-                      {activeSite.benchmarks.f1Delta}
-                    </span>
-                  </div>
-                  <div className="w-full h-1 bg-[#0D1424] rounded-full mt-2 overflow-hidden">
-                    <div
-                      className="h-full bg-[#38E8FF] rounded-full transition-all duration-500"
-                      style={{ width: activeSite.benchmarks.f1 }}
-                    />
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-[#0D1424]/50 border border-[#334155]/25">
-                  <div className="text-[10px] font-mono text-[#94A3B8]">PRECISION</div>
-                  <div className="text-xl font-mono font-bold text-[#F0F4F8] mt-1 tabular-nums">
-                    {activeSite.benchmarks.precision}
-                  </div>
-                  <div className="text-[9px] font-mono text-[#94A3B8] mt-0.5">
-                    Low False Positives
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-lg bg-[#0D1424]/50 border border-[#334155]/25">
-                  <div className="text-[10px] font-mono text-[#94A3B8]">RECALL</div>
-                  <div className="text-xl font-mono font-bold text-[#F0F4F8] mt-1 tabular-nums">
-                    {activeSite.benchmarks.recall}
-                  </div>
-                  <div className="text-[9px] font-mono text-[#94A3B8] mt-0.5">
-                    Ground Truth Align
-                  </div>
-                </div>
-              </div>
-
-              {/* 4-Stage Encoder Feature Difference Heatmaps preview bars */}
-              <div className="space-y-2 bg-[#04070B]/60 p-3 rounded-lg border border-[#334155]/25 font-mono text-[11px]">
-                <div className="flex justify-between items-center text-[10px] text-[#94A3B8] mb-1">
-                  <span>SIAMESE ENCODER DIFF ATTENTION</span>
-                  <span className="text-[#FFB020] font-bold">L4 PYRAMID</span>
-                </div>
-                <div>
-                  <div className="flex justify-between text-[10px] mb-0.5">
-                    <span>Stage 1 (Conv2_x / Edge Gradients)</span>
-                    <span className="text-[#F0F4F8]">{activeSite.benchmarks.stage1Pct}%</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-[#0D1424] rounded overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-[#FFB020] to-amber-300 rounded"
-                      style={{ width: `${activeSite.benchmarks.stage1Pct}%` }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-[10px] mb-0.5">
-                    <span>Stage 2 (Conv3_x / Spectral Textures)</span>
-                    <span className="text-[#F0F4F8]">{activeSite.benchmarks.stage2Pct}%</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-[#0D1424] rounded overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-[#FFB020] to-[#38E8FF] rounded"
-                      style={{ width: `${activeSite.benchmarks.stage2Pct}%` }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-[10px] mb-0.5">
-                    <span>Stage 3 &amp; 4 (High Semantic / Structural Shift)</span>
-                    <span className="text-[#F0F4F8]">{activeSite.benchmarks.stage34Pct}%</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-[#0D1424] rounded overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-[#38E8FF] to-[#00F5A0] rounded"
-                      style={{ width: `${activeSite.benchmarks.stage34Pct}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 flex items-center justify-between text-[10px] font-mono text-[#94A3B8]">
-              <span>BATCH SIZE: 16 TILES</span>
-              <span>CHIP: 1024x1024</span>
-              <span className="text-[#00F5A0]">INFERENCE: {activeSite.benchmarks.latencyMs}</span>
-            </div>
-          </div>
-
-          {/* PANEL B: BFAST STRUCTURAL BREAKPOINT & URBANIZATION (5 cols) */}
-          <div
-            id="bfast"
-            className="lg:col-span-5 rounded-xl border border-[#334155]/35 bg-[#090E17] p-4 backdrop-blur-xl relative flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between border-b border-[#334155]/25 pb-3 mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="p-1.5 rounded bg-[#38E8FF]/20 text-[#38E8FF] border border-[#38E8FF]/30">
-                    <svg
-                      className="size-3.5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      aria-hidden="true"
-                    >
-                      <path d="M3 3v18h18" />
-                      <path d="m19 9-5 5-4-4-3 3" />
-                    </svg>
-                  </span>
-                  <div>
-                    <h2 className="font-bold text-xs uppercase tracking-wider text-[#F0F4F8]">
-                      BFAST TEMPORAL BREAKPOINT ANALYSIS
-                    </h2>
-                    <p className="text-[10px] font-mono text-[#94A3B8]">
-                      {activeSite.bfast.subtitle}
-                    </p>
-                  </div>
-                </div>
-                <Link
-                  href="/timeline"
-                  className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#FFB020]/20 text-[#FFB020] border border-[#FFB020]/30 font-semibold hover:bg-[#FFB020]/30 transition-colors"
-                >
-                  2030 FORECAST →
-                </Link>
-              </div>
-
-              {/* Temporal SVG Visualization */}
-              <div className="relative w-full h-48 bg-[#04070B]/70 rounded-lg border border-[#334155]/25 p-3 overflow-hidden flex flex-col justify-end">
-                {/* Background Grid lines */}
-                <div className="absolute inset-0 flex flex-col justify-between p-3 pointer-events-none opacity-20">
-                  <div className="border-b border-dashed border-[#334155] w-full" />
-                  <div className="border-b border-dashed border-[#334155] w-full" />
-                  <div className="border-b border-dashed border-[#334155] w-full" />
-                </div>
-
-                {/* SVG Trajectory Line */}
-                <svg
-                  className="w-full h-full overflow-visible"
-                  preserveAspectRatio="none"
-                  viewBox="0 0 500 120"
-                  aria-label="BFAST temporal trajectory chart"
-                >
-                  <path
-                    d={activeSite.bfast.svgPathBaseline}
-                    fill="none"
-                    stroke="#FFB020"
-                    strokeLinecap="round"
-                    strokeWidth="2.5"
-                  />
-                  <path
-                    d={activeSite.bfast.svgPathUpperCi}
-                    fill="none"
-                    opacity="0.6"
-                    stroke="#38E8FF"
-                    strokeDasharray="3,3"
-                    strokeWidth="1"
-                  />
-                  {activeSite.bfast.markers.map((m, idx) => (
-                    <circle key={idx} cx={m.cx} cy={m.cy} fill={m.color} r="4.5" />
-                  ))}
-                </svg>
-
-                {/* Temporal Timeline Annotations */}
-                <div className="relative z-10 grid grid-cols-4 gap-2 text-[9px] font-mono text-[#94A3B8] pt-2 border-t border-[#334155]/25">
-                  {activeSite.bfast.timelineLabels.map((item, idx) => (
-                    <div
-                      key={item.year}
-                      className={
-                        idx === 0
-                          ? "text-start"
-                          : idx === activeSite.bfast.timelineLabels.length - 1
-                            ? "text-end"
-                            : "text-center"
-                      }
-                    >
-                      <span
-                        className={`font-semibold block ${
-                          item.tone === "crimson"
-                            ? "text-[#FF3B5C]"
-                            : item.tone === "emerald"
-                              ? "text-[#00F5A0]"
-                              : item.tone === "cyan"
-                                ? "text-[#38E8FF]"
-                                : "text-[#F0F4F8]"
-                        }`}
-                      >
-                        {item.year}
-                      </span>
-                      <span>{item.subtitle}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Trajectory Stats & Annotations */}
-            <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-[#334155]/25 text-center font-mono">
-              <div className="p-2 rounded bg-[#0D1424]/40 border border-[#334155]/20">
-                <span className="text-[9px] text-[#94A3B8] block">BREAK MAGNITUDE</span>
-                <span className="text-xs font-bold text-[#FFB020]">
-                  {activeSite.bfast.breakMagnitude}
-                </span>
-              </div>
-              <div className="p-2 rounded bg-[#0D1424]/40 border border-[#334155]/20">
-                <span className="text-[9px] text-[#94A3B8] block">CONFIDENCE</span>
-                <span className="text-xs font-bold text-[#00F5A0]">
-                  {activeSite.bfast.confidence}
-                </span>
-              </div>
-              <div className="p-2 rounded bg-[#0D1424]/40 border border-[#334155]/20">
-                <span className="text-[9px] text-[#94A3B8] block">CYCLE FREQUENCY</span>
-                <span className="text-xs font-bold text-[#38E8FF]">
-                  {activeSite.bfast.cycleFrequency}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* PANEL C: IPCC 4-POOL CARBON & URBAN HEAT ISLAND (3 cols) */}
-          <div
-            id="carbon-uhi"
-            className="lg:col-span-3 rounded-xl border border-[#334155]/35 bg-[#090E17] p-4 backdrop-blur-xl relative flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between border-b border-[#334155]/25 pb-3 mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="p-1.5 rounded bg-[#00F5A0]/20 text-[#00F5A0] border border-[#00F5A0]/30">
-                    <svg
-                      className="size-3.5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      aria-hidden="true"
-                    >
-                      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                    </svg>
-                  </span>
-                  <div>
-                    <h2 className="font-bold text-xs uppercase tracking-wider text-[#F0F4F8]">
-                      CARBON &amp; UHI TELEMETRY
-                    </h2>
-                    <p className="text-[10px] font-mono text-[#94A3B8]">
-                      IPCC Tier-1 4-Pool Modeling
-                    </p>
-                  </div>
-                </div>
-                <Link
-                  href="/carbon"
-                  className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#00F5A0]/20 text-[#00F5A0] border border-[#00F5A0]/30 font-semibold hover:bg-[#00F5A0]/30 transition-colors"
-                >
-                  {activeSite.carbonUhi.badge} →
-                </Link>
-              </div>
-
-              {/* Carbon Delta */}
-              <div className="p-3 rounded-lg bg-[#0D1424]/50 border border-[#334155]/25 mb-3">
-                <div className="flex justify-between items-center text-[10px] font-mono text-[#94A3B8]">
-                  <span>PROJECTED SEQUESTRATION</span>
-                  <span className="text-[#00F5A0] font-bold">
-                    {activeSite.carbonUhi.sequestrationYoy}
-                  </span>
-                </div>
-                <div className="text-2xl font-mono font-black text-[#00F5A0] mt-1 tabular-nums">
-                  {activeSite.carbonUhi.sequestrationDelta}{" "}
-                  <span className="text-xs font-normal text-[#94A3B8]">tCO₂e</span>
-                </div>
-                <p className="text-[9px] font-mono text-[#94A3B8] mt-1">
-                  {activeSite.carbonUhi.sequestrationNote}
-                </p>
-              </div>
-
-              {/* UHI Microclimate Cooling */}
-              <div className="p-3 rounded-lg bg-[#0D1424]/50 border border-[#334155]/25 mb-3">
-                <div className="flex justify-between items-center text-[10px] font-mono text-[#94A3B8]">
-                  <span>LAND SURFACE TEMP (ΔLST)</span>
-                  <span className="text-[#38E8FF] font-bold">
-                    {activeSite.carbonUhi.deltaLstZoneLabel}
-                  </span>
-                </div>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-2xl font-mono font-black text-[#38E8FF] tabular-nums">
-                    {activeSite.carbonUhi.deltaLst}
-                  </span>
-                  <span className="text-[10px] font-mono text-[#94A3B8]">
-                    {activeSite.carbonUhi.deltaLstCompare}
-                  </span>
-                </div>
-                <div className="w-full bg-[#04070B] h-1.5 rounded-full mt-2 overflow-hidden flex">
-                  <div className="bg-[#38E8FF] h-full" style={{ width: "48%" }} />
-                  <div className="bg-[#FF3B5C] h-full" style={{ width: "52%" }} />
-                </div>
-              </div>
-            </div>
-
-            {/* Water Stress Telemetry Gauges */}
-            <div className="p-2.5 rounded bg-[#04070B]/70 border border-[#334155]/25 font-mono text-[10px]">
-              <div className="flex justify-between mb-1">
-                <span className="text-[#94A3B8]">NDWI Moisture Index:</span>
-                <span className="text-[#38E8FF] font-bold">{activeSite.carbonUhi.ndwi}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#94A3B8]">NDRE Chlorophyll:</span>
-                <span className="text-[#00F5A0] font-bold">{activeSite.carbonUhi.ndre}</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* 5. Panel D: Live Orbital Tasking & STAC Ingestion Pipeline */}
-        <section
-          id="stac"
-          className="rounded-xl border border-[#334155]/35 bg-[#090E17] p-4 backdrop-blur-xl"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#334155]/25 pb-3 mb-4">
-            <div className="flex items-center gap-3">
-              <div className="size-9 rounded-lg bg-[#0D1424] border border-[#FFB020]/35 flex items-center justify-center text-[#FFB020]">
-                <svg
-                  className="size-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  aria-hidden="true"
-                >
-                  <ellipse cx="12" cy="5" rx="9" ry="3" />
-                  <path d="M3 5V19A9 3 0 0 0 21 19V5" />
-                  <path d="M3 12A9 3 0 0 0 21 12" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="font-bold text-xs uppercase tracking-wider text-[#F0F4F8]">
-                  LEO TASKING &amp; STAC INGESTION STATUS
-                </h2>
-                <p className="text-[10px] font-mono text-[#94A3B8]">
-                  Sentinel-2B Overpass Vector // Element84 AWS SpatioTemporal Asset Catalog API v1.0
-                </p>
-              </div>
-            </div>
-
-            {/* Overpass Countdown Counter */}
-            <div className="flex flex-wrap items-center gap-3 font-mono">
-              <div className="bg-[#04070B]/80 border border-[#334155]/35 px-3 py-1.5 rounded text-xs flex items-center gap-2">
-                <span className="size-2 rounded-full bg-[#FFB020] animate-ping" aria-hidden="true" />
-                <span className="text-[#94A3B8]">NEXT PASS:</span>
-                <span className="text-[#FFB020] font-bold tabular-nums">{countdownStr}</span>
-              </div>
-              <div className="hidden sm:block text-[11px] text-[#94A3B8]">
-                AWS S3 BUCKET: <span className="text-[#38E8FF] font-bold">14.8 TB</span>
-              </div>
-              <Link
-                href="/watchlist"
-                className="px-3 py-1.5 rounded bg-[#FFB020]/15 border border-[#FFB020]/40 text-[#FFB020] text-xs font-bold hover:bg-[#FFB020] hover:text-[#04070B] transition-colors"
-              >
-                QUERY LIVE STAC CATALOG →
-              </Link>
-            </div>
-          </div>
-
-          {/* Live Stream Steps Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 font-mono text-xs">
-            <Link
-              href="/watchlist"
-              className="p-3 rounded-lg bg-[#0D1424]/40 border border-[#334155]/25 hover:border-[#00F5A0]/50 flex items-center justify-between transition-colors"
-            >
-              <div>
-                <span className="text-[#F0F4F8] block font-semibold text-[11px]">
-                  ESA Copernicus Hub
-                </span>
-                <span className="text-[10px] text-[#94A3B8]">B02..B12 L2A STAC Feed</span>
-              </div>
-              <span className="text-[10px] text-[#00F5A0] bg-[#00F5A0]/10 border border-[#00F5A0]/25 px-2 py-0.5 rounded">
-                SYNCED
-              </span>
-            </Link>
-
-            <Link
-              href="/lab"
-              className="p-3 rounded-lg bg-[#0D1424]/40 border border-[#334155]/25 hover:border-[#38E8FF]/50 flex items-center justify-between transition-colors"
-            >
-              <div>
-                <span className="text-[#F0F4F8] block font-semibold text-[11px]">
-                  Sen2Cor Radiometry &amp; Pair Lab
-                </span>
-                <span className="text-[10px] text-[#94A3B8]">BOA L2A + Custom Pair Sandbox</span>
-              </div>
-              <span className="text-[10px] text-[#38E8FF] bg-[#38E8FF]/10 border border-[#38E8FF]/25 px-2 py-0.5 rounded">
-                ACTIVE
-              </span>
-            </Link>
-
-            <Link
-              href="/benchmarks"
-              className="p-3 rounded-lg bg-[#0D1424]/40 border border-[#334155]/25 hover:border-[#FFB020]/50 flex items-center justify-between transition-colors"
-            >
-              <div>
-                <span className="text-[#F0F4F8] block font-semibold text-[11px]">
-                  Siamese U-Net (FC-Siam-diff)
-                </span>
-                <span className="text-[10px] text-[#94A3B8]">5-Channel + Grad-CAM++ XAI</span>
-              </div>
-              <span className="text-[10px] text-[#FFB020] bg-[#FFB020]/10 border border-[#FFB020]/25 px-2 py-0.5 rounded">
-                {activeSite.benchmarks.latencyMs}
-              </span>
-            </Link>
-
-            <Link
-              href={studioAnalyzeHref}
-              className="p-3 rounded-lg bg-[#0D1424]/40 border border-[#334155]/25 hover:border-[#F0F4F8]/50 flex items-center justify-between transition-colors"
-            >
-              <div>
-                <span className="text-[#F0F4F8] block font-semibold text-[11px]">
-                  Cloud-COG &amp; GeoJSON Vector
-                </span>
-                <span className="text-[10px] text-[#94A3B8]">RFC 7946 + Executive PDF</span>
-              </div>
-              <span className="text-[10px] text-[#F0F4F8] bg-[#04070B] border border-[#334155]/40 px-2 py-0.5 rounded">
-                READY
-              </span>
-            </Link>
-          </div>
-        </section>
       </main>
-
-      {/* Cockpit Footer */}
-      <footer className="border-t border-[#334155]/25 bg-[#04070B]/90 backdrop-blur-xl px-4 py-3 mt-4 text-[#94A3B8] text-[11px] font-mono">
-        <div className="max-w-[1920px] mx-auto flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="text-[#FFB020] font-bold">TERRASHIFT AI // ORBITAL</span>
-            <span className="text-[#334155]">|</span>
-            <span>Kingdom of Saudi Arabia Vision 2030 Earth Observation</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span>PyTorch 2.14 · Siamese U-Net · STAC v1.0.0</span>
-            <span className="text-[#334155]">|</span>
-            <span className="text-[#00F5A0] flex items-center gap-1.5">
-              <span className="size-1.5 rounded-full bg-[#00F5A0]" aria-hidden="true" />
-              All Sensor Feeds Nominal
-            </span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

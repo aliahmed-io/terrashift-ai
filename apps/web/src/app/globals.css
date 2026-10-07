@@ -30,10 +30,33 @@
   --color-alert-500: #ff3b5c;
   --color-crimson-400: #ff3b5c;
   --color-lagoon-400: #38e8ff;
+
+  /* Petrol & Porcelain geospatial system (see src/tokens/index.ts) */
+  --color-petrol-900: #082f44;
+  --color-petrol-800: #0b3b54;
+  --color-petrol-700: #0f4c6c;
+  --color-petrol-500: #2a7aa0;
+  --color-cyan-ring: #36c5d8;
+  --color-sand-pin: #f4c396;
+  --color-sand-ink: #5a3a1a;
+  --color-coral-beam: #c8553d;
+  --color-porcelain-50: #ffffff;
+  --color-porcelain-100: #f3f5f7;
+  --color-porcelain-200: #e6eaee;
+  --color-slate-ink-500: #64707d;
+  --color-slate-ink-700: #3a4450;
+  --color-slate-ink-900: #111827;
+  --color-go-600: #00875a;
+  --color-go-700: #006e49;
+  --color-wait-500: #d97a06;
+  --color-stop-600: #c2312b;
+  --color-void: #0c1014;
+
   --font-display: var(--font-space), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-space), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
   --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --shadow-sheet: 0 24px 48px -16px rgb(8 47 68 / 0.45), 0 2px 8px rgb(8 47 68 / 0.12);
 }
 
 html {
