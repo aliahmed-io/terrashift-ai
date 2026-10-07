@@ -520,64 +520,85 @@ export function AnalyzeClient() {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-ink-950 text-bone-100">
-      {/* 1. Unified Application Header */}
-      <header className="z-20 flex h-14 w-full shrink-0 items-center justify-between border-b border-white/10 bg-ink-950/95 px-4 backdrop-blur-md">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#04070B] text-[#F0F4F8]">
+      {/* 1. Stitch Orbital Telemetry Top Ticker */}
+      <div className="hidden lg:flex shrink-0 items-center justify-between px-4 py-1 border-b border-[#334155]/25 bg-[#0D1424]/50 text-[10px] font-mono tracking-widest text-[#94A3B8]">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 text-[#FFB020]">
+            <span className="size-1.5 rounded-full bg-[#FFB020] animate-ping" aria-hidden="true" />
+            ORBITAL LEO S2-A OVERPASS ACTIVE
+          </span>
+          <span className="text-[#334155]">|</span>
+          <span className="tabular-nums">LAT: {cameraCenter[1].toFixed(4)}° N</span>
+          <span className="tabular-nums">LON: {cameraCenter[0].toFixed(4)}° E</span>
+          <span className="text-[#334155]">|</span>
+          <span>ALTITUDE: 786.2 KM</span>
+          <span>INCL: 98.62°</span>
+          <span>SWATH: 290 KM</span>
+        </div>
+        <div className="flex items-center gap-4 text-[10px] font-mono tabular-nums">
+          <span className="text-[#38E8FF]">CRS: EPSG:3857 // WGS84</span>
+          <span className="text-[#00F5A0]">GSD: 10m/px BOA</span>
+          <span className="text-[#FFB020]">MODEL: FC-SIAM-DIFF v4.2</span>
+        </div>
+      </div>
+
+      {/* 2. Unified Stitch Command Header */}
+      <header className="z-20 flex h-14 w-full shrink-0 items-center justify-between border-b border-[#334155]/35 bg-[#090E17]/95 px-4 backdrop-blur-xl">
         {/* Left Section: Brand & Hotspot Selector */}
         <div className="flex items-center gap-3">
           <Link
             href="/"
-            className="flex items-center gap-2 rounded-lg p-1 text-bone-200 transition-colors hover:text-signal-400 focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:outline-none"
-            aria-label="Back to TerraShift Home"
+            className="flex items-center gap-2.5 group focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:outline-none"
+            aria-label="Back to TerraShift Command Deck"
           >
-            <svg
-              className="size-4 shrink-0 rtl:rotate-180"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-            <span className="font-semibold tracking-tight text-bone-100 text-sm">TerraShift</span>
-            <span className="hidden rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-bone-300 sm:inline-block">
-              {t.studio}
-            </span>
+            <div className="relative size-8 rounded-lg bg-[#0D1424]/90 border border-[#FFB020]/40 flex items-center justify-center text-[#FFB020] shadow-[0_0_15px_rgba(255,176,32,0.3)] group-hover:border-[#FFB020] transition-colors">
+              <svg
+                className="size-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M13 7 9 3 5 7l4 4" />
+                <path d="m17 11 4 4-4 4-4-4" />
+                <path d="m8 12 4 4 6-6-4-4Z" />
+                <path d="m16 8 3-3" />
+                <path d="M9 21a6 6 0 0 0-6-6" />
+              </svg>
+              <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-[#00F5A0]" />
+            </div>
+            <div className="hidden sm:flex flex-col">
+              <span className="leading-none text-xs tracking-widest text-[#FFB020] font-bold uppercase">
+                TERRASHIFT AI
+              </span>
+              <span className="mt-0.5 text-[9px] font-mono tracking-widest text-[#94A3B8] uppercase">
+                {t.studio} {"//"} KSA 2030
+              </span>
+            </div>
           </Link>
 
-          <div className="h-4 w-px bg-white/10" aria-hidden="true" />
+          <div className="h-5 w-px bg-[#334155]/40" aria-hidden="true" />
 
           {/* Hotspot Preset Selector Menu */}
           <div ref={hotspotDropdownRef} className="relative">
             <button
               type="button"
               onClick={() => setHotspotMenuOpen(!hotspotMenuOpen)}
-              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-ink-900/80 px-2.5 py-1.5 text-xs font-medium text-bone-200 transition-colors hover:border-signal-400/40 hover:text-signal-400 focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:outline-none"
+              className="flex items-center gap-1.5 rounded border border-[#FFB020]/40 bg-[#FFB020]/15 px-2.5 py-1.5 font-mono text-xs font-semibold text-[#FFB020] shadow-[0_0_12px_rgba(255,176,32,0.15)] transition-colors hover:bg-[#FFB020]/25 focus-visible:ring-2 focus-visible:ring-signal-400 focus-visible:outline-none"
               aria-expanded={hotspotMenuOpen}
               aria-haspopup="listbox"
               aria-label="Select benchmark hotspot location"
             >
-              <svg
-                className="size-3.5 text-signal-400 shrink-0"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-              <span className="max-w-[130px] truncate sm:max-w-[180px]">
+              <span className="size-1.5 rounded-full bg-[#FFB020] shrink-0" aria-hidden="true" />
+              <span className="max-w-[140px] truncate sm:max-w-[210px]">
                 {selectedPreset ? selectedPreset.name : t.selectHotspot}
               </span>
               <svg
-                className="size-3 text-bone-400 shrink-0"
+                className="size-3 text-[#FFB020] shrink-0"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -593,9 +614,9 @@ export function AnalyzeClient() {
             {hotspotMenuOpen && (
               <ul
                 role="listbox"
-                className="absolute start-0 top-full mt-1.5 z-40 w-72 rounded-xl border border-white/10 bg-ink-900/95 p-1.5 shadow-2xl backdrop-blur-xl"
+                className="absolute start-0 top-full mt-1.5 z-40 w-80 rounded-xl border border-[#334155]/50 bg-[#090E17]/95 p-1.5 shadow-2xl backdrop-blur-xl"
               >
-                <li className="px-2.5 py-1 text-[10px] font-medium tracking-wider text-bone-400 uppercase">
+                <li className="px-2.5 py-1 font-mono text-[10px] font-semibold tracking-wider text-[#94A3B8] uppercase">
                   {t.globalHotspots}
                 </li>
                 {HOTSPOT_PRESETS.map((p) => (
@@ -605,17 +626,17 @@ export function AnalyzeClient() {
                       onClick={() => selectPreset(p)}
                       className={`w-full rounded-lg px-2.5 py-2 text-start transition-colors ${
                         selectedPreset?.id === p.id
-                          ? "bg-signal-400/15 text-signal-400 font-medium"
-                          : "text-bone-200 hover:bg-white/5 hover:text-bone-100"
+                          ? "bg-[#FFB020]/15 text-[#FFB020] border border-[#FFB020]/30 font-medium"
+                          : "text-[#F0F4F8] hover:bg-[#0D1424] hover:text-[#FFB020]"
                       }`}
                     >
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-medium">{p.name}</span>
-                        <span className="font-mono text-[10px] text-bone-400 tabular-nums">
+                        <span className="font-mono text-[10px] text-[#38E8FF] tabular-nums">
                           {p.yearT1}→{p.yearT2}
                         </span>
                       </div>
-                      <p className="mt-0.5 text-[11px] text-bone-400 line-clamp-1">
+                      <p className="mt-0.5 text-[11px] text-[#94A3B8] line-clamp-1">
                         {p.description}
                       </p>
                     </button>
@@ -633,37 +654,43 @@ export function AnalyzeClient() {
           </div>
           <nav
             aria-label="Platform Modules"
-            className="hidden xl:flex items-center gap-1 rounded-lg border border-white/10 bg-ink-900/80 p-1 text-[11px]"
+            className="hidden xl:flex items-center gap-1 rounded border border-[#334155]/40 bg-[#0D1424]/80 p-1 font-mono text-[11px] uppercase tracking-wider"
           >
             <Link
+              href="/"
+              className="rounded px-2 py-1 text-[#94A3B8] transition-colors hover:bg-white/10 hover:text-[#F0F4F8]"
+            >
+              Command Deck
+            </Link>
+            <Link
               href="/benchmarks"
-              className="rounded px-2 py-1 text-bone-300 transition-colors hover:bg-white/10 hover:text-bone-100"
+              className="rounded px-2 py-1 text-[#94A3B8] transition-colors hover:bg-white/10 hover:text-[#F0F4F8]"
             >
               Benchmarks & XAI
             </Link>
             <Link
               href="/timeline"
-              className="rounded px-2 py-1 text-bone-300 transition-colors hover:bg-white/10 hover:text-bone-100"
+              className="rounded px-2 py-1 text-[#94A3B8] transition-colors hover:bg-white/10 hover:text-[#F0F4F8]"
             >
               BFAST Timeline
             </Link>
             <Link
               href="/lab"
-              className="rounded px-2 py-1 text-bone-300 transition-colors hover:bg-white/10 hover:text-bone-100"
+              className="rounded px-2 py-1 text-[#94A3B8] transition-colors hover:bg-white/10 hover:text-[#F0F4F8]"
             >
-              Image Pair Lab
+              Image Lab
             </Link>
             <Link
               href="/carbon"
-              className="rounded px-2 py-1 text-bone-300 transition-colors hover:bg-white/10 hover:text-bone-100"
+              className="rounded px-2 py-1 text-[#94A3B8] transition-colors hover:bg-white/10 hover:text-[#F0F4F8]"
             >
               Carbon & UHI
             </Link>
             <Link
               href="/watchlist"
-              className="rounded px-2 py-1 text-bone-300 transition-colors hover:bg-white/10 hover:text-bone-100"
+              className="rounded px-2 py-1 text-[#94A3B8] transition-colors hover:bg-white/10 hover:text-[#F0F4F8]"
             >
-              STAC Watchlist
+              STAC Atlas
             </Link>
           </nav>
         </div>

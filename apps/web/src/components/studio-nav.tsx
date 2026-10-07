@@ -2,148 +2,159 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "motion/react";
+import { useEffect, useState, type ReactNode } from "react";
 
-const NAV_ITEMS = [
-  { href: "/analyze", label: "GIS Map Studio", code: "01" },
-  { href: "/benchmarks", label: "Ablation & XAI", code: "02" },
-  { href: "/timeline", label: "BFAST Timeline", code: "03" },
-  { href: "/lab", label: "Image Pair Lab", code: "04" },
-  { href: "/carbon", label: "Carbon & UHI", code: "05" },
-  { href: "/watchlist", label: "STAC Watchlist", code: "06" },
+const STUDIO_LINKS = [
+  { href: "/", label: "Command Deck" },
+  { href: "/analyze", label: "Map Studio" },
+  { href: "/benchmarks", label: "Model Benchmarks & XAI" },
+  { href: "/timeline", label: "BFAST Timeline" },
+  { href: "/lab", label: "Image Pair Lab" },
+  { href: "/carbon", label: "Carbon & UHI" },
+  { href: "/watchlist", label: "Live STAC Atlas" },
 ] as const;
 
-export function StudioNav() {
+export interface StudioNavProps {
+  readonly rightSlot?: ReactNode;
+}
+
+export function StudioNav({ rightSlot }: StudioNavProps = {}) {
   const pathname = usePathname();
+  const [utcTime, setUtcTime] = useState("12:44:09.82 Z");
+
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date();
+      setUtcTime(`${now.toISOString().substring(11, 22)} Z`);
+    };
+    updateClock();
+    const id = setInterval(updateClock, 500);
+    return () => clearInterval(id);
+  }, []);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-bone-100/10 bg-ink-950/90 backdrop-blur-xl">
-      {/* Top Orbital Telemetry Micro-Bar */}
-      <div className="border-b border-bone-100/5 bg-ink-900/70 px-6 py-1">
-        <div className="mx-auto flex max-w-[1440px] items-center justify-between font-mono text-[10px] tracking-widest uppercase text-bone-400">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 text-phosphor-400">
-              <span className="size-1.5 rounded-full bg-phosphor-400 shadow-[0_0_8px_#00F5A0]" />
-              ORBITAL TELEMETRY LOCKED
-            </span>
-            <span className="hidden sm:inline text-bone-400/50">|</span>
-            <span className="hidden sm:inline">SENTINEL-2 L2A · 10M MULTI-SPECTRAL</span>
-          </div>
-          <div className="flex items-center gap-4 tabular-nums">
-            <span className="hidden md:inline">TENSOR ENGINE: FC-SIAM-DIFF (5-CH)</span>
-            <span className="text-signal-400">SUN-SYNC 786 KM</span>
-          </div>
+    <header className="sticky top-0 z-50 w-full bg-[#04070B]/85 backdrop-blur-xl border-b border-[#334155]/30 shadow-2xl">
+      {/* Telemetry Ticker Top Banner (from Stitch Design) */}
+      <div className="hidden lg:flex items-center justify-between px-4 py-1 border-b border-[#334155]/25 bg-[#0D1424]/40 text-[10px] font-mono tracking-widest text-[#94A3B8]">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 text-[#FFB020]">
+            <span className="size-1.5 rounded-full bg-[#FFB020] animate-ping" aria-hidden="true" />
+            ORBITAL LEO S2-A OVERPASS ACTIVE
+          </span>
+          <span className="text-[#334155]">|</span>
+          <span>LAT: 24.8350° N</span>
+          <span>LON: 46.7450° E</span>
+          <span className="text-[#334155]">|</span>
+          <span>ALTITUDE: 786.2 KM</span>
+          <span>INCL: 98.62°</span>
+          <span>SWATH: 290 KM</span>
+        </div>
+        <div className="flex items-center gap-4 text-[11px] font-mono tabular-nums">
+          <span className="text-[#38E8FF]">SUN ELEV: 64.2°</span>
+          <span className="text-[#00F5A0]">GSD: 10m/px BOA</span>
+          <span className="text-[#F0F4F8]">UTC: {utcTime}</span>
         </div>
       </div>
 
-      {/* Main Command Navigation Bar */}
-      <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between px-6 gap-4">
-        <div className="flex items-center gap-6">
+      {/* Main Command Nav */}
+      <div className="flex justify-between items-center w-full px-4 py-2.5 backdrop-blur-md">
+        {/* Brand Cluster */}
+        <div className="flex items-center gap-5">
           <Link
             href="/"
-            className="group flex items-center gap-2.5 text-bone-100 hover:text-signal-400 transition-colors"
+            className="flex items-center gap-2.5 group focus-visible:outline-none"
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle
-                cx="12"
-                cy="12"
-                r="10"
+            <div className="relative size-8 rounded-lg bg-[#0D1424]/90 border border-[#FFB020]/40 flex items-center justify-center text-[#FFB020] shadow-[0_0_15px_rgba(255,176,32,0.3)] group-hover:border-[#FFB020] transition-colors">
+              <svg
+                className="size-4"
+                viewBox="0 0 24 24"
+                fill="none"
                 stroke="currentColor"
-                strokeWidth="1.3"
-                className="opacity-80"
-              />
-              <path d="M12 2v20" stroke="#FFB020" strokeWidth="1.8" />
-              <path
-                d="M2 12h20"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeDasharray="2 2"
-              />
-            </svg>
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M13 7 9 3 5 7l4 4" />
+                <path d="m17 11 4 4-4 4-4-4" />
+                <path d="m8 12 4 4 6-6-4-4Z" />
+                <path d="m16 8 3-3" />
+                <path d="M9 21a6 6 0 0 0-6-6" />
+              </svg>
+              <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-[#00F5A0]" />
+            </div>
             <div className="flex flex-col">
-              <span className="font-mono text-xs font-semibold tracking-[0.22em] uppercase leading-none">
-                TerraShift
+              <span className="leading-none text-xs tracking-widest text-[#FFB020] font-bold uppercase">
+                TERRASHIFT AI
               </span>
-              <span className="font-mono text-[9px] tracking-widest text-bone-400 uppercase mt-0.5">
-                Orbital Intelligence
+              <span className="mt-0.5 text-[9px] font-mono tracking-widest text-[#94A3B8] uppercase">
+                SOLARIS // KSA 2030
               </span>
             </div>
           </Link>
 
-          <nav aria-label="Studio Navigation" className="hidden lg:flex items-center gap-1">
-            {NAV_ITEMS.map((item) => {
-              const active = pathname === item.href;
+          <div className="hidden xl:block h-6 w-px bg-[#334155]/35" aria-hidden="true" />
+
+          {/* Navigation Links */}
+          <nav
+            aria-label="Mission Modules"
+            className="flex items-center gap-4 xl:gap-5 overflow-x-auto py-0.5"
+          >
+            {STUDIO_LINKS.map((link) => {
+              const active =
+                link.href === "/"
+                  ? pathname === "/"
+                  : pathname === link.href || pathname?.startsWith(`${link.href}/`);
               return (
                 <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    active ? "text-ink-950 font-semibold" : "text-bone-300 hover:text-bone-100"
+                  key={link.href}
+                  href={link.href}
+                  className={`whitespace-nowrap pb-1 text-xs tracking-wider uppercase transition-colors flex items-center gap-1.5 ${
+                    active
+                      ? "text-[#FFB020] border-b-2 border-[#FFB020] font-bold"
+                      : "text-[#94A3B8] hover:text-[#F0F4F8] font-medium border-b-2 border-transparent"
                   }`}
                 >
-                  {active && (
-                    <motion.span
-                      layoutId="orbital-nav-pill"
-                      transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                      className="absolute inset-0 rounded-lg bg-signal-400 shadow-[0_0_20px_rgba(255,176,32,0.35)]"
-                    />
-                  )}
-                  <span className="relative z-10 flex items-center gap-1.5">
-                    <span
-                      className={`font-mono text-[10px] ${
-                        active ? "text-ink-950/75" : "text-bone-400"
-                      }`}
-                    >
-                      {item.code}
-                    </span>
-                    <span>{item.label}</span>
-                  </span>
+                  {active ? (
+                    <span className="size-1.5 rounded-full bg-[#FFB020]" aria-hidden="true" />
+                  ) : null}
+                  {link.label}
                 </Link>
               );
             })}
           </nav>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        {/* Action Cluster */}
+        <div className="flex items-center gap-3 shrink-0">
+          {rightSlot}
           <a
-            href="/api/model/weights"
-            download="siamese_unet_checkpoint.pt"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ink-900 hover:bg-ink-800 border border-bone-100/15 text-xs font-mono text-bone-200 transition-colors"
+            href="/api/model"
+            download="siamese_unet_levircd.pt"
+            title="Download trained PyTorch FC-Siam-diff weights (.pt)"
+            className="hidden sm:flex items-center gap-2 bg-[#0D1424]/80 border border-[#334155]/40 hover:border-[#00F5A0]/50 px-2.5 py-1.5 rounded text-[11px] font-mono text-[#94A3B8] transition-colors"
           >
-            <span className="size-1.5 rounded-full bg-signal-400" />
-            <span>Weights (.pt)</span>
+            <span className="size-2 rounded-full bg-[#00F5A0] animate-pulse" aria-hidden="true" />
+            <span className="text-[#F0F4F8] font-semibold">Weights v4.2-FC-Siam</span>
+            <span className="text-[#FFB020] text-[10px]">42.8ms</span>
           </a>
+
           <Link
             href="/analyze"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-signal-400 hover:bg-signal-500 text-ink-950 font-semibold text-xs transition-all shadow-[0_0_18px_rgba(255,176,32,0.25)]"
+            className="bg-[#FFB020] text-[#04070B] font-bold text-xs uppercase tracking-wider px-3.5 py-2 rounded flex items-center gap-1.5 shadow-[0_0_20px_rgba(255,176,32,0.35)] hover:brightness-110 active:scale-[0.98] transition-all"
           >
-            <span>Open Map Studio</span>
+            <svg
+              className="size-3.5"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M8 5v14l11-7z" />
+            </svg>
+            <span>Execute Inference</span>
           </Link>
         </div>
       </div>
-
-      {/* Mobile Navigation Strip */}
-      <nav
-        aria-label="Mobile Studio Navigation"
-        className="flex lg:hidden items-center gap-1.5 overflow-x-auto px-4 py-2 border-t border-bone-100/10"
-      >
-        {NAV_ITEMS.map((item) => {
-          const active = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`shrink-0 px-2.5 py-1 rounded-md text-xs font-mono transition-colors ${
-                active
-                  ? "bg-signal-400 text-ink-950 font-semibold"
-                  : "text-bone-300 bg-ink-900/80 border border-bone-100/10"
-              }`}
-            >
-              {item.code} · {item.label}
-            </Link>
-          );
-        })}
-      </nav>
     </header>
   );
 }
