@@ -409,65 +409,36 @@ export default function WatchlistPage() {
     <div className="min-h-screen bg-orbital-canvas text-bone-100 flex flex-col">
       <StudioNav />
 
-      <main className="flex-1 max-w-[1440px] w-full mx-auto px-6 py-8 space-y-8">
-        {/* Header & STAC Provenance */}
-        <section className="orbital-panel rounded-2xl p-6 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-          <div>
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-signal-400/10 border border-signal-400/30 text-signal-400 text-[10px] font-mono uppercase tracking-widest mb-3">
-              <span className="size-1.5 rounded-full bg-signal-400" />
-              <span>STAC 1.0.0 Spatio-Temporal Asset Catalog & Watchlist</span>
-            </div>
-            <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-bone-100">
-              Global & Saudi Vision 2030 Case-Study Atlas
+      <main className="flex-1 max-w-[1440px] w-full mx-auto px-6 py-6 space-y-6">
+        {/* Top Control & Filter Bar */}
+        <section className="orbital-panel rounded-xl p-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-xl font-semibold tracking-tight text-bone-100 me-2">
+              STAC Watchlist
             </h1>
-            <p className="text-xs sm:text-sm text-bone-300 mt-1.5 max-w-3xl leading-relaxed">
-              Browse 12 curated Sentinel-2 change-detection STAC items across Saudi Vision 2030 giga-projects, tropical deforestation frontiers, and hydrological basins. Configure automated 5-day revisit alert rules or launch directly into the Map Studio.
-            </p>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <a
-              href="https://github.com/radiantearth/stac-browser"
-              target="_blank"
-              rel="noreferrer"
-              className="px-3 py-1.5 rounded-lg bg-ink-950/90 hover:border-signal-400/50 border border-bone-100/15 text-bone-200 font-mono transition-colors"
-            >
-              Ref: radiantearth/stac-browser
-            </a>
-            <a
-              href="https://github.com/radiantearth/stac-spec"
-              target="_blank"
-              rel="noreferrer"
-              className="px-3 py-1.5 rounded-lg bg-ink-950/90 hover:border-signal-400/50 border border-bone-100/15 text-bone-200 font-mono transition-colors"
-            >
-              Ref: radiantearth/stac-spec (v1.0.0)
-            </a>
-          </div>
-        </section>
-
-        {/* Filter Bar & Watchlist Summary */}
-        <section className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 orbital-panel rounded-2xl p-4">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {[
-              { id: "all", label: "All STAC Items (12)" },
-              { id: "vision2030", label: "Saudi Vision 2030 (4)" },
-              { id: "deforestation", label: "Deforestation & Forest (4)" },
-              { id: "hydrology", label: "Hydrology & Water (3)" },
-              { id: "urban", label: "MENA Megaprojects (1)" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveCategory(tab.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  activeCategory === tab.id
-                    ? "bg-signal-400 text-ink-950 font-semibold"
-                    : "bg-ink-950/80 text-bone-300 hover:text-bone-100 border border-bone-100/10"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[
+                { id: "all", label: "All (12)" },
+                { id: "vision2030", label: "Vision 2030 (4)" },
+                { id: "deforestation", label: "Forest (4)" },
+                { id: "hydrology", label: "Hydrology (3)" },
+                { id: "urban", label: "Urban (1)" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveCategory(tab.id)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    activeCategory === tab.id
+                      ? "bg-signal-400 text-ink-950 font-semibold"
+                      : "bg-ink-950/80 text-bone-300 hover:text-bone-100 border border-bone-100/10"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -475,12 +446,12 @@ export default function WatchlistPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filter by region, STAC ID, or project..."
-              className="h-9 px-3 rounded-lg bg-ink-950 border border-bone-100/15 text-xs text-bone-100 placeholder:text-bone-400 focus:outline-none focus:border-signal-400 w-full md:w-64"
+              placeholder="Search items..."
+              className="h-9 px-3 rounded-lg bg-ink-950 border border-bone-100/15 text-xs text-bone-100 placeholder:text-bone-400 focus:outline-none focus:border-signal-400 w-full sm:w-56"
             />
-            <div className="shrink-0 px-3 py-1.5 rounded-lg bg-phosphor-400/10 border border-phosphor-400/30 text-phosphor-400 text-xs font-mono tabular-nums">
-              {activeWatchCount} Active Watch Rules
-            </div>
+            <span className="shrink-0 font-mono text-xs text-bone-400 tabular-nums">
+              {activeWatchCount} Active
+            </span>
           </div>
         </section>
 
@@ -495,62 +466,40 @@ export default function WatchlistPage() {
                 <div
                   key={item.id}
                   onClick={() => setSelectedStacItem(item)}
-                  className={`cursor-pointer rounded-2xl p-5 transition-all flex flex-col justify-between ${
+                  className={`cursor-pointer rounded-xl p-4 transition-all flex flex-col justify-between ${
                     isSelected
                       ? "orbital-panel-active"
                       : "orbital-panel hover:border-bone-100/25"
                   }`}
                 >
                   <div>
-                    {/* Top Row: Category Badge & Alert Status */}
-                    <div className="flex items-center justify-between gap-2 mb-2.5">
-                      <span className="px-2 py-0.5 rounded bg-ink-950/80 border border-bone-100/10 text-[10px] font-mono uppercase tracking-wider text-bone-300">
+                    <div className="flex items-center justify-between gap-2">
+                      <h2 className="text-sm font-semibold text-bone-100">{item.title}</h2>
+                      <span className="font-mono text-[10px] text-signal-400">
                         {item.categoryLabel}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold ${
-                          item.alertStatus === "CRITICAL"
-                            ? "bg-crimson-400/15 text-crimson-400 border border-crimson-400/30"
-                            : item.alertStatus === "SINK_VERIFIED"
-                              ? "bg-phosphor-400/15 text-phosphor-400 border border-phosphor-400/30"
-                              : "bg-signal-400/15 text-signal-400 border border-signal-400/30"
-                        }`}
-                      >
-                        {item.alertStatus}
                       </span>
                     </div>
 
-                    <h2 className="font-display text-xl text-bone-100">{item.title}</h2>
                     <div className="text-xs text-bone-400 font-mono mt-0.5 tabular-nums">
                       {item.region} · [{item.lat.toFixed(2)}°, {item.lon.toFixed(2)}°]
                     </div>
 
-                    <p className="text-xs text-bone-300 mt-2.5 leading-relaxed">
-                      {item.summary}
-                    </p>
-
                     {/* STAC Metadata Strip */}
-                    <div className="grid grid-cols-3 gap-2 mt-4 p-2.5 rounded-xl bg-ink-950/80 border border-bone-100/10 text-center font-mono tabular-nums">
+                    <div className="grid grid-cols-3 gap-2 mt-3 p-2.5 rounded-lg bg-ink-950/80 border border-bone-100/10 text-center font-mono tabular-nums">
                       <div>
-                        <div className="text-[10px] text-bone-400">Epoch Window</div>
+                        <div className="text-[10px] text-bone-400">Window</div>
                         <div className="text-xs font-semibold text-bone-100 mt-0.5">
-                          {item.t1} → {item.t2}
+                          {item.t1}→{item.t2}
                         </div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-bone-400">Detected Shift</div>
-                        <div
-                          className={`text-xs font-semibold mt-0.5 ${
-                            item.alertStatus === "SINK_VERIFIED"
-                              ? "text-phosphor-400"
-                              : "text-signal-400"
-                          }`}
-                        >
+                        <div className="text-[10px] text-bone-400">Shift</div>
+                        <div className="text-xs font-semibold text-signal-400 mt-0.5">
                           {item.deltaPct > 0 ? `+${item.deltaPct}%` : `${item.deltaPct}%`}
                         </div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-bone-400">Affected Area</div>
+                        <div className="text-[10px] text-bone-400">Area</div>
                         <div className="text-xs font-semibold text-bone-100 mt-0.5">
                           {item.areaHa.toLocaleString()} ha
                         </div>
@@ -559,7 +508,7 @@ export default function WatchlistPage() {
                   </div>
 
                   {/* Watch Rule Toggle & Deep Links */}
-                  <div className="mt-4 pt-3 border-t border-bone-100/10 flex flex-wrap items-center justify-between gap-2">
+                  <div className="mt-3 pt-3 border-t border-bone-100/10 flex items-center justify-between gap-2">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -568,17 +517,17 @@ export default function WatchlistPage() {
                       }}
                       className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono transition-colors border ${
                         isSubscribed
-                          ? "bg-phosphor-400/15 border-phosphor-400/40 text-phosphor-400"
+                          ? "bg-signal-400/15 border-signal-400/40 text-signal-400"
                           : "bg-ink-950/80 border-bone-100/15 text-bone-300 hover:text-bone-100"
                       }`}
                     >
-                      {isSubscribed ? "Watch Rule: ON (5d)" : "Enable Watch Rule"}
+                      {isSubscribed ? "Watching (5d)" : "Watch"}
                     </button>
 
-                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    <div onClick={(e) => e.stopPropagation()}>
                       <Link
                         href={`/analyze?lat=${item.lat}&lon=${item.lon}&t1=${item.t1}&t2=${item.t2}&label=${encodeURIComponent(item.title)}`}
-                        className="px-3 py-1.5 rounded-lg bg-signal-400 hover:bg-signal-500 text-ink-950 font-semibold text-xs transition-colors"
+                        className="px-3 py-1.5 rounded-lg bg-signal-400 hover:bg-signal-500 text-ink-950 font-semibold text-xs transition-colors inline-block"
                       >
                         Open in Map Studio
                       </Link>
@@ -590,16 +539,11 @@ export default function WatchlistPage() {
           </div>
 
           {/* Right Column: Live STAC 1.0.0 Item Inspector */}
-          <div className="lg:col-span-4 orbital-panel rounded-2xl p-5 sticky top-20 space-y-4">
+          <div className="lg:col-span-4 orbital-panel rounded-xl p-5 sticky top-20 space-y-4">
             <div className="flex items-center justify-between border-b border-bone-100/10 pb-3">
-              <div>
-                <div className="text-[10px] font-mono uppercase tracking-widest text-signal-400">
-                  STAC 1.0.0 Feature Inspector
-                </div>
-                <h3 className="text-sm font-semibold text-bone-100 font-mono mt-0.5">
-                  {selectedStacItem.id}
-                </h3>
-              </div>
+              <h3 className="text-xs font-semibold text-bone-100 font-mono">
+                {selectedStacItem.id}
+              </h3>
               <button
                 type="button"
                 onClick={() => handleDownloadStac(selectedStacItem)}
@@ -609,32 +553,18 @@ export default function WatchlistPage() {
               </button>
             </div>
 
-            {/* Watchlist Rule Specification */}
-            <div className="p-3 rounded-xl bg-ink-950/80 border border-bone-100/10 space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-bone-400 font-mono">Automated Trigger Rule</span>
-                <span className="text-phosphor-400 font-mono">
-                  Sentinel-2 ({selectedStacItem.revisitDays}d Revisit)
-                </span>
-              </div>
+            <div className="p-3 rounded-lg bg-ink-950/80 border border-bone-100/10 space-y-1">
               <div className="text-xs font-mono text-bone-100">
                 {selectedStacItem.thresholdRule}
               </div>
               <div className="text-[11px] text-bone-400 font-mono tabular-nums">
-                eo:cloud_cover: {selectedStacItem.cloudCover}% · mlm:confidence:{" "}
-                {(selectedStacItem.confidence * 100).toFixed(1)}%
+                Cloud: {selectedStacItem.cloudCover}% · Conf: {(selectedStacItem.confidence * 100).toFixed(1)}% · Revisit: {selectedStacItem.revisitDays}d
               </div>
             </div>
 
-            {/* STAC JSON Code Viewer */}
-            <div>
-              <div className="text-[10px] font-mono uppercase tracking-widest text-bone-400 mb-1.5">
-                RFC 7946 STAC Item Payload
-              </div>
-              <pre className="p-3 rounded-xl bg-ink-950 border border-bone-100/10 text-[11px] font-mono text-bone-200 overflow-x-auto max-h-[380px] overflow-y-auto leading-relaxed">
-                {JSON.stringify(buildStacItemJson(selectedStacItem), null, 2)}
-              </pre>
-            </div>
+            <pre className="p-3 rounded-lg bg-ink-950 border border-bone-100/10 text-[11px] font-mono text-bone-200 overflow-x-auto max-h-[420px] overflow-y-auto leading-relaxed">
+              {JSON.stringify(buildStacItemJson(selectedStacItem), null, 2)}
+            </pre>
           </div>
         </section>
       </main>
