@@ -77,6 +77,21 @@ export function LocationSearch({ onSelectLocation }: LocationSearchProps) {
   return (
     <div className="relative w-full">
       <div className="relative flex items-center">
+        <span className="pointer-events-none absolute start-3 text-bone-400" aria-hidden="true">
+          <svg
+            className="size-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+        </span>
+
         <input
           ref={inputRef}
           type="text"
@@ -84,62 +99,34 @@ export function LocationSearch({ onSelectLocation }: LocationSearchProps) {
           aria-expanded={open}
           aria-controls="location-search-listbox"
           aria-haspopup="listbox"
-          aria-label="Search for place or coordinates"
+          aria-label="Search city or coordinates"
           name="location-search"
           autoComplete="off"
           spellCheck={false}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Search for place or coordinates"
-          className="w-full rounded-xl bg-white py-2.5 ps-4 pe-10 text-xs font-medium text-[#111827] placeholder:text-[#64707D] shadow-[0_8px_24px_rgba(8,47,68,0.22)] border border-[#E6EAEE] focus:border-[#0F4C6C] focus-visible:outline-none transition-colors"
+          placeholder="Search city or coordinates… (/)"
+          className="w-full rounded-lg border border-bone-100/15 bg-ink-950 py-2 ps-9 pe-8 text-xs text-bone-100 placeholder:text-bone-400 focus:border-signal-400 focus-visible:outline-none transition-colors"
         />
 
-        <div className="absolute end-3 flex items-center gap-1.5 text-[#111827]">
+        <div className="absolute end-2.5 flex items-center">
           {loading ? (
             <span
-              className="flex items-center gap-0.5"
+              className="size-1.5 rounded-full bg-signal-400 animate-ping"
               role="status"
-              aria-label="Searching locations…"
-            >
-              <span className="size-1.5 rounded-full bg-[#0F4C6C] animate-ping" />
-            </span>
+              aria-label="Searching…"
+            />
           ) : query.length > 0 ? (
             <button
               type="button"
               onClick={clearQuery}
-              className="rounded p-0.5 text-[#64707D] hover:text-[#111827] transition-colors focus-visible:outline-none"
-              aria-label="Clear search input"
+              className="rounded p-0.5 text-bone-400 hover:text-bone-100 transition-colors focus-visible:outline-none"
+              aria-label="Clear search"
             >
-              <svg
-                className="size-3.5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
-              </svg>
+              ×
             </button>
-          ) : (
-            <svg
-              className="size-4 text-[#111827]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -147,7 +134,7 @@ export function LocationSearch({ onSelectLocation }: LocationSearchProps) {
         <ul
           id="location-search-listbox"
           role="listbox"
-          className="absolute inset-x-0 top-full z-50 mt-1.5 max-h-56 overflow-y-auto rounded-xl border border-[#E6EAEE] bg-white p-1.5 shadow-2xl"
+          className="absolute inset-x-0 top-full z-50 mt-1.5 max-h-56 overflow-y-auto rounded-xl border border-bone-100/15 bg-ink-900 p-1.5 shadow-2xl"
         >
           {results.map((loc) => (
             <li key={loc.placeId} role="option" aria-selected="false">
@@ -158,12 +145,12 @@ export function LocationSearch({ onSelectLocation }: LocationSearchProps) {
                   setQuery(loc.displayName.split(",")[0] ?? loc.displayName);
                   setOpen(false);
                 }}
-                className="w-full rounded-lg px-3 py-2 text-start text-xs transition-colors hover:bg-[#F3F5F7] focus-visible:bg-[#F3F5F7] focus-visible:outline-none"
+                className="w-full rounded-lg px-3 py-2 text-start text-xs transition-colors hover:bg-signal-400/15 hover:text-signal-400 focus-visible:outline-none"
               >
-                <span className="block font-semibold truncate text-[#111827]">
+                <span className="block font-medium truncate text-bone-100">
                   {loc.displayName}
                 </span>
-                <span className="font-mono text-[10px] text-[#64707D] tabular-nums">
+                <span className="font-mono text-[10px] text-bone-400 tabular-nums">
                   {loc.lat.toFixed(4)}, {loc.lon.toFixed(4)}
                 </span>
               </button>

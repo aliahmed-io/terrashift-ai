@@ -85,7 +85,7 @@ function HeatmapCanvas({
 
     const imgData = ctx.createImageData(cols, rows);
     const thrInt = threshold * 100;
-    const [ar, ag, ab] = accentColor ?? [255, 176, 32];
+    const [ar, ag, ab] = accentColor ?? [56, 189, 248];
 
     for (let r = 0; r < rows; r++) {
       const row = grid[r] ?? [];
@@ -191,9 +191,8 @@ export default function BenchmarksPage() {
               <span className="size-1.5 rounded-full bg-signal-400" aria-hidden="true" />
               <span>Deep Vision Ablation & Explainable AI (XAI)</span>
             </div>
-            <h1 className="font-display text-3xl sm:text-4xl tracking-tight text-bone-100">
-              4-Way Architecture Benchmark &{" "}
-              <span className="italic text-signal-400">Encoder Tensor Lab</span>
+            <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-bone-100">
+              4-Way Architecture Benchmark & Encoder Tensor Lab
             </h1>
             <p className="text-xs sm:text-sm text-bone-300 leading-relaxed">
               Evaluates our 5-channel weight-sharing{" "}
@@ -451,7 +450,7 @@ export default function BenchmarksPage() {
                             grid={m.heatmap_grid}
                             threshold={threshold}
                             mode={viewMode}
-                            accentColor={isOurs ? [255, 176, 32] : [61, 214, 195]}
+                            accentColor={isOurs ? [56, 189, 248] : [16, 185, 129]}
                           />
                         </div>
 

@@ -1,62 +1,40 @@
 @import "tailwindcss";
 
 @theme {
-  --color-surface: #04070b;
-  --color-surface-container: #090e17;
-  --color-surface-variant: #0d1424;
-  --color-on-surface: #f0f4f8;
+  --color-surface: #0b0f17;
+  --color-surface-container: #111824;
+  --color-surface-variant: #172030;
+  --color-on-surface: #f8fafc;
   --color-on-surface-variant: #94a3b8;
-  --color-primary: #ffb020;
-  --color-outline: #334155;
-  --color-emerald: #00f5a0;
-  --color-cyan: #38e8ff;
-  --color-crimson: #ff3b5c;
+  --color-primary: #38bdf8;
+  --color-outline: #1e293b;
+  --color-emerald: #10b981;
+  --color-cyan: #38bdf8;
+  --color-crimson: #f43f5e;
 
-  --color-ink-950: #04070b;
-  --color-ink-900: #090e17;
-  --color-ink-800: #0d1424;
-  --color-ink-700: #1a2538;
+  --color-ink-950: #0b0f17;
+  --color-ink-900: #111824;
+  --color-ink-800: #172030;
+  --color-ink-700: #1e293b;
   --color-ink-400: #94a3b8;
-  --color-bone-100: #f0f4f8;
+  --color-bone-100: #f8fafc;
   --color-bone-200: #e2e8f0;
   --color-bone-300: #94a3b8;
   --color-bone-400: #64748b;
-  --color-signal-400: #ffb020;
-  --color-signal-500: #f59e0b;
-  --color-signal-600: #e08a00;
-  --color-teal-400: #00f5a0;
-  --color-phosphor-400: #00f5a0;
-  --color-alert-400: #ff3b5c;
-  --color-alert-500: #ff3b5c;
-  --color-crimson-400: #ff3b5c;
-  --color-lagoon-400: #38e8ff;
-
-  /* Petrol & Porcelain geospatial system (see src/tokens/index.ts) */
-  --color-petrol-900: #082f44;
-  --color-petrol-800: #0b3b54;
-  --color-petrol-700: #0f4c6c;
-  --color-petrol-500: #2a7aa0;
-  --color-cyan-ring: #36c5d8;
-  --color-sand-pin: #f4c396;
-  --color-sand-ink: #5a3a1a;
-  --color-coral-beam: #c8553d;
-  --color-porcelain-50: #ffffff;
-  --color-porcelain-100: #f3f5f7;
-  --color-porcelain-200: #e6eaee;
-  --color-slate-ink-500: #64707d;
-  --color-slate-ink-700: #3a4450;
-  --color-slate-ink-900: #111827;
-  --color-go-600: #00875a;
-  --color-go-700: #006e49;
-  --color-wait-500: #d97a06;
-  --color-stop-600: #c2312b;
-  --color-void: #0c1014;
+  --color-signal-400: #38bdf8;
+  --color-signal-500: #0ea5e9;
+  --color-signal-600: #0284c7;
+  --color-teal-400: #10b981;
+  --color-phosphor-400: #10b981;
+  --color-alert-400: #f43f5e;
+  --color-alert-500: #f43f5e;
+  --color-crimson-400: #f43f5e;
+  --color-lagoon-400: #38bdf8;
 
   --font-display: var(--font-space), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-space), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
   --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --shadow-sheet: 0 24px 48px -16px rgb(8 47 68 / 0.45), 0 2px 8px rgb(8 47 68 / 0.12);
 }
 
 html {
@@ -76,35 +54,30 @@ html.lenis body {
 
 body {
   font-family: var(--font-sans);
+  background-color: #0b0f17;
+  color: #f8fafc;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* Stitch SOLARIS // ORBITAL HUD Grid & Glass-Cockpit Surfaces */
+/* Unified Minimal Matte Slate Canvas & Card Surfaces */
 .hud-grid,
 .bg-orbital-canvas {
-  background-color: #04070b;
-  background-size: 32px 32px;
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+  background-color: #0b0f17;
 }
 
 .orbital-panel {
   position: relative;
-  background-color: #090e17;
-  border: 1px solid rgba(51, 65, 85, 0.35);
-  box-shadow: 0 20px 40px -24px rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(16px);
+  background-color: #111824;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.6);
 }
 
 .orbital-panel-active {
   position: relative;
-  background-color: #090e17;
-  border: 1px solid rgba(255, 176, 32, 0.45);
-  box-shadow:
-    inset 0 1px 0 0 rgba(255, 176, 32, 0.2),
-    0 0 24px -6px rgba(255, 176, 32, 0.22);
+  background-color: #111824;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  box-shadow: 0 12px 32px -12px rgba(56, 189, 248, 0.15);
 }
 
 @keyframes orbital-scan {
@@ -135,7 +108,7 @@ body {
 
 :focus-visible {
   outline: 2px solid var(--color-signal-400);
-  outline-offset: 4px;
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -145,22 +118,5 @@ body {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
-  }
-}
-
-@keyframes pulse-ring {
-  0% {
-    opacity: 0.9;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(2.4);
-  }
-}
-
-@keyframes marquee {
-  to {
-    transform: translateX(-50%);
   }
 }

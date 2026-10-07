@@ -177,9 +177,8 @@ export default function CarbonPage() {
               <span className="size-1.5 rounded-full bg-phosphor-400" />
               <span>IPCC Tier-1 Carbon Flux & Urban Microclimate Engine</span>
             </div>
-            <h1 className="font-display text-3xl sm:text-4xl tracking-tight text-bone-100">
-              Carbon Flux, Biomass Pools &{" "}
-              <span className="italic text-signal-400">Urban Heat Island</span>
+            <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-bone-100">
+              Carbon Flux, Biomass Pools & Urban Heat Island
             </h1>
             <p className="text-xs sm:text-sm text-bone-300 mt-1.5 max-w-3xl leading-relaxed">
               Converts Siamese U-Net pixel-level canopy loss, afforestation gain, and impervious expansion into{" "}

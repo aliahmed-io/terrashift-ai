@@ -152,9 +152,8 @@ export default function LabPage() {
               <span className="size-1.5 rounded-full bg-phosphor-400" aria-hidden="true" />
               <span>Custom Image-Pair Sandbox & LEVIR-CD Ground-Truth Validator</span>
             </div>
-            <h1 className="font-display text-3xl sm:text-4xl tracking-tight text-bone-100">
-              Optical / Drone Pair Upload &{" "}
-              <span className="italic text-signal-400">Confusion Matrix Lab</span>
+            <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-bone-100">
+              Optical / Drone Pair Upload & Confusion Matrix Lab
             </h1>
             <p className="text-xs sm:text-sm text-bone-300 leading-relaxed">
               Test the PyTorch Siamese U-Net on built-in{" "}

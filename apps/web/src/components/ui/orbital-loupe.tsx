@@ -38,10 +38,10 @@ export function OrbitalLoupe({
 
   const ringStroke =
     accentColor === "phosphor"
-      ? "#00F5A0"
+      ? "#10B981"
       : accentColor === "cyan"
-        ? "#38E8FF"
-        : "#FFB020";
+        ? "#38BDF8"
+        : "#38BDF8";
 
   const pxX = Math.round((pos.x / 100) * 256);
   const pxY = Math.round((pos.y / 100) * 256);
@@ -194,7 +194,7 @@ export function OrbitalLoupe({
           <div
             aria-hidden="true"
             style={{ left: `${pos.x}%`, backgroundColor: ringStroke }}
-            className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 shadow-[0_0_12px_#FFB020]"
+            className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 shadow-[0_0_12px_#38BDF8]"
           >
             <div
               style={{ borderColor: ringStroke }}

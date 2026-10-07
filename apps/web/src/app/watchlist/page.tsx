@@ -417,9 +417,8 @@ export default function WatchlistPage() {
               <span className="size-1.5 rounded-full bg-signal-400" />
               <span>STAC 1.0.0 Spatio-Temporal Asset Catalog & Watchlist</span>
             </div>
-            <h1 className="font-display text-3xl sm:text-4xl tracking-tight text-bone-100">
-              Global & Saudi Vision 2030{" "}
-              <span className="italic text-signal-400">Case-Study Atlas</span>
+            <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-bone-100">
+              Global & Saudi Vision 2030 Case-Study Atlas
             </h1>
             <p className="text-xs sm:text-sm text-bone-300 mt-1.5 max-w-3xl leading-relaxed">
               Browse 12 curated Sentinel-2 change-detection STAC items across Saudi Vision 2030 giga-projects, tropical deforestation frontiers, and hydrological basins. Configure automated 5-day revisit alert rules or launch directly into the Map Studio.

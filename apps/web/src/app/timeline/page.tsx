@@ -79,10 +79,10 @@ function ForecastRiskCanvas({
           imgData.data[idx + 2] = 64;
           imgData.data[idx + 3] = 255;
         } else if (val >= 65 && horizonYear >= 2028) {
-          // 2028 expansion frontier (Signal Amber)
-          imgData.data[idx] = 255;
-          imgData.data[idx + 1] = 176;
-          imgData.data[idx + 2] = 32;
+          // 2028 expansion frontier (Sky Cyan)
+          imgData.data[idx] = 56;
+          imgData.data[idx + 1] = 189;
+          imgData.data[idx + 2] = 248;
           imgData.data[idx + 3] = 255;
         } else if (val >= 35) {
           // Historical observed change 2017-2024 (Teal)
@@ -200,11 +200,8 @@ export default function TimelinePage() {
                 EPOCHS: 2017 → 2024 // HORIZON: 2030
               </span>
             </div>
-            <h1 className="text-3xl sm:text-4xl lg:text-[42px] font-bold tracking-tight text-bone-100 leading-[1.08]">
-              Multi-Year Trajectory &{" "}
-              <span className="font-display italic font-normal text-teal-400">
-                2030 Spatial Contagion
-              </span>
+            <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-bone-100">
+              Multi-Year Trajectory & 2030 Spatial Contagion
             </h1>
             <p className="text-xs sm:text-sm text-bone-300 leading-relaxed">
               Acquires 5 multi-year Sentinel-2 composites (<strong className="text-bone-100">2017 → 2024</strong>), runs{" "}
