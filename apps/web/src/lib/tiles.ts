@@ -178,14 +178,13 @@ export function getEoxTileUrls(year: number): string[] {
 }
 
 export function getHighResTileUrl(): string {
-  return "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+  return "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}";
 }
 
 export function getHighResTileUrls(): string[] {
-  return [
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-  ];
+  return ["0", "1", "2", "3"].map(
+    (sub) => `https://mt${sub}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}`,
+  );
 }
 
 export function getMapboxStyleUrl(): string {

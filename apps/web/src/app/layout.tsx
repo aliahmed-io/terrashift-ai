@@ -44,8 +44,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       className={`${instrument.variable} ${spaceGrotesk.variable} ${jetbrains.variable}`}
     >
       <head>
-        <link rel="preconnect" href="https://server.arcgisonline.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://services.arcgisonline.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://mt0.google.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://mt1.google.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://mt2.google.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://mt3.google.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://a.tiles.maps.eox.at" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://b.tiles.maps.eox.at" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://c.tiles.maps.eox.at" crossOrigin="anonymous" />

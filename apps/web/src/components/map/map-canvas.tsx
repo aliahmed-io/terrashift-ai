@@ -60,7 +60,7 @@ function buildMapStyle(year: number): maplibregl.StyleSpecification {
       tiles: getHighResTileUrls(),
       tileSize: 256,
       maxzoom: 19,
-      attribution: "Esri, Maxar, Earthstar Geographics",
+      attribution: "Maxar, Airbus, CNES / Copernicus",
     },
   };
 
