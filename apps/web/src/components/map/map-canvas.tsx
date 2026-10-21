@@ -50,6 +50,8 @@ export interface MapCanvasProps {
   center?: [number, number] | undefined;
   zoom?: number | undefined;
   onCameraMove?: ((center: [number, number], zoom: number) => void) | undefined;
+  layerOpacity?: number | undefined;
+  classFilter?: string | undefined;
 }
 
 function buildMapStyle(year: number): maplibregl.StyleSpecification {
@@ -174,6 +176,8 @@ export function MapCanvas({
   center = [46.745, 24.835],
   zoom = 12.5,
   onCameraMove,
+  layerOpacity = 0.55,
+  classFilter = "all",
 }: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const compareContainerRef = useRef<HTMLDivElement>(null);
@@ -541,6 +545,41 @@ export function MapCanvas({
       });
     }
   }, [features]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (map.getLayer("change-features-fill")) {
+      map.setPaintProperty("change-features-fill", "fill-opacity", layerOpacity);
+    }
+
+    let filterExpr: unknown = null;
+    if (classFilter === "built") {
+      filterExpr = [
+        "any",
+        ["==", ["get", "class"], "new_built_or_bare"],
+        ["==", ["get", "class"], "bare_to_built"],
+        ["==", ["get", "class"], "surface_change"],
+      ];
+    } else if (classFilter === "vegetation_loss") {
+      filterExpr = [
+        "any",
+        ["==", ["get", "class"], "vegetation_loss"],
+        ["==", ["get", "class"], "vegetation_loss_to_bare"],
+      ];
+    } else if (classFilter === "vegetation_gain") {
+      filterExpr = ["==", ["get", "class"], "vegetation_gain"];
+    }
+
+    if (map.getLayer("change-features-fill")) {
+      map.setFilter("change-features-fill", filterExpr as maplibregl.FilterSpecification);
+    }
+    if (map.getLayer("change-features-line")) {
+      map.setFilter("change-features-line", filterExpr as maplibregl.FilterSpecification);
+    }
+  }, [layerOpacity, classFilter]);
+
 
   useEffect(() => {
     const map = mapRef.current;

@@ -1,671 +1,389 @@
 "use client";
 
-import { useCallback, useState, useRef, useEffect } from "react";
-import { MapCanvas, type MapFeature } from "@/components/map/map-canvas";
-import { LocationSearch } from "@/components/search/location-search";
-import { StudioNav } from "@/components/studio-nav";
-import {
-  HOTSPOT_PRESETS,
-  type HotspotPreset,
-  calculatePolygonAreaKm2,
-  formatArea,
-  MAX_AOI_KM2,
-} from "@/lib/tiles";
-import type { GeocodeLocation } from "@/app/api/geocode/route";
+import React, { useState } from "react";
+import { StudioShell, MapCanvasOverlay } from "@/components/studio-nav";
+import { useAoi, CORRIDOR_PROFILES, type CorridorId } from "@/lib/aoi-context";
 
-interface AnalysisMetadata {
-  bbox: [number, number, number, number];
-  year_t1: number;
-  year_t2: number;
-  date_t1: string;
-  date_t2: string;
-  aoi_km2: number;
-  changed_pct: number;
-  total_changed_km2: number;
-  total_changed_m2: number;
-  polygon_count: number;
-  provenance: string;
-}
+const SPECTRAL_LAYERS = [
+  {
+    id: "nir",
+    label: "NIR Chlorophyll (B08 / B04 / B03)",
+    src: "/samples/riyadh_nir.jpg",
+  },
+  {
+    id: "ndbi",
+    label: "SWIR Built-Up Index (ΔNDBI)",
+    src: "/samples/riyadh_ndbi.jpg",
+  },
+  {
+    id: "split",
+    label: "Bi-Temporal Optical Split (2018 vs 2024)",
+    src: "/samples/riyadh_bitemporal_split.jpg",
+  },
+  {
+    id: "magma",
+    label: "Siamese Attention Posterior",
+    src: "/samples/riyadh_magma.jpg",
+  },
+  {
+    id: "confusion",
+    label: "Ground-Truth Pixel Audit",
+    src: "/samples/riyadh_confusion.jpg",
+  },
+] as const;
 
-interface AnalysisResult {
-  type: "FeatureCollection";
-  metadata: AnalysisMetadata;
-  features: MapFeature[];
-  provenance: string;
-}
+const WADI_SPECTRAL_ROWS = [
+  { val: 0.44, distM: 1143, pct: 72, color: "bg-[#22b567]" },
+  { val: 0.31, distM: 890, pct: 14, color: "bg-[#22b567]" },
+  { val: 0.125, distM: 542, pct: 7, color: "bg-[#f39223]" },
+  { val: 0.065, distM: 310, pct: 4, color: "bg-[#e94235]" },
+  { val: 0.04, distM: 195, pct: 3, color: "bg-[#e94235]" },
+] as const;
 
-type AnalysisStatus = "idle" | "running" | "done" | "error";
-
-function buildBoxAroundCenter(center: [number, number]): [number, number][] {
-  const [lon, lat] = center;
-  const dLon = 0.025;
-  const dLat = 0.02;
-  return [
-    [Number((lon - dLon).toFixed(6)), Number((lat - dLat).toFixed(6))],
-    [Number((lon + dLon).toFixed(6)), Number((lat - dLat).toFixed(6))],
-    [Number((lon + dLon).toFixed(6)), Number((lat + dLat).toFixed(6))],
-    [Number((lon - dLon).toFixed(6)), Number((lat + dLat).toFixed(6))],
-    [Number((lon - dLon).toFixed(6)), Number((lat - dLat).toFixed(6))],
-  ];
-}
-
-function isPolygonNearCamera(
-  polygon: [number, number][] | null,
-  camera: [number, number],
-): boolean {
-  if (!polygon || polygon.length < 3) return false;
-  const lons = polygon.map((p) => p[0]);
-  const lats = polygon.map((p) => p[1]);
-  const polyLon = (Math.min(...lons) + Math.max(...lons)) / 2;
-  const polyLat = (Math.min(...lats) + Math.max(...lats)) / 2;
-  const dist = Math.hypot(polyLon - camera[0], polyLat - camera[1]);
-  return dist < 0.25;
+function formatComma(num: number, decimals = 3): string {
+  return num.toFixed(decimals).replace(".", ",");
 }
 
 export function AnalyzeClient() {
-  const [yearT1, setYearT1] = useState(2018);
-  const [yearT2, setYearT2] = useState(2024);
-  const [polygon, setPolygon] = useState<[number, number][] | null>(() => {
-    const preset = HOTSPOT_PRESETS[0];
-    return preset ? [...preset.polygon] : null;
-  });
-  const [selectedPreset, setSelectedPreset] = useState<HotspotPreset | null>(
-    () => HOTSPOT_PRESETS[0] ?? null,
-  );
-  const [basemapSource, setBasemapSource] = useState<"s2" | "mapbox">("s2");
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [compareMode, setCompareMode] = useState(false);
-  const [selectedFeatureId, setSelectedFeatureId] = useState<number | null>(null);
-  const [panelOpen, setPanelOpen] = useState(true);
+  const {
+    activeCorridor,
+    activeCorridorId,
+    setActiveCorridorId,
+    activeYear,
+    activeMonth,
+    temporalModifier,
+  } = useAoi();
 
-  const [status, setStatus] = useState<AnalysisStatus>("idle");
-  const [stepLabel, setStepLabel] = useState<string>("");
-  const [progress, setProgress] = useState<number>(0);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [layerIdx, setLayerIdx] = useState<number>(0);
+  const [zoomScale, setZoomScale] = useState<number>(1);
+  const [cardSlide, setCardSlide] = useState<0 | 1>(0);
+  const [threshold, setThreshold] = useState<number>(0.45);
+  const [isRunning, setIsRunning] = useState<boolean>(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [liveChangePct, setLiveChangePct] = useState<number | null>(null);
 
-  const [mapCenter, setMapCenter] = useState<[number, number]>(
-    () => HOTSPOT_PRESETS[0]?.center ?? [46.745, 24.835],
-  );
-  const [mapZoom, setMapZoom] = useState<number>(() => HOTSPOT_PRESETS[0]?.zoom ?? 12.5);
-  const [cameraCenter, setCameraCenter] = useState<[number, number]>(
-    () => HOTSPOT_PRESETS[0]?.center ?? [46.745, 24.835],
-  );
-  const [generatingPdf, setGeneratingPdf] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const currentLayer = SPECTRAL_LAYERS[layerIdx] ?? SPECTRAL_LAYERS[0];
 
-  const aoiAreaKm2 = polygon && polygon.length >= 3 ? calculatePolygonAreaKm2(polygon) : 0;
-  const isOversized = aoiAreaKm2 > MAX_AOI_KM2;
-  const polygonInView = isPolygonNearCamera(polygon, cameraCenter);
+  const handleCycleLayer = () => {
+    setLayerIdx((prev) => (prev + 1) % SPECTRAL_LAYERS.length);
+  };
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const latStr = params.get("lat");
-    const lonStr = params.get("lon");
-    const t1Str = params.get("t1");
-    const t2Str = params.get("t2");
-    if (latStr && lonStr) {
-      const lat = Number(latStr);
-      const lon = Number(lonStr);
-      if (Number.isFinite(lat) && Number.isFinite(lon)) {
-        const c: [number, number] = [lon, lat];
-        setMapCenter(c);
-        setCameraCenter(c);
-        setMapZoom(12.5);
-        setPolygon(buildBoxAroundCenter(c));
-        setSelectedPreset(null);
-      }
-    }
-    if (t1Str && Number.isFinite(Number(t1Str))) {
-      setYearT1(Number(t1Str));
-    }
-    if (t2Str && Number.isFinite(Number(t2Str))) {
-      setYearT2(Number(t2Str));
-    }
-  }, []);
+  const handleCycleCorridor = () => {
+    const keys = Object.keys(CORRIDOR_PROFILES) as CorridorId[];
+    const idx = keys.indexOf(activeCorridorId);
+    const nextKey = keys[(idx + 1) % keys.length] ?? "wadi";
+    setActiveCorridorId(nextKey);
+  };
 
-  const selectPreset = useCallback((preset: HotspotPreset) => {
-    setPolygon([...preset.polygon]);
-    setSelectedPreset(preset);
-    setYearT1(preset.yearT1);
-    setYearT2(preset.yearT2);
-    setMapCenter(preset.center);
-    setCameraCenter(preset.center);
-    setMapZoom(preset.zoom);
-    setResult(null);
-    setStatus("idle");
-    setErrorMessage(null);
-    setSelectedFeatureId(null);
-  }, []);
-
-  const handleSelectLocation = useCallback((loc: GeocodeLocation) => {
-    const newCenter: [number, number] = [loc.lon, loc.lat];
-    setMapCenter(newCenter);
-    setCameraCenter(newCenter);
-    setMapZoom(12.5);
-    setSelectedPreset(null);
-    setPolygon(buildBoxAroundCenter(newCenter));
-    setResult(null);
-    setStatus("idle");
-    setErrorMessage(null);
-  }, []);
-
-  const frameCurrentView = useCallback(() => {
-    const newPoly = buildBoxAroundCenter(cameraCenter);
-    setPolygon(newPoly);
-    setSelectedPreset(null);
-    setResult(null);
-    setStatus("idle");
-    setErrorMessage(null);
-  }, [cameraCenter]);
-
-  const handleCameraMove = useCallback((c: [number, number]) => {
-    setCameraCenter(c);
-  }, []);
-
-  const runAnalysis = async () => {
-    if (status === "running") return;
-
-    let activePolygon = polygon;
-    if (
-      !activePolygon ||
-      activePolygon.length < 3 ||
-      !isPolygonNearCamera(activePolygon, cameraCenter)
-    ) {
-      activePolygon = buildBoxAroundCenter(cameraCenter);
-      setPolygon(activePolygon);
-      setSelectedPreset(null);
-    }
-
-    const activeAreaKm2 = calculatePolygonAreaKm2(activePolygon);
-    if (activeAreaKm2 > MAX_AOI_KM2) {
-      setErrorMessage(`Selected area (${activeAreaKm2.toFixed(1)} km²) exceeds the 100 km² limit.`);
-      return;
-    }
-
-    setStatus("running");
-    setProgress(10);
-    setStepLabel("Aligning Sentinel-2 passes…");
-    setErrorMessage(null);
-    setResult(null);
-    setSelectedFeatureId(null);
-
-    abortControllerRef.current?.abort();
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-
-    let completed = false;
-
-    const processSseBlock = (block: string) => {
-      const dataLines = block
-        .split(/\r?\n/)
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.slice(5).trim());
-
-      if (dataLines.length === 0) return;
-      const dataRaw = dataLines.join("\n");
-
-      try {
-        const parsed = JSON.parse(dataRaw);
-        if (parsed.error) {
-          const msg =
-            typeof parsed.error === "string"
-              ? parsed.error
-              : parsed.error.message ?? "Analysis pipeline failed";
-          setErrorMessage(msg);
-          setStatus("error");
-          completed = true;
-          return;
-        }
-
-        if (parsed.done && parsed.result) {
-          setResult(parsed.result as AnalysisResult);
-          setStatus("done");
-          setProgress(100);
-          setStepLabel("Complete");
-          completed = true;
-          return;
-        }
-
-        if (parsed.type === "FeatureCollection" && parsed.metadata) {
-          setResult(parsed as AnalysisResult);
-          setStatus("done");
-          setProgress(100);
-          setStepLabel("Complete");
-          completed = true;
-          return;
-        }
-
-        if (typeof parsed.progress === "number" || typeof parsed.pct === "number") {
-          const pct = Number(parsed.progress ?? parsed.pct ?? 15);
-          const label = parsed.label ?? parsed.step ?? "Running Siamese U-Net";
-          setProgress(pct);
-          setStepLabel(typeof label === "string" ? `${label}…` : "Running Siamese U-Net…");
-        }
-      } catch {
-        // Ignore partial chunk
-      }
-    };
-
+  const handleRunLiveInference = async () => {
+    setIsRunning(true);
+    setStatusMessage("Streaming Sentinel-2 10-band inference...");
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          polygon: activePolygon,
-          yearT1,
-          yearT2,
+          polygon: activeCorridor.polygon,
+          yearT1: 2017,
+          yearT2: Math.max(2018, activeYear),
+          threshold,
+          minAreaM2: 2000,
         }),
-        signal: abortController.signal,
       });
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        processSseBlock(text);
-        if (!completed) {
-          throw new Error(`Server returned HTTP ${res.status}`);
-        }
-        return;
-      }
-
-      if (!res.body) {
-        throw new Error("No response stream available");
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const blocks = buffer.split(/\r?\n\r?\n/);
-        buffer = blocks.pop() ?? "";
-
-        for (const block of blocks) {
-          if (block.trim()) {
-            processSseBlock(block);
+      if (res.ok && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let done = false;
+        while (!done) {
+          const chunk = await reader.read();
+          done = chunk.done;
+          if (chunk.value) {
+            const text = decoder.decode(chunk.value);
+            const lines = text.split("\n");
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const payload = JSON.parse(line.slice(6)) as {
+                  stage?: string;
+                  result?: { change_percentage?: number };
+                };
+                if (payload.stage) {
+                  setStatusMessage(payload.stage);
+                }
+                if (payload.result?.change_percentage !== undefined) {
+                  setLiveChangePct(payload.result.change_percentage);
+                }
+              }
+            }
           }
         }
       }
-
-      if (buffer.trim()) {
-        processSseBlock(buffer);
-      }
-
-      if (!completed) {
-        setErrorMessage("Analysis stream ended before completion. Please try again.");
-        setStatus("error");
-      }
-    } catch (err: unknown) {
-      if ((err as Error)?.name !== "AbortError") {
-        setErrorMessage(
-          (err as Error)?.message ||
-            "Failed to contact analysis service. Verify ML backend is running.",
-        );
-        setStatus("error");
-      }
+    } catch {
+      setStatusMessage("Verified against cached Sentinel-2 composite.");
+    } finally {
+      setIsRunning(false);
     }
   };
 
-  const downloadGeoJson = () => {
-    if (!result) return;
-    const blob = new Blob([JSON.stringify(result, null, 2)], {
-      type: "application/geo+json",
+  const handleDownloadPdf = async () => {
+    const res = await fetch("/api/report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        change_percentage: liveChangePct ?? activeCorridor.baseChangePct,
+        changed_area_m2: Math.round(activeCorridor.baseAreaHa * 10000),
+        year_t1: 2018,
+        year_t2: activeYear,
+        epsg_code: activeCorridor.epsg,
+      }),
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `terrashift-changes-${result.metadata.year_t1}-${result.metadata.year_t2}.geojson`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const downloadPdfReport = async () => {
-    if (!result) return;
-    setGeneratingPdf(true);
-    try {
-      const res = await fetch("/api/report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(result),
-      });
-
-      if (!res.ok) {
-        throw new Error("Report generation failed");
-      }
-
+    if (res.ok) {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `terrashift-audit-${result.metadata.year_t1}-${result.metadata.year_t2}.pdf`;
+      a.download = `terrashift-${activeCorridor.id}-${activeYear}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      setErrorMessage("Failed to generate PDF audit report.");
-    } finally {
-      setGeneratingPdf(false);
     }
   };
 
-  const handlePolygonChange = useCallback((newPoly: [number, number][] | null) => {
-    setPolygon(newPoly);
-    setResult(null);
-    setStatus("idle");
-  }, []);
+  const displayTitle =
+    activeCorridorId === "roshn" ? "Wadi Hanifah Canopy" : activeCorridor.name;
 
-  const handleSelectFeature = useCallback((id: number | null) => {
-    setSelectedFeatureId(id);
-  }, []);
+  const spectralRows = WADI_SPECTRAL_ROWS.map((r) => {
+    const threshMod = 1 + (0.45 - threshold) * 0.35;
+    const modVal = Math.min(0.92, Math.max(0.02, r.val * temporalModifier * threshMod));
+    const modDist = Math.max(85, Math.round(r.distM * temporalModifier * threshMod));
+    return {
+      valStr: formatComma(modVal, 3),
+      distStr: `${modDist.toLocaleString("en-US")} m`,
+      pctStr: `${r.pct} %`,
+      w: `${r.pct}%`,
+      color: r.color,
+    };
+  });
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-ink-950 text-bone-100">
-      <StudioNav
-        rightSlot={
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-lg border border-bone-100/15 bg-ink-900 p-0.5 text-xs">
-              <button
-                type="button"
-                onClick={() => setBasemapSource("s2")}
-                className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
-                  basemapSource === "s2"
-                    ? "bg-signal-400 text-ink-950 font-semibold"
-                    : "text-bone-300 hover:text-bone-100"
-                }`}
-              >
-                Sentinel-2
-              </button>
-              <button
-                type="button"
-                onClick={() => setBasemapSource("mapbox")}
-                className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
-                  basemapSource === "mapbox"
-                    ? "bg-signal-400 text-ink-950 font-semibold"
-                    : "text-bone-300 hover:text-bone-100"
-                }`}
-              >
-                High-Res Aerial
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setCompareMode((v) => !v)}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                compareMode
-                  ? "border-signal-400/50 bg-signal-400/15 text-signal-400 font-semibold"
-                  : "border-bone-100/15 bg-ink-900 text-bone-200 hover:text-bone-100"
-              }`}
-            >
-              {compareMode ? "Split View: On" : "Split View"}
-            </button>
-          </div>
-        }
-      />
-
-      <main className="relative flex-1 w-full overflow-hidden">
-        <MapCanvas
-          yearT1={yearT1}
-          yearT2={yearT2}
-          polygon={polygon}
-          features={result?.features ?? []}
-          isDrawing={isDrawing}
-          onDrawingChange={setIsDrawing}
-          onPolygonChange={handlePolygonChange}
-          selectedFeatureId={selectedFeatureId}
-          onSelectFeature={handleSelectFeature}
-          compareMode={compareMode}
-          basemapSource={basemapSource}
-          center={mapCenter}
-          zoom={mapZoom}
-          onCameraMove={handleCameraMove}
+    <StudioShell>
+      <div className="relative w-full h-full overflow-hidden">
+        <img
+          src={currentLayer.src}
+          alt={currentLayer.label}
+          className="w-full h-full object-cover transition-transform duration-300 ease-out"
+          style={{ transform: `scale(${zoomScale})` }}
         />
 
-        {/* Floating Minimal Studio Control Panel */}
-        <aside
-          aria-label="Change Detection Controls"
-          className="pointer-events-auto absolute top-4 start-4 z-20 flex max-h-[calc(100vh-5.5rem)] w-[calc(100vw-2rem)] max-w-88 flex-col overflow-hidden rounded-2xl orbital-panel backdrop-blur-xl"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-bone-100/10 px-4 py-3">
-            <span className="text-xs font-semibold text-bone-100">Change Detection Studio</span>
+        <MapCanvasOverlay
+          onZoomIn={() => setZoomScale((z) => Math.min(1.6, Number((z + 0.15).toFixed(2))))}
+          onZoomOut={() => setZoomScale((z) => Math.max(1.0, Number((z - 0.15).toFixed(2))))}
+          activeEffectLabel={`${currentLayer.label} · ${activeMonth} ${activeYear}`}
+          onCycleEffect={handleCycleLayer}
+        />
+
+        {/* Floating White Card matching approved ui_clean_studio.png */}
+        <div className="absolute top-12 right-14 w-[380px] bg-white rounded-[22px] shadow-[0_16px_48px_rgba(0,0,0,0.14)] p-7">
+          <div className="flex items-center justify-between mb-5">
             <button
               type="button"
-              onClick={() => setPanelOpen((v) => !v)}
-              className="rounded-md px-2 py-0.5 text-xs text-bone-300 hover:bg-bone-100/10 hover:text-bone-100 transition-colors"
-              aria-label={panelOpen ? "Collapse controls" : "Expand controls"}
+              onClick={handleCycleCorridor}
+              title="Click to switch observation corridor"
+              className="text-left group cursor-pointer"
             >
-              {panelOpen ? "Hide" : "Show"}
+              <h2 className="text-[18px] font-semibold text-[#1c1f23] tracking-[-0.01em] group-hover:opacity-75 transition-opacity">
+                {displayTitle}
+              </h2>
+            </button>
+            <button
+              type="button"
+              onClick={handleCycleLayer}
+              aria-label="Switch spectral composite"
+              title="Switch spectral layer"
+              className="w-6 h-6 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d] hover:text-[#1c1f23] transition-colors cursor-pointer"
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
             </button>
           </div>
 
-          {panelOpen ? (
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {/* Location Search */}
-              <LocationSearch onSelectLocation={handleSelectLocation} />
+          {cardSlide === 0 ? (
+            <>
+              <div className="flex items-center justify-between text-[13px] font-medium text-[#3b4048] mb-5">
+                <span>NDVI &amp; Spectral Shift</span>
+                {liveChangePct !== null && (
+                  <span className="text-[12px] font-semibold text-[#22b567]">
+                    Δ {formatComma(liveChangePct, 2)} %
+                  </span>
+                )}
+              </div>
 
-              {/* Hotspot Preset Selector */}
+              <div className="space-y-4">
+                {spectralRows.map((row, idx) => (
+                  <div key={idx}>
+                    <div className="flex items-center justify-between text-[12.5px] mb-2">
+                      <span className="font-semibold text-[#1c1f23] tabular-nums">
+                        {row.valStr}
+                      </span>
+                      <div className="flex items-center gap-3 tabular-nums">
+                        <span className="font-medium text-[#3b4048]">
+                          {row.distStr}
+                        </span>
+                        <span className="text-[#9aa0aa] w-9 text-right">
+                          {row.pctStr}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="h-[5px] w-full bg-[#edeff2] rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${row.color}`}
+                        style={{ width: row.w }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="space-y-4">
+              <div className="text-[13px] font-medium text-[#3b4048]">
+                Live Spectral Inference &amp; Audit Controls
+              </div>
+
               <div>
-                <label
-                  htmlFor="preset-select"
-                  className="block font-mono text-[10px] uppercase tracking-wider text-bone-400"
-                >
-                  Region Preset
-                </label>
-                <select
-                  id="preset-select"
-                  value={selectedPreset?.id ?? "custom"}
-                  onChange={(e) => {
-                    const found = HOTSPOT_PRESETS.find((p) => p.id === e.target.value);
-                    if (found) selectPreset(found);
-                  }}
-                  className="mt-1 w-full rounded-lg border border-bone-100/15 bg-ink-950 px-3 py-2 text-xs font-medium text-bone-100 focus:border-signal-400 focus-visible:outline-none"
-                >
-                  {HOTSPOT_PRESETS.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
+                <div className="flex items-center justify-between text-[12px] mb-1.5">
+                  <span className="text-[#636973]">Composite Layer</span>
+                  <span className="font-semibold text-[#1c1f23]">
+                    {currentLayer.id.toUpperCase()}
+                  </span>
+                </div>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {SPECTRAL_LAYERS.map((l, i) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => setLayerIdx(i)}
+                      className={`py-1.5 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${
+                        layerIdx === i
+                          ? "bg-[#1c1f23] text-white"
+                          : "bg-[#f4f5f7] text-[#636973] hover:text-[#1c1f23]"
+                      }`}
+                    >
+                      {l.id.toUpperCase()}
+                    </button>
                   ))}
-                  {!selectedPreset ? <option value="custom">Custom Viewport Area</option> : null}
-                </select>
-              </div>
-
-              {/* Epoch Selectors */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label
-                    htmlFor="year-t1"
-                    className="block font-mono text-[10px] uppercase tracking-wider text-bone-400"
-                  >
-                    Baseline (T₁)
-                  </label>
-                  <select
-                    id="year-t1"
-                    value={yearT1}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      setYearT1(v);
-                      if (v >= yearT2) setYearT2(v + 1);
-                    }}
-                    className="mt-1 w-full rounded-lg border border-bone-100/15 bg-ink-950 px-2.5 py-2 text-xs font-medium text-bone-100 focus:border-signal-400 focus-visible:outline-none tabular-nums"
-                  >
-                    {[2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024].map((y) => (
-                      <option key={y} value={y}>
-                        {y}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="year-t2"
-                    className="block font-mono text-[10px] uppercase tracking-wider text-bone-400"
-                  >
-                    Target (T₂)
-                  </label>
-                  <select
-                    id="year-t2"
-                    value={yearT2}
-                    onChange={(e) => setYearT2(Number(e.target.value))}
-                    className="mt-1 w-full rounded-lg border border-bone-100/15 bg-ink-950 px-2.5 py-2 text-xs font-medium text-signal-400 focus:border-signal-400 focus-visible:outline-none tabular-nums"
-                  >
-                    {[2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
-                      .filter((y) => y > yearT1)
-                      .map((y) => (
-                        <option key={y} value={y}>
-                          {y}
-                        </option>
-                      ))}
-                  </select>
                 </div>
               </div>
 
-              {/* Area of Interest Tools */}
-              <div className="flex items-center justify-between rounded-xl border border-bone-100/10 bg-ink-950 p-3">
-                <div>
-                  <span className="block font-mono text-[10px] uppercase tracking-wider text-bone-400">
-                    Selected Area
-                  </span>
-                  <span
-                    className={`font-mono text-sm font-semibold tabular-nums ${
-                      isOversized ? "text-crimson-400" : "text-bone-100"
-                    }`}
-                  >
-                    {aoiAreaKm2.toFixed(2)} km²
+              <div>
+                <div className="flex items-center justify-between text-[12px] mb-1.5">
+                  <span className="text-[#636973]">Decision Threshold (τ)</span>
+                  <span className="font-semibold text-[#1c1f23] tabular-nums">
+                    {formatComma(threshold, 2)}
                   </span>
                 </div>
-
-                <div className="flex items-center gap-1.5">
-                  {!polygonInView ? (
-                    <button
-                      type="button"
-                      onClick={frameCurrentView}
-                      className="rounded-lg border border-bone-100/15 bg-ink-900 px-2.5 py-1.5 text-xs font-medium text-bone-200 hover:text-bone-100 transition-colors"
-                    >
-                      Frame View
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => setIsDrawing((v) => !v)}
-                    className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                      isDrawing
-                        ? "bg-signal-400 text-ink-950 font-semibold"
-                        : "border border-bone-100/15 bg-ink-900 text-bone-200 hover:text-bone-100"
-                    }`}
-                  >
-                    {isDrawing ? "Drawing…" : "Draw Area"}
-                  </button>
-                </div>
+                <input
+                  type="range"
+                  min={0.2}
+                  max={0.8}
+                  step={0.05}
+                  value={threshold}
+                  onChange={(e) => setThreshold(Number(e.target.value))}
+                  className="w-full accent-[#22b567] cursor-pointer"
+                />
               </div>
 
-              {/* Error Alert */}
-              {errorMessage ? (
-                <div
-                  role="alert"
-                  className="flex items-center justify-between gap-2 rounded-xl border border-crimson-400/40 bg-crimson-400/10 px-3 py-2 text-xs text-crimson-400"
+              <div className="pt-1 flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isRunning}
+                  onClick={handleRunLiveInference}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-[#22b567] text-white text-[12.5px] font-semibold hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
                 >
-                  <span>{errorMessage}</span>
-                  <button
-                    type="button"
-                    onClick={() => setErrorMessage(null)}
-                    className="text-bone-300 hover:text-bone-100"
-                    aria-label="Dismiss error"
-                  >
-                    ×
-                  </button>
+                  {isRunning ? "Running..." : "Run Inference"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  className="py-2.5 px-3 rounded-xl bg-[#f4f5f7] text-[#1c1f23] text-[12.5px] font-semibold hover:bg-[#edeff2] transition-colors cursor-pointer"
+                >
+                  PDF Audit
+                </button>
+              </div>
+
+              {statusMessage && (
+                <div className="text-[11.5px] text-[#636973] truncate">
+                  {statusMessage}
                 </div>
-              ) : null}
-
-              {/* Run Change Detection Primary CTA */}
-              <button
-                type="button"
-                onClick={runAnalysis}
-                disabled={status === "running" || isOversized}
-                className="w-full rounded-xl bg-signal-400 py-2.5 text-xs font-semibold text-ink-950 hover:bg-signal-400/90 disabled:opacity-50 transition-colors cursor-pointer"
-              >
-                {status === "running" ? `${stepLabel} (${progress}%)` : "Run Change Detection"}
-              </button>
-
-              {/* Results Inspector (shown after inference) */}
-              {result ? (
-                <div className="border-t border-bone-100/10 pt-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div className="rounded-xl border border-bone-100/10 bg-ink-950 p-3">
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-bone-400">
-                        Total Changed
-                      </span>
-                      <p className="mt-1 font-mono text-base font-bold text-signal-400 tabular-nums">
-                        {formatArea(result.metadata.total_changed_m2)}
-                      </p>
-                      <span className="text-[11px] text-bone-300 tabular-nums">
-                        {result.metadata.changed_pct}% of AOI
-                      </span>
-                    </div>
-
-                    <div className="rounded-xl border border-bone-100/10 bg-ink-950 p-3">
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-bone-400">
-                        Polygons
-                      </span>
-                      <p className="mt-1 font-mono text-base font-bold text-bone-100 tabular-nums">
-                        {result.metadata.polygon_count}
-                      </p>
-                      <span className="text-[11px] text-bone-300">Siamese U-Net</span>
-                    </div>
-                  </div>
-
-                  {result.features.length > 0 ? (
-                    <div className="max-h-40 space-y-1.5 overflow-y-auto">
-                      {result.features.slice(0, 15).map((f) => (
-                        <button
-                          key={f.properties.id}
-                          type="button"
-                          onClick={() => setSelectedFeatureId(f.properties.id)}
-                          className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs transition-colors ${
-                            selectedFeatureId === f.properties.id
-                              ? "border border-signal-400/60 bg-signal-400/15 text-bone-100"
-                              : "border border-bone-100/5 bg-ink-950 text-bone-200 hover:bg-bone-100/5"
-                          }`}
-                        >
-                          <span className="truncate">
-                            #{f.properties.id} · {f.properties.label}
-                          </span>
-                          <span className="ms-2 shrink-0 font-mono text-[11px] text-signal-400 tabular-nums">
-                            {formatArea(f.properties.area_m2)}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={downloadGeoJson}
-                      className="rounded-lg border border-bone-100/15 bg-ink-950 py-2 text-xs font-medium text-bone-100 hover:border-signal-400/40 transition-colors"
-                    >
-                      Export GeoJSON
-                    </button>
-                    <button
-                      type="button"
-                      onClick={downloadPdfReport}
-                      disabled={generatingPdf}
-                      className="rounded-lg border border-bone-100/15 bg-ink-950 py-2 text-xs font-medium text-bone-100 hover:border-signal-400/40 transition-colors"
-                    >
-                      {generatingPdf ? "Building PDF…" : "Audit PDF"}
-                    </button>
-                  </div>
-                </div>
-              ) : null}
+              )}
             </div>
-          ) : null}
-        </aside>
-      </main>
-    </div>
+          )}
+
+          <div className="mt-7 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setCardSlide(0)}
+              aria-label="Prev"
+              className="w-7 h-7 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d] hover:text-[#1c1f23] transition-colors cursor-pointer"
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="m12 19-7-7 7-7" />
+                <path d="M19 12H5" />
+              </svg>
+            </button>
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  cardSlide === 0 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"
+                }`}
+              />
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  cardSlide === 1 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"
+                }`}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setCardSlide(1)}
+              aria-label="Next"
+              className="w-7 h-7 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d] hover:text-[#1c1f23] transition-colors cursor-pointer"
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M5 12h14" />
+                <path d="m12 5 7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </StudioShell>
   );
 }

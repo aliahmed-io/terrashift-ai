@@ -65,12 +65,40 @@ def run_analysis(req: AnalyzeRequest, fetcher: Optional[Fetcher] = None) -> Iter
     if valid.sum() < 64:
         raise AoiError("AOI_TOO_SMALL", "The selected area is too small to analyse.")
 
-    detection, matched = detect_change(rgb1, rgb2, valid)
+    threshold = getattr(req, "threshold", 0.50)
+    min_area_m2 = getattr(req, "min_area_m2", 2000.0)
+
+    detection, matched = detect_change(rgb1, rgb2, valid, threshold=threshold)
     yield _event(4, "Aligning radiometry and detecting change", 80)
 
-    collection = vectorize_changes(detection.mask, detection.probability, rgb1, matched, grid)
+    collection = vectorize_changes(
+        detection.mask,
+        detection.probability,
+        rgb1,
+        matched,
+        grid,
+        min_area_m2=min_area_m2,
+    )
     center_lat = float(np.mean(lats))
     changed_km2 = collection["metadata"]["total_changed_km2"]
+
+    # Retrieve real STAC scene provenance if available
+    stac_metadata: Dict[str, Any] = {}
+    try:
+        from datetime import date
+        from terrashift.acquisition.stac import STACClient
+        stac = STACClient()
+        scenes_t1 = stac.search_scenes(bbox=bbox, target_date=date(req.year_t1, 6, 15), window_days=45)
+        scenes_t2 = stac.search_scenes(bbox=bbox, target_date=date(req.year_t2, 6, 15), window_days=45)
+        if scenes_t1:
+            stac_metadata["scene_t1_id"] = scenes_t1[0].scene_id
+            stac_metadata["scene_t1_cloud"] = round(scenes_t1[0].cloud_cover, 2)
+        if scenes_t2:
+            stac_metadata["scene_t2_id"] = scenes_t2[0].scene_id
+            stac_metadata["scene_t2_cloud"] = round(scenes_t2[0].cloud_cover, 2)
+    except Exception:
+        pass
+
     collection["metadata"].update(
         {
             "bbox": [round(v, 6) for v in bbox],
@@ -82,7 +110,9 @@ def run_analysis(req: AnalyzeRequest, fetcher: Optional[Fetcher] = None) -> Iter
             "changed_pct": round(changed_km2 / area_km2 * 100.0, 2) if area_km2 else 0.0,
             "resolution_m": round(grid.meters_per_pixel(center_lat), 1),
             "threshold": round(detection.threshold, 4),
+            "min_area_m2": min_area_m2,
             "model": detection.model_metadata,
+            "stac_provenance": stac_metadata,
             "provenance": PROVENANCE,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }

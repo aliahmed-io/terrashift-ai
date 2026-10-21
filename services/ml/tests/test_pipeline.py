@@ -137,6 +137,9 @@ def test_ablation_study_returns_4_models_and_xai_stages() -> None:
     assert len(res["methods"]) == 4
     assert len(res["xai_stages"]) == 4
     assert res["methods"][-1]["id"] == "fc_siam_diff"
+    assert len(res["methods"][-1]["pr_curve"]) == 7
+    assert res["image_nir_false_color_base64"].startswith("data:image/jpeg;base64,")
+
 
 
 def test_pair_lab_endpoint_evaluates_ground_truth() -> None:
@@ -176,3 +179,41 @@ def test_carbon_flux_endpoint_computes_pools_and_uhi(monkeypatch: pytest.MonkeyP
     assert "uhi" in data
 
 
+def test_watchlist_crud_endpoints() -> None:
+    client = TestClient(app)
+    item_payload = {
+        "id": "test_hotspot_1",
+        "title": "Test Hotspot",
+        "region": "Riyadh Test",
+        "lat": 24.835,
+        "lon": 46.745,
+        "t1": 2018,
+        "t2": 2024,
+        "deltaPct": 12.5,
+        "summary": "Automated pipeline test item",
+    }
+    res_post = client.post("/v1/watchlist", json=item_payload)
+    assert res_post.status_code == 200
+    assert res_post.json()["status"] == "success"
+
+    res_get = client.get("/v1/watchlist")
+    assert res_get.status_code == 200
+    items = res_get.json()
+    assert any(i["id"] == "test_hotspot_1" for i in items)
+
+    res_del = client.delete("/v1/watchlist/test_hotspot_1")
+    assert res_del.status_code == 200
+    assert res_del.json()["status"] == "deleted"
+
+
+def test_stac_search_endpoint() -> None:
+    client = TestClient(app)
+    req = {
+        "bbox": [46.70, 24.80, 46.80, 24.90],
+        "max_items": 3,
+    }
+    res = client.post("/v1/stac/search", json=req)
+    assert res.status_code == 200
+    data = res.json()
+    assert "scenes" in data
+    assert "count" in data

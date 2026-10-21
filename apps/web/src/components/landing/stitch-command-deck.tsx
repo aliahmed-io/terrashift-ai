@@ -1,123 +1,325 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
-import { StudioNav } from "@/components/studio-nav";
-import { OrbitalLoupe } from "@/components/ui/orbital-loupe";
-import { KSA_MISSION_SITES, type KsaMissionSite } from "@/data/ksaMissionData";
+import React, { useState } from "react";
+import { StudioShell, MapCanvasOverlay } from "@/components/studio-nav";
+import { useAoi, CORRIDOR_PROFILES, type CorridorId } from "@/lib/aoi-context";
 
-const PLATFORM_MODULES = [
-  { href: "/analyze", title: "Map Studio" },
-  { href: "/benchmarks", title: "Model Benchmarks" },
-  { href: "/timeline", title: "BFAST Timeline" },
-  { href: "/lab", title: "Image Pair Lab" },
-  { href: "/carbon", title: "Carbon & UHI" },
-  { href: "/watchlist", title: "STAC Atlas" },
+const CITY_EFFECTS = [
+  {
+    id: "split",
+    label: "Bi-Temporal Split (2018 / 2024)",
+    src: "/samples/riyadh_bitemporal_split.jpg",
+  },
+  {
+    id: "magma",
+    label: "Siamese Attention Posterior",
+    src: "/samples/riyadh_magma.jpg",
+  },
+  {
+    id: "ndbi",
+    label: "SWIR Built-Up Shift (ΔNDBI)",
+    src: "/samples/riyadh_ndbi.jpg",
+  },
+  {
+    id: "nir",
+    label: "NIR Chlorophyll Composite",
+    src: "/samples/riyadh_nir.jpg",
+  },
+  {
+    id: "confusion",
+    label: "Ground-Truth Pixel Audit",
+    src: "/samples/riyadh_confusion.jpg",
+  },
 ] as const;
 
+function formatComma(num: number, decimals = 3): string {
+  return num.toFixed(decimals).replace(".", ",");
+}
+
 export function StitchCommandDeck() {
-  const [siteIdx, setSiteIdx] = useState<number>(0);
-  const site: KsaMissionSite = KSA_MISSION_SITES[siteIdx] ?? KSA_MISSION_SITES[0]!;
+  const {
+    activeCorridor,
+    activeCorridorId,
+    setActiveCorridorId,
+    activeYear,
+    activeMonth,
+    temporalModifier,
+  } = useAoi();
+
+  const [cardSlide, setCardSlide] = useState<0 | 1>(0);
+  const [effectIdx, setEffectIdx] = useState<number>(0);
+  const [zoomScale, setZoomScale] = useState<number>(1);
+  const [cardCollapsed, setCardCollapsed] = useState<boolean>(false);
+
+  const currentEffect = CITY_EFFECTS[effectIdx] ?? CITY_EFFECTS[0];
+
+  const handleCycleEffect = () => {
+    setEffectIdx((prev) => (prev + 1) % CITY_EFFECTS.length);
+  };
+
+  const handleCycleCorridor = () => {
+    const keys = Object.keys(CORRIDOR_PROFILES) as CorridorId[];
+    const idx = keys.indexOf(activeCorridorId);
+    const nextKey = keys[(idx + 1) % keys.length] ?? "roshn";
+    setActiveCorridorId(nextKey);
+  };
+
+  // Compute live rows modulated by activeYear & activeMonth from bottom timeline bar
+  const computedRows = activeCorridor.anomalyRows.map((row) => {
+    const val = Math.min(0.95, Math.max(0.02, row.baseVal * temporalModifier));
+    const areaHa = Math.max(12, Math.round(row.baseAreaHa * temporalModifier));
+    const colorClass =
+      row.tone === "emerald"
+        ? "bg-[#22b567]"
+        : row.tone === "amber"
+          ? "bg-[#f39223]"
+          : "bg-[#e94235]";
+    return {
+      label: row.label,
+      valStr: formatComma(val, 3),
+      distStr: `${areaHa.toLocaleString("en-US")} ha`,
+      pctStr: `${row.pct} %`,
+      widthStr: `${row.pct}%`,
+      colorClass,
+    };
+  });
+
+  // Compute live 10-band reflectance points for Slide 2
+  const bandLabels = ["B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12"];
+  const xCoords = [36, 66, 96, 126, 156, 186, 216, 246, 276, 304];
+  const baselinePoints = activeCorridor.spectralBands2018
+    .map((v, i) => {
+      const x = xCoords[i] ?? 36;
+      const y = Math.round(155 - v * 240);
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  const activePointsList = activeCorridor.spectralBands2024.map((v, i) => {
+    const x = xCoords[i] ?? 36;
+    const modV = Math.min(0.58, v * (0.85 + temporalModifier * 0.15));
+    const y = Math.round(155 - modV * 240);
+    return { band: bandLabels[i] ?? "B02", x, y };
+  });
+  const activePoints = activePointsList.map((p) => `${p.x},${p.y}`).join(" ");
 
   return (
-    <div className="min-h-screen bg-orbital-canvas text-bone-100 flex flex-col">
-      <StudioNav />
+    <StudioShell>
+      <div className="relative w-full h-full overflow-hidden">
+        <img
+          src={currentEffect.src}
+          alt={`${activeCorridor.name} — ${currentEffect.label}`}
+          className="w-full h-full object-cover transition-transform duration-300 ease-out"
+          style={{ transform: `scale(${zoomScale})` }}
+        />
 
-      <main className="mx-auto w-full max-w-[1440px] flex-1 px-6 py-8 space-y-6">
-        {/* Top Bar: Site Switcher & Direct Action */}
-        <section className="orbital-panel rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-2">
-            {KSA_MISSION_SITES.map((m, idx) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => setSiteIdx(idx)}
-                className={`rounded-lg px-3.5 py-2 text-xs font-medium transition-colors ${
-                  siteIdx === idx
-                    ? "bg-signal-400 text-ink-950 font-semibold"
-                    : "bg-ink-950 border border-bone-100/10 text-bone-300 hover:text-bone-100"
-                }`}
-              >
-                {m.pillTitle}
-              </button>
-            ))}
-          </div>
+        {/* Top-left dark pill zoom controls + subtle coordinate grid numbers + bottom-left effect switcher */}
+        <MapCanvasOverlay
+          onZoomIn={() => setZoomScale((z) => Math.min(1.6, Number((z + 0.15).toFixed(2))))}
+          onZoomOut={() => setZoomScale((z) => Math.max(1.0, Number((z - 0.15).toFixed(2))))}
+          activeEffectLabel={`${currentEffect.label} · ${activeMonth} ${activeYear}`}
+          onCycleEffect={handleCycleEffect}
+        />
 
-          <Link
-            href={`/analyze?lat=${site.lat}&lon=${site.lon}&t1=2018&t2=2024`}
-            className="rounded-xl bg-signal-400 px-4 py-2 text-xs font-semibold text-ink-950 hover:bg-signal-400/90 transition-colors"
+        {/* Re-open button if card was collapsed */}
+        {cardCollapsed ? (
+          <button
+            type="button"
+            onClick={() => setCardCollapsed(false)}
+            className="absolute top-12 right-14 bg-white rounded-2xl shadow-[0_12px_36px_rgba(0,0,0,0.14)] px-4 py-2.5 text-[13px] font-semibold text-[#1c1f23] hover:bg-[#f8f9fb] transition-colors cursor-pointer"
           >
-            Open in Map Studio →
-          </Link>
-        </section>
-
-        {/* Main Workspace Preview: Interactive Split View + Metrics */}
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
-          <div className="lg:col-span-7">
-            <OrbitalLoupe
-              baseImage={site.baseImage}
-              overlayImage={site.overlayImage}
-              baseLabel="2018"
-              overlayLabel="2024"
-            />
-          </div>
-
-          <div className="lg:col-span-5 space-y-4">
-            <div className="orbital-panel rounded-2xl p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-bone-100/10 pb-3">
-                <h1 className="text-base font-semibold text-bone-100">{site.pillTitle}</h1>
-                <span className="font-mono text-sm font-semibold text-signal-400 tabular-nums">
-                  {site.pillBadge}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-bone-100/10 bg-ink-950 p-3.5">
-                  <span className="text-xs text-bone-400">F1 Score</span>
-                  <p className="mt-1 font-mono text-xl font-bold text-teal-400 tabular-nums">
-                    {site.benchmarks.f1}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-bone-100/10 bg-ink-950 p-3.5">
-                  <span className="text-xs text-bone-400">IoU</span>
-                  <p className="mt-1 font-mono text-xl font-bold text-signal-400 tabular-nums">
-                    {site.benchmarks.iou}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-bone-100/10 bg-ink-950 p-3.5">
-                  <span className="text-xs text-bone-400">Spectral Shift</span>
-                  <p className="mt-1 font-mono text-lg font-bold text-bone-100 tabular-nums">
-                    {site.bfast.breakMagnitude}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-bone-100/10 bg-ink-950 p-3.5">
-                  <span className="text-xs text-bone-400">Thermal ΔLST</span>
-                  <p className="mt-1 font-mono text-lg font-bold text-teal-400 tabular-nums">
-                    {site.carbonUhi.deltaLst}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Minimal Module Links */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {PLATFORM_MODULES.map((mod) => (
-                <Link
-                  key={mod.href}
-                  href={mod.href}
-                  className="orbital-panel rounded-xl px-4 py-3.5 text-xs font-medium text-bone-200 hover:border-signal-400/40 hover:text-signal-400 transition-colors flex items-center justify-between"
+            {activeCorridor.name}
+          </button>
+        ) : (
+          /* Floating White Card (Exact Golf Field proportion, spacing & footer arrows) */
+          <div className="absolute top-12 right-14 w-[380px] bg-white rounded-[22px] shadow-[0_16px_48px_rgba(0,0,0,0.14)] p-7">
+            <div className="flex items-center justify-between mb-5">
+              <button
+                type="button"
+                onClick={handleCycleCorridor}
+                title="Click to cycle observation corridor"
+                className="text-left group cursor-pointer"
+              >
+                <h2 className="text-[18px] font-semibold text-[#1c1f23] tracking-[-0.01em] group-hover:opacity-75 transition-opacity">
+                  {activeCorridor.name}
+                </h2>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCardCollapsed(true)}
+                aria-label="Minimize card"
+                className="w-6 h-6 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d] hover:text-[#1c1f23] transition-colors cursor-pointer"
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  <span>{mod.title}</span>
-                  <span>→</span>
-                </Link>
-              ))}
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {cardSlide === 0 ? (
+              <>
+                <div className="flex items-center justify-between text-[13px] font-medium text-[#3b4048] mb-5">
+                  <span>Anomaly</span>
+                  <button
+                    type="button"
+                    onClick={handleCycleEffect}
+                    className="text-[11.5px] text-[#8c929c] hover:text-[#1c1f23] transition-colors cursor-pointer"
+                  >
+                    {activeMonth} {activeYear}
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {computedRows.map((row, idx) => (
+                    <div key={idx} title={row.label}>
+                      <div className="flex items-center justify-between text-[12.5px] mb-2">
+                        <span className="font-semibold text-[#1c1f23] tabular-nums">
+                          {row.valStr}
+                        </span>
+                        <div className="flex items-center gap-3 tabular-nums">
+                          <span className="font-medium text-[#3b4048]">
+                            {row.distStr}
+                          </span>
+                          <span className="text-[#9aa0aa] w-9 text-right">
+                            {row.pctStr}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="h-[5px] w-full bg-[#edeff2] rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${row.colorClass}`}
+                          style={{ width: row.widthStr }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-[13px] font-medium text-[#3b4048] mb-4">
+                  10-Band Reflectance Profile (2018 vs {activeYear})
+                </div>
+                <svg viewBox="0 0 320 175" className="w-full h-[185px]">
+                  {[30, 75, 120, 155].map((y) => (
+                    <line
+                      key={y}
+                      x1="28"
+                      y1={y}
+                      x2="310"
+                      y2={y}
+                      stroke="#f0f2f5"
+                      strokeWidth="1"
+                    />
+                  ))}
+                  <text x="2" y="34" fill="#9aa0aa" fontSize="9">
+                    0,45
+                  </text>
+                  <text x="2" y="79" fill="#9aa0aa" fontSize="9">
+                    0,30
+                  </text>
+                  <text x="2" y="124" fill="#9aa0aa" fontSize="9">
+                    0,15
+                  </text>
+                  <polyline
+                    fill="none"
+                    stroke="#c5cad3"
+                    strokeWidth="2"
+                    strokeDasharray="3 3"
+                    points={baselinePoints}
+                  />
+                  <polyline
+                    fill="none"
+                    stroke="#22b567"
+                    strokeWidth="2.5"
+                    points={activePoints}
+                  />
+                  {activePointsList.map((pt) => (
+                    <g key={pt.band}>
+                      <circle cx={pt.x} cy={pt.y} r="3" fill="#22b567" />
+                      <text
+                        x={pt.x}
+                        y="170"
+                        textAnchor="middle"
+                        fill="#8c929c"
+                        fontSize="8.5"
+                      >
+                        {pt.band}
+                      </text>
+                    </g>
+                  ))}
+                </svg>
+              </>
+            )}
+
+            {/* Bottom Card Carousel Footer (Exact Left Arrow + Dots + Right Arrow) */}
+            <div className="mt-7 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setCardSlide(0)}
+                aria-label="Previous slide"
+                className="w-7 h-7 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d] hover:text-[#1c1f23] transition-colors cursor-pointer"
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="m12 19-7-7 7-7" />
+                  <path d="M19 12H5" />
+                </svg>
+              </button>
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    cardSlide === 0 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"
+                  }`}
+                />
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    cardSlide === 1 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"
+                  }`}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setCardSlide(1)}
+                aria-label="Next slide"
+                className="w-7 h-7 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d] hover:text-[#1c1f23] transition-colors cursor-pointer"
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
+              </button>
             </div>
           </div>
-        </section>
-      </main>
-    </div>
+        )}
+      </div>
+    </StudioShell>
   );
 }

@@ -26,14 +26,14 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TerraShift AI — Orbital Earth Observation & Siamese U-Net Telemetry",
+  title: "TerraShift — Planetary Earth Observation & Spectral Analytics",
   description:
-    "Bi-temporal Sentinel-2 change detection that neutralizes seasonal and atmospheric noise, quantifying ground disturbance in square metres.",
+    "Bi-temporal Sentinel-2 change detection, spectral anomaly attribution, BFAST 2030 trajectory forecasting, and IPCC Tier-1 carbon accounting.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#04070B",
-  colorScheme: "dark",
+  themeColor: "#ffffff",
+  colorScheme: "light",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -53,7 +53,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <link rel="preconnect" href="https://c.tiles.maps.eox.at" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://d.tiles.maps.eox.at" crossOrigin="anonymous" />
       </head>
-      <body className="bg-ink-950 text-bone-100 min-h-dvh antialiased selection:bg-signal-400 selection:text-ink-950">
+      <body className="bg-white text-[#1c1f23] min-h-dvh antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -1,35 +1,35 @@
 @import "tailwindcss";
 
 @theme {
-  --color-surface: #0b0f17;
-  --color-surface-container: #111824;
-  --color-surface-variant: #172030;
-  --color-on-surface: #f8fafc;
-  --color-on-surface-variant: #94a3b8;
-  --color-primary: #38bdf8;
-  --color-outline: #1e293b;
-  --color-emerald: #10b981;
-  --color-cyan: #38bdf8;
-  --color-crimson: #f43f5e;
+  --color-surface: #ffffff;
+  --color-surface-container: #f6f7f9;
+  --color-surface-variant: #edeff2;
+  --color-on-surface: #1c1f23;
+  --color-on-surface-variant: #636973;
+  --color-primary: #22b567;
+  --color-outline: #e4e7ec;
+  --color-emerald: #22b567;
+  --color-amber: #f39223;
+  --color-crimson: #e94235;
 
-  --color-ink-950: #0b0f17;
-  --color-ink-900: #111824;
-  --color-ink-800: #172030;
-  --color-ink-700: #1e293b;
-  --color-ink-400: #94a3b8;
-  --color-bone-100: #f8fafc;
-  --color-bone-200: #e2e8f0;
-  --color-bone-300: #94a3b8;
-  --color-bone-400: #64748b;
-  --color-signal-400: #38bdf8;
-  --color-signal-500: #0ea5e9;
-  --color-signal-600: #0284c7;
-  --color-teal-400: #10b981;
-  --color-phosphor-400: #10b981;
-  --color-alert-400: #f43f5e;
-  --color-alert-500: #f43f5e;
-  --color-crimson-400: #f43f5e;
-  --color-lagoon-400: #38bdf8;
+  --color-ink-950: #1c1f23;
+  --color-ink-900: #22252a;
+  --color-ink-800: #3b4048;
+  --color-ink-700: #636973;
+  --color-ink-400: #8c929c;
+  --color-bone-100: #ffffff;
+  --color-bone-200: #f6f7f9;
+  --color-bone-300: #edeff2;
+  --color-bone-400: #d5d8de;
+  --color-signal-400: #22b567;
+  --color-signal-500: #1da15b;
+  --color-signal-600: #17874b;
+  --color-teal-400: #22b567;
+  --color-phosphor-400: #22b567;
+  --color-alert-400: #f39223;
+  --color-alert-500: #e94235;
+  --color-crimson-400: #e94235;
+  --color-lagoon-400: #22b567;
 
   --font-display: var(--font-space), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-space), ui-sans-serif, system-ui, sans-serif;
@@ -38,76 +38,26 @@
 }
 
 html {
-  background: var(--color-surface);
-  color: var(--color-on-surface);
-  color-scheme: dark;
-}
-
-html.lenis,
-html.lenis body {
-  height: auto;
-}
-
-.lenis.lenis-smooth {
-  scroll-behavior: auto !important;
+  background: #ffffff;
+  color: #1c1f23;
+  color-scheme: light;
 }
 
 body {
   font-family: var(--font-sans);
-  background-color: #0b0f17;
-  color: #f8fafc;
+  background-color: #ffffff;
+  color: #1c1f23;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* Unified Minimal Matte Slate Canvas & Card Surfaces */
-.hud-grid,
-.bg-orbital-canvas {
-  background-color: #0b0f17;
-}
-
-.orbital-panel {
-  position: relative;
-  background-color: #111824;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  box-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.6);
-}
-
-.orbital-panel-active {
-  position: relative;
-  background-color: #111824;
-  border: 1px solid rgba(56, 189, 248, 0.45);
-  box-shadow: 0 12px 32px -12px rgba(56, 189, 248, 0.15);
-}
-
-@keyframes orbital-scan {
-  0% {
-    transform: translateY(-100%);
-    opacity: 0;
-  }
-  15% {
-    opacity: 1;
-  }
-  85% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(400%);
-    opacity: 0;
-  }
-}
-
-.animate-orbital-scan {
-  animation: orbital-scan 2.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-}
-
 ::selection {
-  background: var(--color-signal-400);
-  color: var(--color-ink-950);
+  background: #22b567;
+  color: #ffffff;
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-signal-400);
+  outline: 2px solid #22b567;
   outline-offset: 2px;
 }
 

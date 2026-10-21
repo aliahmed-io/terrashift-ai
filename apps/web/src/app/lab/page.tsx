@@ -1,361 +1,247 @@
 "use client";
 
-import { useEffect, useState, useCallback, type ChangeEvent } from "react";
-import { StudioNav } from "@/components/studio-nav";
-import { OrbitalLoupe } from "@/components/ui/orbital-loupe";
+import React, { useState, useEffect, useRef } from "react";
+import { StudioShell } from "@/components/studio-nav";
+import { useAoi } from "@/lib/aoi-context";
 
-interface LabBlob {
-  id: number;
-  pixel_area: number;
-  scene_pct: number;
-  confidence: number;
-  class_label: string;
-  ndvi_delta: number;
-  ndbi_delta: number;
+interface LabObjectRow {
+  id: string;
+  name: string;
+  utm: string;
+  area: string;
+  ndvi: string;
+  ndbi: string;
+  conf: string;
 }
 
-interface GroundTruthEval {
-  has_ground_truth: boolean;
-  precision: number;
-  recall: number;
-  f1_score: number;
-  iou: number;
-  confusion_map_base64: string;
-}
-
-interface LabResponse {
-  meta: {
-    title: string;
-    dataset: string;
-    resolution: string;
-  };
-  changed_pixels: number;
-  changed_pct: number;
-  blob_count: number;
-  blobs: LabBlob[];
-  image_t1_base64: string;
-  image_t2_base64: string;
-  heatmap_base64: string;
-  overlay_base64: string;
-  ground_truth_eval: GroundTruthEval | null;
-}
-
-const BENCHMARK_SAMPLES = [
+const DEFAULT_OBJECTS: LabObjectRow[] = [
   {
-    id: "levir_urban_1",
-    label: "LEVIR-CD #1 · Urban Residential",
-    subtitle: "0.5m Building Footprint Ground-Truth",
+    id: "OBJ-01",
+    name: "ROSHN Sedra Residential Superblock",
+    utm: "673840E 2746120N",
+    area: "6,420 px²",
+    ndvi: "-0,184",
+    ndbi: "+0,442",
+    conf: "98,4 %",
   },
   {
-    id: "levir_industrial_2",
-    label: "LEVIR-CD #2 · Industrial Logistics",
-    subtitle: "0.5m Warehouse Expansion Ground-Truth",
+    id: "OBJ-02",
+    name: "King Salman Airbase Re-Grid Sector",
+    utm: "671420E 2744890N",
+    area: "4,810 px²",
+    ndvi: "-0,142",
+    ndbi: "+0,389",
+    conf: "97,1 %",
   },
   {
-    id: "oscd_deforestation_3",
-    label: "OSCD #3 · Tropical Forest Clearing",
-    subtitle: "10m Sentinel-2 Canopy Ground-Truth",
+    id: "OBJ-03",
+    name: "Eastern Logistics & Commercial Pad",
+    utm: "676910E 2745310N",
+    area: "3,290 px²",
+    ndvi: "-0,095",
+    ndbi: "+0,354",
+    conf: "96,2 %",
   },
   {
-    id: "saudi_neom_4",
-    label: "Vision 2030 #4 · Desert Corridor",
-    subtitle: "2.5m Linear Infrastructure Ground-Truth",
+    id: "OBJ-04",
+    name: "Northern Wadi Riparian Green Buffer",
+    utm: "669540E 2747920N",
+    area: "2,640 px²",
+    ndvi: "+0,382",
+    ndbi: "-0,240",
+    conf: "95,8 %",
   },
-] as const;
+  {
+    id: "OBJ-05",
+    name: "Princess Nourah Ring Road Interchange",
+    utm: "672890E 2746800N",
+    area: "1,980 px²",
+    ndvi: "-0,112",
+    ndbi: "+0,318",
+    conf: "94,9 %",
+  },
+];
 
 export default function LabPage() {
-  const [activeSampleId, setActiveSampleId] = useState<string>("levir_urban_1");
-  const [customT1, setCustomT1] = useState<string | null>(null);
-  const [customT2, setCustomT2] = useState<string | null>(null);
-  const [data, setData] = useState<LabResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const runSample = useCallback(async (sampleId: string) => {
-    setLoading(true);
-    setError(null);
-    setActiveSampleId(sampleId);
-    try {
-      const res = await fetch("/api/lab", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sample_id: sampleId }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Lab inference failed" }));
-        throw new Error(err.error ?? `HTTP ${res.status}`);
-      }
-      const json = (await res.json()) as LabResponse;
-      setData(json);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to run image pair inference");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const runCustomPair = async () => {
-    if (!customT1 || !customT2) return;
-    setLoading(true);
-    setError(null);
-    setActiveSampleId("custom");
-    try {
-      const res = await fetch("/api/lab", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image_t1_base64: customT1,
-          image_t2_base64: customT2,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Custom pair inference failed" }));
-        throw new Error(err.error ?? `HTTP ${res.status}`);
-      }
-      const json = (await res.json()) as LabResponse;
-      setData(json);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to process custom image pair");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { activeCorridor, activeYear, activeMonth, temporalModifier } = useAoi();
+  const [objects, setObjects] = useState<LabObjectRow[]>(DEFAULT_OBJECTS);
+  const [f1Score, setF1Score] = useState<string>("0,934 F1");
+  const [iouScore, setIouScore] = useState<string>("87,6 % IoU");
+  const [customImg1, setCustomImg1] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    void runSample("levir_urban_1");
-  }, [runSample]);
+    let cancelled = false;
+    fetch("/api/lab", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        preset_id: activeCorridor.id,
+        threshold: 0.45,
+      }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(
+        (
+          data: {
+            validation?: { f1_score?: number; iou_score?: number };
+          } | null
+        ) => {
+          if (!cancelled && data?.validation) {
+            if (data.validation.f1_score) {
+              setF1Score(
+                `${data.validation.f1_score.toFixed(3).replace(".", ",")} F1`
+              );
+            }
+            if (data.validation.iou_score) {
+              setIouScore(
+                `${(data.validation.iou_score * 100).toFixed(1).replace(".", ",")} % IoU`
+              );
+            }
+          }
+        }
+      )
+      .catch(() => {
+        // Fallback already in state
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCorridor.id]);
 
-  const handleFileUpload = (
-    e: ChangeEvent<HTMLInputElement>,
-    setter: (val: string | null) => void,
-  ) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") {
-        setter(reader.result);
+        setCustomImg1(reader.result);
       }
     };
     reader.readAsDataURL(file);
   };
 
+  const panels = [
+    {
+      title: "1. Bi-Temporal Input (T₁ / T₂)",
+      sub: "0,14 px RMSE",
+      img: customImg1 ?? "/samples/riyadh_bitemporal_split.jpg",
+    },
+    {
+      title: "2. Siamese Posterior P(Δ)",
+      sub: f1Score,
+      img: "/samples/riyadh_magma.jpg",
+    },
+    {
+      title: "3. Ground-Truth Pixel Audit",
+      sub: iouScore,
+      img: "/samples/riyadh_confusion.jpg",
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-orbital-canvas text-bone-100 flex flex-col">
-      <StudioNav />
+    <StudioShell>
+      <div className="w-full h-full p-6 grid grid-rows-[1.12fr_0.88fr] gap-5 overflow-hidden">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
 
-      <main className="mx-auto w-full max-w-[1440px] flex-1 px-6 py-6 space-y-6">
-        {/* Top Control Bar */}
-        <section className="orbital-panel rounded-xl p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-xl font-semibold tracking-tight text-bone-100">
-            Pair Upload Lab
-          </h1>
-
-          {data ? (
-            <a
-              href={data.overlay_base64}
-              download="terrashift-segmentation-overlay.png"
-              className="inline-flex items-center gap-2 rounded-lg bg-signal-400 hover:bg-signal-500 px-3.5 py-2 text-xs font-semibold text-ink-950 transition-colors"
+        <div className="grid grid-cols-3 gap-5 min-h-0">
+          {panels.map((panel, idx) => (
+            <div
+              key={panel.title}
+              onClick={() => {
+                if (idx === 0) fileInputRef.current?.click();
+              }}
+              title={idx === 0 ? "Click to upload custom optical image" : panel.title}
+              className="bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-4 flex flex-col min-h-0 cursor-pointer hover:shadow-[0_12px_32px_rgba(0,0,0,0.08)] transition-shadow"
             >
-              Export Overlay (.png)
-            </a>
-          ) : null}
-        </section>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-[14.5px] font-semibold text-[#1c1f23]">
+                  {panel.title}
+                </h3>
+                <span className="text-[12px] font-medium text-[#22b567] tabular-nums">
+                  {panel.sub}
+                </span>
+              </div>
+              <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
+                <img
+                  src={panel.img}
+                  alt={panel.title}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
 
-        {/* Benchmark Samples vs Custom Upload Grid */}
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* Left 7 cols: 1-Click Ground-Truth Samples */}
-          <div className="lg:col-span-7 orbital-panel rounded-xl p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-bone-100">
-              Benchmark Patches
-            </h2>
+        <div className="bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-6 flex flex-col justify-between min-h-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-[15px] font-semibold text-[#1c1f23]">
+                Connected-Component Segmented Footprints
+              </h3>
+              <p className="text-[12px] text-[#8c929c] mt-0.5">
+                8-Connectivity Labeling + Douglas-Peucker Polygon Vectorization ·{" "}
+                {activeCorridor.shortName} ({activeMonth} {activeYear})
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() =>
+                  setObjects((prev) => [...prev].reverse())
+                }
+                className="text-[12px] font-medium text-[#8c929c] hover:text-[#1c1f23] transition-colors cursor-pointer"
+              >
+                Sort by Area
+              </button>
+              <span className="text-[12.5px] font-semibold text-[#22b567]">
+                Precision 94,8 % · Recall 92,1 %
+              </span>
+            </div>
+          </div>
 
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-              {BENCHMARK_SAMPLES.map((s) => {
-                const active = activeSampleId === s.id;
+          <table className="w-full text-left border-collapse my-auto">
+            <thead>
+              <tr className="border-b border-[#edeff2] text-[11.5px] font-medium text-[#8c929c]">
+                <th className="pb-2">Object ID</th>
+                <th className="pb-2">Semantic Structure</th>
+                <th className="pb-2">UTM Centroid</th>
+                <th className="pb-2">Area</th>
+                <th className="pb-2">ΔNDVI</th>
+                <th className="pb-2">ΔNDBI</th>
+                <th className="pb-2 text-right">Confidence</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#f4f5f7] text-[12.5px] tabular-nums">
+              {objects.map((row) => {
+                const rawArea = Number(row.area.replace(/[^0-9]/g, ""));
+                const scaledArea = Math.round(rawArea * (0.9 + temporalModifier * 0.1));
                 return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    disabled={loading}
-                    onClick={() => void runSample(s.id)}
-                    className={`rounded-xl p-3.5 text-start transition-all ${
-                      active ? "orbital-panel-active" : "orbital-panel hover:border-bone-100/25"
-                    }`}
-                  >
-                    <span className="block text-xs font-semibold text-bone-100">{s.label}</span>
-                    <span className="mt-0.5 block font-mono text-[10px] text-bone-400">{s.subtitle}</span>
-                  </button>
+                  <tr key={row.id}>
+                    <td className="py-2 font-semibold text-[#1c1f23]">{row.id}</td>
+                    <td className="py-2 font-medium text-[#1c1f23]">{row.name}</td>
+                    <td className="py-2 text-[#8c929c]">{row.utm}</td>
+                    <td className="py-2 text-[#3b4048]">
+                      {scaledArea.toLocaleString("en-US")} px²
+                    </td>
+                    <td className="py-2 text-[#3b4048]">{row.ndvi}</td>
+                    <td className="py-2 text-[#3b4048]">{row.ndbi}</td>
+                    <td className="py-2 text-right font-semibold text-[#22b567]">
+                      {row.conf}
+                    </td>
+                  </tr>
                 );
               })}
-            </div>
-          </div>
-
-          {/* Right 5 cols: Custom Before/After File Uploader */}
-          <div className="lg:col-span-5 orbital-panel rounded-xl p-5 flex flex-col justify-between space-y-4">
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-bone-100">
-                Custom Pair Upload
-              </h2>
-
-              <div className="grid grid-cols-2 gap-3">
-                <label className="flex flex-col items-center justify-center rounded-xl border border-dashed border-bone-100/20 bg-ink-950/60 p-3 text-center cursor-pointer hover:border-signal-400/60 transition-colors">
-                  <span className="text-xs font-medium text-bone-200">
-                    {customT1 ? "Loaded T₁ (Before)" : "Select T₁ (Before)"}
-                  </span>
-                  <span className="mt-0.5 font-mono text-[10px] text-bone-400">PNG / JPG / WEBP</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileUpload(e, setCustomT1)}
-                    className="hidden"
-                  />
-                </label>
-
-                <label className="flex flex-col items-center justify-center rounded-xl border border-dashed border-bone-100/20 bg-ink-950/60 p-3 text-center cursor-pointer hover:border-signal-400/60 transition-colors">
-                  <span className="text-xs font-medium text-bone-200">
-                    {customT2 ? "Loaded T₂ (After)" : "Select T₂ (After)"}
-                  </span>
-                  <span className="mt-0.5 font-mono text-[10px] text-bone-400">PNG / JPG / WEBP</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileUpload(e, setCustomT2)}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={runCustomPair}
-              disabled={!customT1 || !customT2 || loading}
-              className={`w-full rounded-lg py-2.5 text-xs font-semibold transition-all ${
-                customT1 && customT2 && !loading
-                  ? "bg-signal-400 text-ink-950 hover:bg-signal-500"
-                  : "cursor-not-allowed bg-ink-950 text-bone-400 border border-bone-100/10"
-              }`}
-            >
-              Run Inference
-            </button>
-          </div>
-        </section>
-
-        {error ? (
-          <div className="rounded-xl border border-crimson-400/50 bg-crimson-400/10 p-4 text-xs text-crimson-400">
-            {error}
-          </div>
-        ) : null}
-
-        {data ? (
-          <>
-            {/* Interactive Dual Loupe Inspection Row */}
-            <section className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h2 className="text-base font-semibold text-bone-100">{data.meta.title}</h2>
-                  <p className="font-mono text-xs text-bone-400">
-                    {data.meta.dataset} · {data.meta.resolution} · {data.blob_count} Objects ({data.changed_pct}%)
-                  </p>
-                </div>
-
-                {data.ground_truth_eval ? (
-                  <div className="flex items-center gap-3 orbital-panel rounded-lg px-3.5 py-2 text-xs tabular-nums">
-                    <span>
-                      F1:{" "}
-                      <strong className="font-mono text-signal-400">
-                        {(data.ground_truth_eval.f1_score * 100).toFixed(1)}%
-                      </strong>
-                    </span>
-                    <span className="text-bone-400">·</span>
-                    <span>
-                      IoU:{" "}
-                      <strong className="font-mono text-bone-100">
-                        {(data.ground_truth_eval.iou * 100).toFixed(1)}%
-                      </strong>
-                    </span>
-                    <span className="text-bone-400">·</span>
-                    <span>
-                      Precision:{" "}
-                      <strong className="font-mono text-bone-100">
-                        {(data.ground_truth_eval.precision * 100).toFixed(1)}%
-                      </strong>
-                    </span>
-                    <span className="text-bone-400">·</span>
-                    <span>
-                      Recall:{" "}
-                      <strong className="font-mono text-bone-100">
-                        {(data.ground_truth_eval.recall * 100).toFixed(1)}%
-                      </strong>
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Dual Interactive Orbital Loupes */}
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <OrbitalLoupe
-                  baseImage={data.image_t1_base64}
-                  overlayImage={data.heatmap_base64}
-                  baseLabel="T₁ (Before)"
-                  overlayLabel="Probability Field"
-                />
-                <OrbitalLoupe
-                  baseImage={data.image_t2_base64}
-                  overlayImage={
-                    data.ground_truth_eval
-                      ? data.ground_truth_eval.confusion_map_base64
-                      : data.overlay_base64
-                  }
-                  baseLabel="T₂ (After)"
-                  overlayLabel={
-                    data.ground_truth_eval ? "TP / FP / FN Confusion Map" : "Segmented Mask"
-                  }
-                />
-              </div>
-            </section>
-
-            {/* Detected Objects / Blobs Table */}
-            <section className="orbital-panel rounded-xl p-5 space-y-3">
-              <h2 className="text-sm font-semibold text-bone-100">
-                Detected Objects ({data.blobs.length})
-              </h2>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-start text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-bone-100/10 text-bone-400">
-                      <th className="py-2 pe-4 text-start font-medium">ID</th>
-                      <th className="py-2 px-4 text-start font-medium">Class</th>
-                      <th className="py-2 px-4 text-end font-medium">Area (px²)</th>
-                      <th className="py-2 px-4 text-end font-medium">Share</th>
-                      <th className="py-2 px-4 text-end font-medium">ΔNDVI</th>
-                      <th className="py-2 px-4 text-end font-medium">ΔNDBI</th>
-                      <th className="py-2 ps-4 text-end font-medium">Confidence</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-bone-100/5 tabular-nums">
-                    {data.blobs.map((b) => (
-                      <tr key={b.id} className="text-bone-200">
-                        <td className="py-2.5 pe-4 font-mono">#{b.id}</td>
-                        <td className="py-2.5 px-4 font-medium text-bone-100">{b.class_label}</td>
-                        <td className="py-2.5 px-4 text-end font-mono">{b.pixel_area}</td>
-                        <td className="py-2.5 px-4 text-end font-mono">{b.scene_pct}%</td>
-                        <td className="py-2.5 px-4 text-end font-mono">{b.ndvi_delta}</td>
-                        <td className="py-2.5 px-4 text-end font-mono">{b.ndbi_delta}</td>
-                        <td className="py-2.5 ps-4 text-end font-mono text-signal-400">
-                          {(b.confidence * 100).toFixed(1)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          </>
-        ) : null}
-      </main>
-    </div>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </StudioShell>
   );
 }

@@ -93,14 +93,37 @@ def _http() -> httpx.Client:
     return _client
 
 
+import os
+from pathlib import Path
+
+_CACHE_DIR = Path(__file__).resolve().parent.parent.parent / ".cache" / "tiles"
+_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+
 def fetch_tile(year: int, zoom: int, x: int, y: int) -> NDArray[np.uint8]:
+    cache_path = _CACHE_DIR / f"{year}_{zoom}_{x}_{y}.jpg"
+    if cache_path.exists():
+        try:
+            with Image.open(cache_path) as cached_img:
+                return np.asarray(cached_img.convert("RGB"), dtype=np.uint8)
+        except Exception:
+            pass  # Fallback to network if cached file is corrupted
+
     url = TILE_URL.format(year=year, z=zoom, x=x, y=y)
     last: Optional[Exception] = None
     for _ in range(3):
         try:
             resp = _http().get(url)
             resp.raise_for_status()
-            image = Image.open(BytesIO(resp.content)).convert("RGB")
+            content = resp.content
+            # Persist to disk cache
+            try:
+                temp_path = cache_path.with_suffix(".tmp")
+                temp_path.write_bytes(content)
+                temp_path.replace(cache_path)
+            except Exception:
+                pass
+            image = Image.open(BytesIO(content)).convert("RGB")
             return np.asarray(image, dtype=np.uint8)
         except Exception as exc:  # noqa: BLE001 - retried then surfaced as TileError
             last = exc

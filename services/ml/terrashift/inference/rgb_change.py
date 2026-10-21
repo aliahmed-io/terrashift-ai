@@ -91,6 +91,7 @@ def detect_change(
     rgb1: NDArray[np.uint8],
     rgb2: NDArray[np.uint8],
     valid: NDArray[np.bool_],
+    threshold: float = 0.50,
 ) -> Tuple[Detection, NDArray[np.float32]]:
     """Return the Siamese detection and radiometrically matched T2 image (float RGB in [0, 1])."""
     a = rgb1.astype(np.float32) / 255.0
@@ -108,9 +109,9 @@ def detect_change(
     score = ndimage.uniform_filter(dist, size=3).astype(np.float32)
 
     values = score[valid]
-    median = float(np.median(values))
-    mad = float(1.4826 * np.median(np.abs(values - median)))
-    threshold = max(median + 4.0 * mad, 0.09)
+    median = float(np.median(values)) if len(values) > 0 else 0.0
+    mad = float(1.4826 * np.median(np.abs(values - median))) if len(values) > 0 else 0.01
+    stat_baseline = max(median + 3.6 * mad, 0.08)
 
     # 3. Deep Neural Network Forward Pass via PyTorch Siamese U-Net
     deep_prob: Optional[NDArray[np.float32]] = None
@@ -146,16 +147,18 @@ def detect_change(
 
     # Physics-guided probability
     physics_prob = (
-        1.0 / (1.0 + np.exp(-(score - threshold) / (0.25 * threshold)))
+        1.0 / (1.0 + np.exp(-(score - stat_baseline) / (0.22 * stat_baseline + EPS)))
     ).astype(np.float32)
 
     # Blend Deep Siamese probability with physics guidance
     if deep_prob is not None:
-        probability = (0.55 * deep_prob + 0.45 * physics_prob).astype(np.float32)
+        probability = (0.60 * deep_prob + 0.40 * physics_prob).astype(np.float32)
     else:
         probability = physics_prob
 
-    mask = (score > threshold) & valid
+    # Binary mask grounded directly in Siamese probability threshold tau
+    clamped_tau = float(np.clip(threshold, 0.10, 0.90))
+    mask = (probability >= clamped_tau) & valid
     mask = ndimage.binary_opening(mask, structure=np.ones((3, 3), dtype=bool))
     mask = ndimage.binary_closing(mask, structure=np.ones((3, 3), dtype=bool)) & valid
 
@@ -171,6 +174,7 @@ def detect_change(
             "precision": 0.913,
             "recall": 0.870,
         },
+        "threshold_tau": clamped_tau,
     }
 
     return (
@@ -178,7 +182,7 @@ def detect_change(
             score=score,
             probability=probability,
             mask=mask,
-            threshold=threshold,
+            threshold=clamped_tau,
             model_metadata=model_metadata,
         ),
         matched,

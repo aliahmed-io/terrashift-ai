@@ -77,8 +77,10 @@ export const KSA_MISSION_SITES: readonly KsaMissionSite[] = [
     lon: 46.745,
     anchorT0Label: "SENTINEL-2A: 2018-04-12 [PRE-DEVELOPMENT]",
     inferredT1Label: "FC-SIAM-DIFF: 2024-03-28 [TRANSFORMATION]",
-    baseImage: "/ksa/riyadh-stitch-t1.jpg",
-    overlayImage: "/ksa/riyadh-stitch-t2.jpg",
+    baseImage:
+      "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/12/1778/2580.jpg",
+    overlayImage:
+      "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/12/1778/2580.jpg",
     benchmarks: {
       iou: "88.74%",
       iouDelta: "+6.2%",

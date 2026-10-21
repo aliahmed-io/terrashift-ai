@@ -1,6 +1,8 @@
 """FastAPI REST Service for TerraShift AI Change Detection Platform."""
 
 import json
+import os
+import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterator, List
 
@@ -10,7 +12,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from terrashift.acquisition.tiles import AoiError, TileError
-from terrashift.api.schemas import AnalyzeRequest, AnalyzeResponse, ReportRequest
+from terrashift.api.schemas import (
+    AnalyzeRequest,
+    AnalyzeResponse,
+    ReportRequest,
+    StacSearchRequest,
+)
 from terrashift.pipeline import PROVENANCE, run_analysis
 from terrashift.report.pdf import generate_pdf_report
 
@@ -23,7 +30,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -105,14 +112,78 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     return AnalyzeResponse(**final)
 
 
+from terrashift.api.schemas import AnalyzeRequest, AnalyzeResponse, ReportRequest, StacSearchRequest
+
+
 @app.post("/v1/report")
 def export_report(req: ReportRequest) -> Response:
-    pdf_bytes = generate_pdf_report(req.metadata, req.features)
+    t1_b64 = req.image_t1_base64
+    t2_b64 = req.image_t2_base64
+
+    if (not t1_b64 or not t2_b64) and req.polygon and len(req.polygon) >= 3:
+        try:
+            import base64
+            import io
+            from PIL import Image
+            from terrashift.acquisition.tiles import fetch_mosaic
+            from terrashift.geo.bounds import make_pixel_grid
+
+            grid = make_pixel_grid(req.polygon, target_dim=256)
+            if not t1_b64:
+                m1 = fetch_mosaic(req.year_t1, grid)
+                buf1 = io.BytesIO()
+                Image.fromarray(m1).save(buf1, format="JPEG", quality=80)
+                t1_b64 = base64.b64encode(buf1.getvalue()).decode("ascii")
+
+            if not t2_b64:
+                m2 = fetch_mosaic(req.year_t2, grid)
+                buf2 = io.BytesIO()
+                Image.fromarray(m2).save(buf2, format="JPEG", quality=80)
+                t2_b64 = base64.b64encode(buf2.getvalue()).decode("ascii")
+        except Exception:
+            pass
+
+    pdf_bytes = generate_pdf_report(
+        metadata=req.metadata,
+        features=req.features,
+        image_t1_base64=t1_b64,
+        image_t2_base64=t2_b64,
+        overlay_base64=req.overlay_base64,
+    )
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=terrashift-audit-report.pdf"},
     )
+
+
+@app.post("/v1/stac/search")
+def search_stac_scenes(req: StacSearchRequest) -> Dict[str, Any]:
+    """Query Element84 AWS Earth Search for real Sentinel-2 L2A scenes."""
+    from datetime import date
+    from terrashift.acquisition.stac import STACClient
+
+    client = STACClient()
+    target_date = date(req.year or 2024, req.month or 6, 15)
+    scenes = client.search_scenes(
+        bbox=req.bbox,
+        target_date=target_date,
+        window_days=45,
+        max_cloud_cover=req.max_cloud_cover or 20.0,
+    )
+    return {
+        "count": len(scenes),
+        "scenes": [
+            {
+                "scene_id": s.scene_id,
+                "datetime": s.datetime,
+                "cloud_cover": s.cloud_cover,
+                "bbox": s.bbox,
+                "assets": s.assets,
+            }
+            for s in scenes
+        ],
+    }
 
 
 @app.get("/v1/model/weights")
@@ -211,3 +282,88 @@ def run_carbon_endpoint(payload: Dict[str, Any]) -> Dict[str, Any]:
         )
     except (AoiError, TileError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _get_db():
+    import sqlite3
+    db_path = os.path.join(os.path.dirname(__file__), "..", "..", ".cache", "terrashift.db")
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS watchlist_items (
+            id TEXT PRIMARY KEY,
+            title TEXT,
+            region TEXT,
+            category TEXT,
+            lat REAL,
+            lon REAL,
+            t1 INTEGER,
+            t2 INTEGER,
+            delta_pct REAL,
+            delta_label TEXT,
+            area_ha REAL,
+            cloud_cover REAL,
+            confidence REAL,
+            alert_status TEXT,
+            threshold_rule TEXT,
+            revisit_days INTEGER,
+            summary TEXT,
+            created_at TEXT
+        )
+    """)
+    conn.commit()
+    return conn
+
+
+@app.get("/v1/watchlist")
+def get_watchlist() -> List[Dict[str, Any]]:
+    conn = _get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM watchlist_items ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    cols = [d[0] for d in cursor.description]
+    conn.close()
+    return [dict(zip(cols, r)) for r in rows]
+
+
+@app.post("/v1/watchlist")
+def add_watchlist_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    from datetime import datetime, timezone
+    conn = _get_db()
+    created_at = datetime.now(timezone.utc).isoformat()
+    conn.execute("""
+        INSERT OR REPLACE INTO watchlist_items 
+        (id, title, region, category, lat, lon, t1, t2, delta_pct, delta_label, area_ha, cloud_cover, confidence, alert_status, threshold_rule, revisit_days, summary, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        str(item.get("id", f"WATCH_{int(datetime.now().timestamp())}")),
+        str(item.get("title", "Custom Watch Area")),
+        str(item.get("region", "User Defined AOI")),
+        str(item.get("category", "urban")),
+        float(item.get("lat", 24.835)),
+        float(item.get("lon", 46.745)),
+        int(item.get("t1", 2018)),
+        int(item.get("t2", 2024)),
+        float(item.get("deltaPct", item.get("delta_pct", 0.0))),
+        str(item.get("deltaLabel", item.get("delta_label", "Monitored AOI"))),
+        float(item.get("areaHa", item.get("area_ha", 100.0))),
+        float(item.get("cloudCover", item.get("cloud_cover", 0.1))),
+        float(item.get("confidence", 0.95)),
+        str(item.get("alertStatus", item.get("alert_status", "ACTIVE"))),
+        str(item.get("thresholdRule", item.get("threshold_rule", "Default Rule"))),
+        int(item.get("revisitDays", item.get("revisit_days", 5))),
+        str(item.get("summary", "")),
+        created_at,
+    ))
+    conn.commit()
+    conn.close()
+    return {"status": "success", "id": item.get("id")}
+
+
+@app.delete("/v1/watchlist/{item_id}")
+def delete_watchlist_item(item_id: str) -> Dict[str, Any]:
+    conn = _get_db()
+    conn.execute("DELETE FROM watchlist_items WHERE id = ?", (item_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "deleted", "id": item_id}

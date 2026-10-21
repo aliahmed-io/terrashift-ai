@@ -46,6 +46,7 @@ def vectorize_changes(
     rgb1: NDArray[np.uint8],
     matched2: NDArray[np.float32],
     grid: Grid,
+    min_area_m2: float = MIN_AREA_M2,
 ) -> Dict[str, Any]:
     labels, count = ndimage.label(mask, structure=np.ones((3, 3), dtype=int))
     a = rgb1.astype(np.float32) / 255.0
@@ -66,7 +67,7 @@ def vectorize_changes(
             np.asarray(poly.exterior.coords)[:, 0], np.asarray(poly.exterior.coords)[:, 1]
         )
         area_m2 = abs(float(_geod.polygon_area_perimeter(lon, lat)[0]))
-        if area_m2 < MIN_AREA_M2:
+        if area_m2 < min_area_m2:
             continue
         dg = float(green_delta[sl][sub].mean())
         db = float(bare_delta[sl][sub].mean())
