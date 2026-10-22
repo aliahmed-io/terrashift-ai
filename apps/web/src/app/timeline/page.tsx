@@ -17,7 +17,7 @@ interface ForecastPoint {
 }
 
 export default function TimelinePage() {
-  const { activeCorridor, activeYear, activeMonth, temporalModifier } = useAoi();
+  const { activeCorridor, activeYear, activeMonth, temporalModifier, getRasterUrl } = useAoi();
   const [series, setSeries] = useState<TimeseriesPoint[] | null>(null);
   const [forecast, setForecast] = useState<ForecastPoint[] | null>(null);
   const [alignmentScore, setAlignmentScore] = useState<number>(104.2);
@@ -268,7 +268,7 @@ export default function TimelinePage() {
             </div>
             <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
               <img
-                src="/samples/riyadh_contagion.jpg"
+                src={getRasterUrl("contagion")}
                 alt="Spatial Contagion Forecast"
                 className="w-full h-full object-cover"
               />

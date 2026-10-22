@@ -33,8 +33,11 @@ export async function POST(req: NextRequest) {
       : 0.45;
   const scaleFactor = Math.max(0.65, Math.min(1.35, 1.0 + (0.45 - threshold) * 0.6));
 
+  const rawPreset = (raw as { preset_id?: string }).preset_id ?? "roshn";
+  const cid = rawPreset.startsWith("roshn") ? "roshn" : rawPreset;
+
   return NextResponse.json({
-    preset_id: (raw as { preset_id?: string }).preset_id ?? "roshn_sedra",
+    preset_id: rawPreset,
     title: "ROSHN Sedra Corridor (2018 vs 2024)",
     subtitle: "Sentinel-2 L2A 10m Bi-Temporal Registration & Connected-Component Audit",
     resolution: "512x512",
@@ -57,12 +60,12 @@ export async function POST(req: NextRequest) {
       fp_pct: 0.65,
       fn_pct: 0.98,
       tn_pct: 86.47,
-      confusion_b64: "/samples/riyadh_confusion.jpg",
+      confusion_b64: `/api/raster/${encodeURIComponent(cid)}/confusion`,
     },
-    t1_b64: "/samples/riyadh_urban_2018.jpg",
-    t2_b64: "/samples/riyadh_urban_2024.jpg",
-    heatmap_b64: "/samples/riyadh_magma.jpg",
-    overlay_b64: "/samples/riyadh_bitemporal_split.jpg",
+    t1_b64: `/api/raster/${encodeURIComponent(cid)}/split?splitRatio=0.0`,
+    t2_b64: `/api/raster/${encodeURIComponent(cid)}/split?splitRatio=1.0`,
+    heatmap_b64: `/api/raster/${encodeURIComponent(cid)}/magma`,
+    overlay_b64: `/api/raster/${encodeURIComponent(cid)}/split`,
     histogram_bins: [0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95],
     histogram_counts: [148200, 42100, 18900, 12400, 9800, 8400, 7600, 6200, 4800, 3744],
     objects: [

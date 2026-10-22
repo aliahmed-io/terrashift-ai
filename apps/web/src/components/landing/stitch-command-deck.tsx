@@ -1,34 +1,42 @@
 "use client";
 
-import React, { useState } from "react";
-import { StudioShell, MapCanvasOverlay } from "@/components/studio-nav";
+import React, { useState, useRef } from "react";
+import dynamic from "next/dynamic";
+import { StudioShell, MapCanvasOverlay, type StudioViewMode } from "@/components/studio-nav";
 import { useAoi, CORRIDOR_PROFILES, type CorridorId } from "@/lib/aoi-context";
+
+const MapCanvas = dynamic(
+  () => import("@/components/map/map-canvas").then((m) => m.MapCanvas),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="size-full flex items-center justify-center bg-[#0B0F17] text-white/50 text-xs tracking-wider uppercase font-mono">
+        Initializing Orbital Map Engine...
+      </div>
+    ),
+  },
+);
 
 const CITY_EFFECTS = [
   {
     id: "split",
     label: "Bi-Temporal Split (2018 / 2024)",
-    src: "/samples/riyadh_bitemporal_split.jpg",
   },
   {
     id: "magma",
     label: "Siamese Attention Posterior",
-    src: "/samples/riyadh_magma.jpg",
   },
   {
     id: "ndbi",
     label: "SWIR Built-Up Shift (ΔNDBI)",
-    src: "/samples/riyadh_ndbi.jpg",
   },
   {
     id: "nir",
     label: "NIR Chlorophyll Composite",
-    src: "/samples/riyadh_nir.jpg",
   },
   {
     id: "confusion",
     label: "Ground-Truth Pixel Audit",
-    src: "/samples/riyadh_confusion.jpg",
   },
 ] as const;
 
@@ -44,14 +52,21 @@ export function StitchCommandDeck() {
     activeYear,
     activeMonth,
     temporalModifier,
+    getRasterUrl,
   } = useAoi();
 
   const [cardSlide, setCardSlide] = useState<0 | 1>(0);
   const [effectIdx, setEffectIdx] = useState<number>(0);
-  const [zoomScale, setZoomScale] = useState<number>(1);
+  const [viewMode, setViewMode] = useState<StudioViewMode>("diagnostic");
+  const zoomActionsRef = useRef<{ zoomIn: () => void; zoomOut: () => void } | null>(null);
   const [cardCollapsed, setCardCollapsed] = useState<boolean>(false);
 
   const currentEffect = CITY_EFFECTS[effectIdx] ?? CITY_EFFECTS[0];
+
+  const corridorCenter: [number, number] = [
+    (activeCorridor.bbox[0] + activeCorridor.bbox[2]) / 2,
+    (activeCorridor.bbox[1] + activeCorridor.bbox[3]) / 2,
+  ];
 
   const handleCycleEffect = () => {
     setEffectIdx((prev) => (prev + 1) % CITY_EFFECTS.length);
@@ -106,19 +121,33 @@ export function StitchCommandDeck() {
   return (
     <StudioShell>
       <div className="relative w-full h-full overflow-hidden">
-        <img
-          src={currentEffect.src}
-          alt={`${activeCorridor.name} — ${currentEffect.label}`}
-          className="w-full h-full object-cover transition-transform duration-300 ease-out"
-          style={{ transform: `scale(${zoomScale})` }}
+        {/* Real GPU-Accelerated MapLibre Satellite Map with Multi-Spectral Diagnostic Overlays */}
+        <MapCanvas
+          yearT1={2018}
+          yearT2={activeYear}
+          polygon={activeCorridor.polygon}
+          isDrawing={false}
+          onDrawingChange={() => {}}
+          onPolygonChange={() => {}}
+          center={corridorCenter}
+          zoom={12.5}
+          compareMode={viewMode === "compare" || currentEffect.id === "split"}
+          effectRasterUrl={getRasterUrl(currentEffect.id)}
+          effectBbox={activeCorridor.bbox}
+          showEffectOverlay={viewMode === "diagnostic" && currentEffect.id !== "split"}
+          effectOpacity={0.85}
+          zoomActionsRef={zoomActionsRef}
+          showDefaultZoomControls={false}
         />
 
         {/* Top-left dark pill zoom controls + subtle coordinate grid numbers + bottom-left effect switcher */}
         <MapCanvasOverlay
-          onZoomIn={() => setZoomScale((z) => Math.min(1.6, Number((z + 0.15).toFixed(2))))}
-          onZoomOut={() => setZoomScale((z) => Math.max(1.0, Number((z - 0.15).toFixed(2))))}
+          onZoomIn={() => zoomActionsRef.current?.zoomIn()}
+          onZoomOut={() => zoomActionsRef.current?.zoomOut()}
           activeEffectLabel={`${currentEffect.label} · ${activeMonth} ${activeYear}`}
           onCycleEffect={handleCycleEffect}
+          viewMode={viewMode}
+          onSelectViewMode={setViewMode}
         />
 
         {/* Re-open button if card was collapsed */}

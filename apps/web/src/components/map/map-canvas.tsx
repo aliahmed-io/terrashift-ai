@@ -52,6 +52,12 @@ export interface MapCanvasProps {
   onCameraMove?: ((center: [number, number], zoom: number) => void) | undefined;
   layerOpacity?: number | undefined;
   classFilter?: string | undefined;
+  effectRasterUrl?: string | undefined;
+  effectBbox?: [number, number, number, number] | undefined;
+  showEffectOverlay?: boolean | undefined;
+  effectOpacity?: number | undefined;
+  zoomActionsRef?: React.MutableRefObject<{ zoomIn: () => void; zoomOut: () => void } | null> | undefined;
+  showDefaultZoomControls?: boolean | undefined;
 }
 
 function buildMapStyle(year: number): maplibregl.StyleSpecification {
@@ -161,6 +167,69 @@ function applyBasemapMode(map: maplibregl.Map | null, mode: "s2" | "mapbox") {
   }
 }
 
+function applyDiagnosticOverlay(
+  map: maplibregl.Map | null,
+  effectRasterUrl?: string,
+  effectBbox?: [number, number, number, number],
+  showEffectOverlay: boolean = true,
+  effectOpacity: number = 0.85,
+) {
+  if (!map || !map.isStyleLoaded()) return;
+
+  const sourceId = "diagnostic-overlay-source";
+  const layerId = "diagnostic-overlay-layer";
+
+  if (!effectRasterUrl || !effectBbox || showEffectOverlay === false) {
+    if (map.getLayer(layerId)) {
+      map.removeLayer(layerId);
+    }
+    if (map.getSource(sourceId)) {
+      map.removeSource(sourceId);
+    }
+    return;
+  }
+
+  const [minLon, minLat, maxLon, maxLat] = effectBbox;
+  const coordinates: [[number, number], [number, number], [number, number], [number, number]] = [
+    [minLon, maxLat],
+    [maxLon, maxLat],
+    [maxLon, minLat],
+    [minLon, minLat],
+  ];
+
+  if (map.getLayer(layerId)) {
+    map.removeLayer(layerId);
+  }
+  if (map.getSource(sourceId)) {
+    map.removeSource(sourceId);
+  }
+
+  try {
+    map.addSource(sourceId, {
+      type: "image",
+      url: effectRasterUrl,
+      coordinates,
+    });
+
+    const beforeId = map.getLayer("aoi-fill") ? "aoi-fill" : undefined;
+    map.addLayer(
+      {
+        id: layerId,
+        type: "raster",
+        source: sourceId,
+        paint: {
+          "raster-opacity": effectOpacity,
+          "raster-fade-duration": 0,
+          "raster-resampling": "linear",
+        },
+      },
+      beforeId,
+    );
+  } catch {
+    // Graceful fallback during tile/context refresh
+  }
+}
+
 export function MapCanvas({
   yearT1,
   yearT2,
@@ -178,6 +247,12 @@ export function MapCanvas({
   onCameraMove,
   layerOpacity = 0.55,
   classFilter = "all",
+  effectRasterUrl,
+  effectBbox,
+  showEffectOverlay = true,
+  effectOpacity = 0.85,
+  zoomActionsRef,
+  showDefaultZoomControls = true,
 }: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const compareContainerRef = useRef<HTMLDivElement>(null);
@@ -194,6 +269,15 @@ export function MapCanvas({
   basemapSourceRef.current = basemapSource;
   const onCameraMoveRef = useRef(onCameraMove);
   onCameraMoveRef.current = onCameraMove;
+
+  const effectRasterUrlRef = useRef(effectRasterUrl);
+  effectRasterUrlRef.current = effectRasterUrl;
+  const effectBboxRef = useRef(effectBbox);
+  effectBboxRef.current = effectBbox;
+  const showEffectOverlayRef = useRef(showEffectOverlay);
+  showEffectOverlayRef.current = showEffectOverlay;
+  const effectOpacityRef = useRef(effectOpacity);
+  effectOpacityRef.current = effectOpacity;
 
   const [activeVertices, setActiveVertices] = useState<[number, number][]>([]);
   const [cursorPos, setCursorPos] = useState<[number, number] | null>(null);
@@ -376,6 +460,14 @@ export function MapCanvas({
       map.on("mouseleave", "change-features-fill", () => {
         if (!isDrawing) map.getCanvas().style.cursor = "";
       });
+
+      applyDiagnosticOverlay(
+        map,
+        effectRasterUrlRef.current,
+        effectBboxRef.current,
+        showEffectOverlayRef.current,
+        effectOpacityRef.current,
+      );
     });
 
     mapRef.current = map;
@@ -391,6 +483,33 @@ export function MapCanvas({
       mapRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (map.isStyleLoaded()) {
+      applyDiagnosticOverlay(map, effectRasterUrl, effectBbox, showEffectOverlay, effectOpacity);
+    } else {
+      map.once("load", () => {
+        applyDiagnosticOverlay(map, effectRasterUrl, effectBbox, showEffectOverlay, effectOpacity);
+      });
+    }
+  }, [effectRasterUrl, effectBbox, showEffectOverlay, effectOpacity]);
+
+  useEffect(() => {
+    if (!zoomActionsRef) return;
+    zoomActionsRef.current = {
+      zoomIn: () => {
+        mapRef.current?.zoomIn({ duration: 250 });
+      },
+      zoomOut: () => {
+        mapRef.current?.zoomOut({ duration: 250 });
+      },
+    };
+    return () => {
+      zoomActionsRef.current = null;
+    };
+  }, [zoomActionsRef]);
 
   const centerLon = center[0];
   const centerLat = center[1];
@@ -764,24 +883,26 @@ export function MapCanvas({
         )}
 
         {/* Minimal Zoom Controls */}
-        <div className="pointer-events-auto absolute bottom-6 end-6 z-20 flex flex-col overflow-hidden rounded-xl border border-bone-100/15 bg-ink-900/90 backdrop-blur-md shadow-xl">
-          <button
-            type="button"
-            onClick={() => mapRef.current?.zoomIn({ duration: 250 })}
-            className="flex size-9 items-center justify-center border-b border-bone-100/10 text-base text-bone-100 hover:bg-bone-100/10 transition-colors focus-visible:outline-none"
-            aria-label="Zoom in"
-          >
-            +
-          </button>
-          <button
-            type="button"
-            onClick={() => mapRef.current?.zoomOut({ duration: 250 })}
-            className="flex size-9 items-center justify-center text-base text-bone-100 hover:bg-bone-100/10 transition-colors focus-visible:outline-none"
-            aria-label="Zoom out"
-          >
-            −
-          </button>
-        </div>
+        {showDefaultZoomControls && (
+          <div className="pointer-events-auto absolute bottom-6 end-6 z-20 flex flex-col overflow-hidden rounded-xl border border-bone-100/15 bg-ink-900/90 backdrop-blur-md shadow-xl">
+            <button
+              type="button"
+              onClick={() => mapRef.current?.zoomIn({ duration: 250 })}
+              className="flex size-9 items-center justify-center border-b border-bone-100/10 text-base text-bone-100 hover:bg-bone-100/10 transition-colors focus-visible:outline-none"
+              aria-label="Zoom in"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              onClick={() => mapRef.current?.zoomOut({ duration: 250 })}
+              className="flex size-9 items-center justify-center text-base text-bone-100 hover:bg-bone-100/10 transition-colors focus-visible:outline-none"
+              aria-label="Zoom out"
+            >
+              −
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Live Polygon Drawing Status Bar */}

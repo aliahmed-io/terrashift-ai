@@ -16,7 +16,7 @@ function formatComma(num: number, decimals = 1): string {
 }
 
 export default function CarbonPage() {
-  const { activeCorridor, activeYear, activeMonth, temporalModifier } = useAoi();
+  const { activeCorridor, activeYear, activeMonth, temporalModifier, getRasterUrl } = useAoi();
   const [biome, setBiome] = useState<string>("arid_afforestation");
   const [priceUsd, setPriceUsd] = useState<number>(35);
   const [netSinkTco2e, setNetSinkTco2e] = useState<number>(-142800);
@@ -30,6 +30,7 @@ export default function CarbonPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        preset_id: activeCorridor.id,
         biome,
         disturbed_area_ha: Math.round(312 * temporalModifier),
         greening_area_ha: Math.round(1420 * temporalModifier),
@@ -146,7 +147,7 @@ export default function CarbonPage() {
               </div>
               <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
                 <img
-                  src="/samples/riyadh_carbon.jpg"
+                  src={getRasterUrl("carbon")}
                   alt="Carbon Flux Map"
                   className="w-full h-full object-cover"
                 />
@@ -164,7 +165,7 @@ export default function CarbonPage() {
               </div>
               <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
                 <img
-                  src="/samples/riyadh_thermal.jpg"
+                  src={getRasterUrl("thermal")}
                   alt="Thermal Shift Map"
                   className="w-full h-full object-cover"
                 />

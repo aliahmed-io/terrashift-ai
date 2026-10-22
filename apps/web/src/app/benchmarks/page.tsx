@@ -27,7 +27,7 @@ function formatComma(num: number, decimals = 3): string {
 }
 
 export default function BenchmarksPage() {
-  const { activeCorridor, activeYear, activeMonth, temporalModifier } = useAoi();
+  const { activeCorridor, activeYear, activeMonth, temporalModifier, getRasterUrl } = useAoi();
   const [selectedIdx, setSelectedIdx] = useState<number>(0);
   const [tau, setTau] = useState<number>(0.45);
   const [models, setModels] = useState<AblationModel[] | null>(null);
@@ -61,28 +61,28 @@ export default function BenchmarksPage() {
     {
       title: models?.[0]?.name ?? "Siamese ResUNet-10ch",
       sub: "Attention Posterior",
-      img: "/samples/riyadh_magma.jpg",
+      img: models?.[0]?.heatmap_b64 ?? getRasterUrl("magma", tau),
       left: `${formatComma((models?.[0]?.f1_score ?? 0.914) * (0.97 + temporalModifier * 0.03), 3)} F1`,
       right: `${formatComma((models?.[0]?.iou_score ?? 0.842) * 100, 1)} %`,
     },
     {
       title: models?.[1]?.name ?? "Bi-Temporal ΔNDBI",
       sub: "SWIR Built-Up Index",
-      img: "/samples/riyadh_ndbi.jpg",
+      img: models?.[1]?.heatmap_b64 ?? getRasterUrl("ndbi", tau),
       left: `${formatComma((models?.[1]?.f1_score ?? 0.861) * (0.97 + temporalModifier * 0.03), 3)} F1`,
       right: `${formatComma((models?.[1]?.iou_score ?? 0.756) * 100, 1)} %`,
     },
     {
       title: models?.[2]?.name ?? "NIR Chlorophyll",
       sub: "Vegetation Composite",
-      img: "/samples/riyadh_nir.jpg",
+      img: models?.[2]?.heatmap_b64 ?? getRasterUrl("nir", tau),
       left: `${formatComma((models?.[2]?.f1_score ?? 0.838) * (0.97 + temporalModifier * 0.03), 3)} F1`,
       right: `${formatComma((models?.[2]?.iou_score ?? 0.721) * 100, 1)} %`,
     },
     {
       title: models?.[3]?.name ?? "Ground-Truth Audit",
       sub: "Pixel Error Map",
-      img: "/samples/riyadh_confusion.jpg",
+      img: models?.[3]?.heatmap_b64 ?? getRasterUrl("confusion", tau),
       left: `${formatComma((models?.[3]?.precision ?? 0.938) * (0.97 + temporalModifier * 0.03), 3)} Prec`,
       right: `${formatComma((models?.[3]?.iou_score ?? 0.892) * 100, 1)} %`,
     },

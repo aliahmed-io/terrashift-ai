@@ -24,7 +24,7 @@ const WATCHLIST_ITEMS: {
     pct: 18,
     w: "68%",
     color: "bg-[#e94235]",
-    thumb: "/samples/riyadh_bitemporal_split.jpg",
+    thumb: "/api/raster/neom/magma",
   },
   {
     id: "wadi",
@@ -35,7 +35,7 @@ const WATCHLIST_ITEMS: {
     pct: 12,
     w: "52%",
     color: "bg-[#22b567]",
-    thumb: "/samples/riyadh_carbon.jpg",
+    thumb: "/api/raster/wadi/carbon",
   },
   {
     id: "redsea",
@@ -46,7 +46,7 @@ const WATCHLIST_ITEMS: {
     pct: 9,
     w: "38%",
     color: "bg-[#f39223]",
-    thumb: "/samples/riyadh_nir.jpg",
+    thumb: "/api/raster/redsea/ndbi",
   },
   {
     id: "rondonia",
@@ -57,7 +57,7 @@ const WATCHLIST_ITEMS: {
     pct: 20,
     w: "74%",
     color: "bg-[#e94235]",
-    thumb: "/samples/riyadh_magma.jpg",
+    thumb: "/api/raster/rondonia/confusion",
   },
 ];
 

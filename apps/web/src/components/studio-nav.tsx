@@ -60,6 +60,68 @@ function IconChevronDown() {
   );
 }
 
+function IconSatellite({ className }: { readonly className?: string } = {}) {
+  return (
+    <svg
+      width="12.5"
+      height="12.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M13 7 9 3 5 7l4 4" />
+      <path d="m17 11 4 4-4 4-4-4" />
+      <path d="m8 12 4 4 6-6-4-4Z" />
+      <path d="m16 8 3-3" />
+      <path d="M9 21a6 6 0 0 0-6-6" />
+    </svg>
+  );
+}
+
+function IconDiagnostic({ className }: { readonly className?: string } = {}) {
+  return (
+    <svg
+      width="12.5"
+      height="12.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z" />
+    </svg>
+  );
+}
+
+function IconBiTemporal({ className }: { readonly className?: string } = {}) {
+  return (
+    <svg
+      width="12.5"
+      height="12.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function StudioNav({ rightSlot }: StudioNavProps = {}) {
   const pathname = usePathname();
   const { activeCorridorId, setActiveCorridorId, activeCorridor } = useAoi();
@@ -333,17 +395,25 @@ export function StudioShell({
   );
 }
 
+export type StudioViewMode = "satellite" | "diagnostic" | "compare";
+
+export interface MapCanvasOverlayProps {
+  readonly onZoomIn?: () => void;
+  readonly onZoomOut?: () => void;
+  readonly activeEffectLabel?: string;
+  readonly onCycleEffect?: () => void;
+  readonly viewMode?: StudioViewMode;
+  readonly onSelectViewMode?: (mode: StudioViewMode) => void;
+}
+
 export function MapCanvasOverlay({
   onZoomIn,
   onZoomOut,
   activeEffectLabel,
   onCycleEffect,
-}: {
-  readonly onZoomIn?: () => void;
-  readonly onZoomOut?: () => void;
-  readonly activeEffectLabel?: string;
-  readonly onCycleEffect?: () => void;
-} = {}) {
+  viewMode = "diagnostic",
+  onSelectViewMode,
+}: MapCanvasOverlayProps = {}) {
   return (
     <>
       {/* Top-Left Dark Translucent Pill Zoom Button Pair */}
@@ -393,17 +463,76 @@ export function MapCanvasOverlay({
         </button>
       </div>
 
-      {/* Optional subtle layer badge bottom-left for switching real city effects */}
-      {activeEffectLabel && onCycleEffect && (
-        <button
-          type="button"
-          onClick={onCycleEffect}
-          className="absolute bottom-5 left-5 z-10 px-3.5 py-2 rounded-xl bg-white/95 backdrop-blur-md shadow-[0_4px_16px_rgba(0,0,0,0.1)] text-[12px] font-medium text-[#1c1f23] flex items-center gap-2 hover:bg-white transition-colors cursor-pointer"
-        >
-          <span className="w-2 h-2 rounded-full bg-[#22b567]" />
-          <span>{activeEffectLabel}</span>
-        </button>
-      )}
+      {/* Bottom-left View Mode Switcher + Layer Badge */}
+      <div className="absolute bottom-5 left-5 z-10 flex flex-col sm:flex-row items-start sm:items-center gap-2">
+        {onSelectViewMode && (
+          <div className="flex items-center bg-[#1b1e23]/90 backdrop-blur-md p-1 rounded-xl shadow-md border border-white/10 text-[11px] font-medium text-white/70">
+            <button
+              type="button"
+              onClick={() => onSelectViewMode("satellite")}
+              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                viewMode === "satellite"
+                  ? "bg-white text-[#1c1f23] font-semibold shadow-sm"
+                  : "hover:text-white"
+              }`}
+            >
+              <IconSatellite />
+              <span>Satellite</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectViewMode("diagnostic")}
+              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                viewMode === "diagnostic"
+                  ? "bg-white text-[#1c1f23] font-semibold shadow-sm"
+                  : "hover:text-white"
+              }`}
+            >
+              <IconDiagnostic />
+              <span>AI Diagnostic</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectViewMode("compare")}
+              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                viewMode === "compare"
+                  ? "bg-white text-[#1c1f23] font-semibold shadow-sm"
+                  : "hover:text-white"
+              }`}
+            >
+              <IconBiTemporal />
+              <span>Bi-Temporal</span>
+            </button>
+          </div>
+        )}
+
+        {viewMode !== "satellite" && activeEffectLabel && onCycleEffect && (
+          <button
+            type="button"
+            onClick={onCycleEffect}
+            title="Click to cycle neural diagnostic layer"
+            className="px-3 py-1.5 rounded-xl bg-white/95 backdrop-blur-md shadow-[0_4px_16px_rgba(0,0,0,0.1)] text-[11.5px] font-medium text-[#1c1f23] flex items-center gap-2 hover:bg-white transition-colors cursor-pointer border border-[#edeff2]"
+          >
+            <span className="w-2 h-2 rounded-full bg-[#22b567] animate-pulse" />
+            <span>{activeEffectLabel}</span>
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#8c929c"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="ml-0.5 opacity-60"
+              aria-hidden="true"
+            >
+              <path d="m7 15 5 5 5-5" />
+              <path d="m7 9 5-5 5 5" />
+            </svg>
+          </button>
+        )}
+      </div>
 
       {/* Subtle Coordinate Grid Indices matching reference */}
       <div className="pointer-events-none absolute top-11 left-24 right-24 flex justify-between text-[10px] font-medium text-[#1c1f23]/45">

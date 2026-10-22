@@ -20,4 +20,19 @@ describe("Cross-page AOI State & Presets", () => {
       expect(preset.yearT2).toBeLessThanOrEqual(2025);
     }
   });
+
+  it("verifies all 5 corridors are defined with valid bounding boxes and EPSG codes", async () => {
+    const { CORRIDOR_PROFILES } = await import("../src/lib/aoi-context");
+    const corridorIds = ["roshn", "wadi", "neom", "redsea", "rondonia"] as const;
+    for (const id of corridorIds) {
+      const p = CORRIDOR_PROFILES[id];
+      expect(p).toBeDefined();
+      expect(p.bbox.length).toBe(4);
+      expect(p.bbox[0]).toBeLessThan(p.bbox[2]); // minLon < maxLon
+      expect(p.bbox[1]).toBeLessThan(p.bbox[3]); // minLat < maxLat
+      expect(p.epsg).toBeGreaterThan(32000);
+      expect(p.baseAreaHa).toBeGreaterThan(0);
+      expect(p.baseChangePct).toBeGreaterThan(0);
+    }
+  });
 });

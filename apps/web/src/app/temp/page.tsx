@@ -203,7 +203,7 @@ function TempDesignShowcaseInner() {
         {screen === "dossier" && (
           <div className="relative w-full h-full overflow-hidden">
             <img
-              src="/samples/riyadh_bitemporal_split.jpg"
+              src="/api/raster/roshn/split"
               alt="North Riyadh & ROSHN Sedra Sentinel-2 Canvas"
               className="w-full h-full object-cover"
             />
@@ -408,7 +408,7 @@ function TempDesignShowcaseInner() {
         {screen === "studio" && (
           <div className="relative w-full h-full overflow-hidden">
             <img
-              src="/samples/riyadh_nir.jpg"
+              src="/api/raster/roshn/nir"
               alt="Riyadh NIR Chlorophyll Composite"
               className="w-full h-full object-cover"
             />
@@ -529,28 +529,28 @@ function TempDesignShowcaseInner() {
                 {
                   title: "Siamese ResUNet-10ch",
                   sub: "Attention Posterior",
-                  img: "/samples/riyadh_magma.jpg",
+                  img: "/api/raster/roshn/magma",
                   left: "0,914 F1",
                   right: "84,2 %",
                 },
                 {
                   title: "Bi-Temporal ΔNDBI",
                   sub: "SWIR Built-Up Index",
-                  img: "/samples/riyadh_ndbi.jpg",
+                  img: "/api/raster/roshn/ndbi",
                   left: "0,861 F1",
                   right: "75,6 %",
                 },
                 {
                   title: "NIR Chlorophyll",
                   sub: "Vegetation Composite",
-                  img: "/samples/riyadh_nir.jpg",
+                  img: "/api/raster/roshn/nir",
                   left: "0,838 F1",
                   right: "72,1 %",
                 },
                 {
                   title: "Ground-Truth Audit",
                   sub: "Pixel Error Map",
-                  img: "/samples/riyadh_confusion.jpg",
+                  img: "/api/raster/roshn/confusion",
                   left: "0,938 Prec",
                   right: "89,2 %",
                 },
@@ -878,7 +878,7 @@ function TempDesignShowcaseInner() {
                 </div>
                 <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
                   <img
-                    src="/samples/riyadh_contagion.jpg"
+                    src="/api/raster/roshn/contagion"
                     alt="Spatial Contagion Forecast"
                     className="w-full h-full object-cover"
                   />
@@ -985,17 +985,17 @@ function TempDesignShowcaseInner() {
                 {
                   title: "1. Bi-Temporal Input (T₁ / T₂)",
                   sub: "0,14 px RMSE",
-                  img: "/samples/riyadh_bitemporal_split.jpg",
+                  img: "/api/raster/roshn/split",
                 },
                 {
                   title: "2. Siamese Posterior P(Δ)",
                   sub: "0,934 F1",
-                  img: "/samples/riyadh_magma.jpg",
+                  img: "/api/raster/roshn/magma",
                 },
                 {
                   title: "3. Ground-Truth Pixel Audit",
                   sub: "87,6 % IoU",
-                  img: "/samples/riyadh_confusion.jpg",
+                  img: "/api/raster/roshn/confusion",
                 },
               ].map((panel) => (
                 <div
@@ -1152,7 +1152,7 @@ function TempDesignShowcaseInner() {
                   </div>
                   <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
                     <img
-                      src="/samples/riyadh_carbon.jpg"
+                      src="/api/raster/roshn/carbon"
                       alt="Carbon Flux Map"
                       className="w-full h-full object-cover"
                     />
@@ -1170,7 +1170,7 @@ function TempDesignShowcaseInner() {
                   </div>
                   <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
                     <img
-                      src="/samples/riyadh_thermal.jpg"
+                      src="/api/raster/roshn/thermal"
                       alt="Thermal Shift Map"
                       className="w-full h-full object-cover"
                     />
@@ -1311,7 +1311,7 @@ function TempDesignShowcaseInner() {
                     pct: "18 %",
                     w: "68%",
                     color: "bg-[#e94235]",
-                    thumb: "/samples/riyadh_bitemporal_split.jpg",
+                    thumb: "/api/raster/neom/magma",
                   },
                   {
                     name: "Green Riyadh · Wadi Hanifah Canopy",
@@ -1321,7 +1321,7 @@ function TempDesignShowcaseInner() {
                     pct: "12 %",
                     w: "52%",
                     color: "bg-[#22b567]",
-                    thumb: "/samples/riyadh_carbon.jpg",
+                    thumb: "/api/raster/wadi/carbon",
                   },
                   {
                     name: "Red Sea Global · Shura Lagoon",
@@ -1331,7 +1331,7 @@ function TempDesignShowcaseInner() {
                     pct: "9 %",
                     w: "38%",
                     color: "bg-[#f39223]",
-                    thumb: "/samples/riyadh_nir.jpg",
+                    thumb: "/api/raster/redsea/ndbi",
                   },
                   {
                     name: "Rondônia · Primary Forest Loss",
@@ -1341,7 +1341,7 @@ function TempDesignShowcaseInner() {
                     pct: "20 %",
                     w: "74%",
                     color: "bg-[#e94235]",
-                    thumb: "/samples/riyadh_magma.jpg",
+                    thumb: "/api/raster/rondonia/confusion",
                   },
                 ].map((item) => (
                   <div

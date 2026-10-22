@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
   const greeningHa = body.greening_area_ha ?? 1420.0;
   const priceUsd = body.carbon_price_usd ?? 35.0;
   const biome = body.biome ?? "arid_afforestation";
+  const corridorId = body.preset_id ?? "roshn";
 
   const biomeFactor =
     biome === "tropical_moist_forest"
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
         share_pct: 8,
       },
     ],
-    flux_map_b64: "/samples/riyadh_carbon.jpg",
-    thermal_map_b64: "/samples/riyadh_thermal.jpg",
+    flux_map_b64: `/api/raster/${encodeURIComponent(corridorId)}/carbon`,
+    thermal_map_b64: `/api/raster/${encodeURIComponent(corridorId)}/thermal`,
   });
 }

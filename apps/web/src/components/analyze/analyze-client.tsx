@@ -1,34 +1,42 @@
 "use client";
 
-import React, { useState } from "react";
-import { StudioShell, MapCanvasOverlay } from "@/components/studio-nav";
+import React, { useState, useRef } from "react";
+import dynamic from "next/dynamic";
+import { StudioShell, MapCanvasOverlay, type StudioViewMode } from "@/components/studio-nav";
 import { useAoi, CORRIDOR_PROFILES, type CorridorId } from "@/lib/aoi-context";
+
+const MapCanvas = dynamic(
+  () => import("@/components/map/map-canvas").then((m) => m.MapCanvas),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="size-full flex items-center justify-center bg-[#0B0F17] text-white/50 text-xs tracking-wider uppercase font-mono">
+        Initializing Orbital Map Engine...
+      </div>
+    ),
+  },
+);
 
 const SPECTRAL_LAYERS = [
   {
     id: "nir",
     label: "NIR Chlorophyll (B08 / B04 / B03)",
-    src: "/samples/riyadh_nir.jpg",
   },
   {
     id: "ndbi",
     label: "SWIR Built-Up Index (ΔNDBI)",
-    src: "/samples/riyadh_ndbi.jpg",
   },
   {
     id: "split",
     label: "Bi-Temporal Optical Split (2018 vs 2024)",
-    src: "/samples/riyadh_bitemporal_split.jpg",
   },
   {
     id: "magma",
     label: "Siamese Attention Posterior",
-    src: "/samples/riyadh_magma.jpg",
   },
   {
     id: "confusion",
     label: "Ground-Truth Pixel Audit",
-    src: "/samples/riyadh_confusion.jpg",
   },
 ] as const;
 
@@ -52,15 +60,22 @@ export function AnalyzeClient() {
     activeYear,
     activeMonth,
     temporalModifier,
+    getRasterUrl,
   } = useAoi();
 
   const [layerIdx, setLayerIdx] = useState<number>(0);
-  const [zoomScale, setZoomScale] = useState<number>(1);
+  const [viewMode, setViewMode] = useState<StudioViewMode>("diagnostic");
+  const zoomActionsRef = useRef<{ zoomIn: () => void; zoomOut: () => void } | null>(null);
   const [cardSlide, setCardSlide] = useState<0 | 1>(0);
   const [threshold, setThreshold] = useState<number>(0.45);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [liveChangePct, setLiveChangePct] = useState<number | null>(null);
+
+  const corridorCenter: [number, number] = [
+    (activeCorridor.bbox[0] + activeCorridor.bbox[2]) / 2,
+    (activeCorridor.bbox[1] + activeCorridor.bbox[3]) / 2,
+  ];
 
   const currentLayer = SPECTRAL_LAYERS[layerIdx] ?? SPECTRAL_LAYERS[0];
 
@@ -166,18 +181,32 @@ export function AnalyzeClient() {
   return (
     <StudioShell>
       <div className="relative w-full h-full overflow-hidden">
-        <img
-          src={currentLayer.src}
-          alt={currentLayer.label}
-          className="w-full h-full object-cover transition-transform duration-300 ease-out"
-          style={{ transform: `scale(${zoomScale})` }}
+        {/* Real GPU-Accelerated MapLibre Satellite Map with Multi-Spectral Diagnostic Overlays */}
+        <MapCanvas
+          yearT1={2018}
+          yearT2={activeYear}
+          polygon={activeCorridor.polygon}
+          isDrawing={false}
+          onDrawingChange={() => {}}
+          onPolygonChange={() => {}}
+          center={corridorCenter}
+          zoom={12.5}
+          compareMode={viewMode === "compare" || currentLayer.id === "split"}
+          effectRasterUrl={getRasterUrl(currentLayer.id, threshold)}
+          effectBbox={activeCorridor.bbox}
+          showEffectOverlay={viewMode === "diagnostic" && currentLayer.id !== "split"}
+          effectOpacity={0.85}
+          zoomActionsRef={zoomActionsRef}
+          showDefaultZoomControls={false}
         />
 
         <MapCanvasOverlay
-          onZoomIn={() => setZoomScale((z) => Math.min(1.6, Number((z + 0.15).toFixed(2))))}
-          onZoomOut={() => setZoomScale((z) => Math.max(1.0, Number((z - 0.15).toFixed(2))))}
+          onZoomIn={() => zoomActionsRef.current?.zoomIn()}
+          onZoomOut={() => zoomActionsRef.current?.zoomOut()}
           activeEffectLabel={`${currentLayer.label} · ${activeMonth} ${activeYear}`}
           onCycleEffect={handleCycleLayer}
+          viewMode={viewMode}
+          onSelectViewMode={setViewMode}
         />
 
         {/* Floating White Card matching approved ui_clean_studio.png */}

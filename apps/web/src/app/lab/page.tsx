@@ -63,7 +63,7 @@ const DEFAULT_OBJECTS: LabObjectRow[] = [
 ];
 
 export default function LabPage() {
-  const { activeCorridor, activeYear, activeMonth, temporalModifier } = useAoi();
+  const { activeCorridor, activeYear, activeMonth, temporalModifier, getRasterUrl } = useAoi();
   const [objects, setObjects] = useState<LabObjectRow[]>(DEFAULT_OBJECTS);
   const [f1Score, setF1Score] = useState<string>("0,934 F1");
   const [iouScore, setIouScore] = useState<string>("87,6 % IoU");
@@ -125,17 +125,17 @@ export default function LabPage() {
     {
       title: "1. Bi-Temporal Input (T₁ / T₂)",
       sub: "0,14 px RMSE",
-      img: customImg1 ?? "/samples/riyadh_bitemporal_split.jpg",
+      img: customImg1 ?? getRasterUrl("split"),
     },
     {
       title: "2. Siamese Posterior P(Δ)",
       sub: f1Score,
-      img: "/samples/riyadh_magma.jpg",
+      img: getRasterUrl("magma"),
     },
     {
       title: "3. Ground-Truth Pixel Audit",
       sub: iouScore,
-      img: "/samples/riyadh_confusion.jpg",
+      img: getRasterUrl("confusion"),
     },
   ];
 
