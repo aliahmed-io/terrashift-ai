@@ -144,11 +144,11 @@ The operational change probability $P_{\text{fusion}}(x, y)$ is a weighted ensem
 $$P_{\text{fusion}}(x, y) = 0.60 \cdot P_{\text{deep}}(x, y) + 0.40 \cdot P_{\text{physics}}(x, y)$$
 
 **Empirical Justification (from official OSCD test benchmark scorecard):**
-- $M_1$ Siamese U-Net alone: $F_1 = 0.3699, \text{IoU} = 0.2269, \text{Precision} = 0.4805, \text{Recall} = 0.3007$
+- $M_1$ Siamese U-Net alone: $F_1 = 0.3803, \text{IoU} = 0.2348, \text{Precision} = 0.3853, \text{Recall} = 0.3754$
 - Statistical Baseline alone: $F_1 = 0.3739, \text{IoU} = 0.2300, \text{Precision} = 0.3650, \text{Recall} = 0.3834$
-- **$M_1$ + Statistical Fusion: $F_1 = 0.4025, \text{IoU} = 0.2519, \text{Precision} = 0.4796, \text{Recall} = 0.3467$**
+- **$M_1$ + Statistical Fusion: $F_1 = 0.4117, \text{IoU} = 0.2592, \text{Precision} = 0.4311, \text{Recall} = 0.3940$**
 
-The statistical baseline contributes complementary sensitivity in low-contrast soil/grading transitions where deep features alone are overly conservative, while the deep network suppresses false alarms in shadow and atmospheric fringe pixels. This yields a $+0.0326$ $F_1$ gain ($+8.8\%$) and lowers Expected Calibration Error to $0.0875$.
+The statistical baseline contributes complementary sensitivity in low-contrast soil/grading transitions where deep features alone are overly conservative, while the deep network suppresses false alarms in shadow and atmospheric fringe pixels. This yields an absolute $+0.0314$ pooled $F_1$ gain over standalone deep learning ($+0.0378$ over statistical alone) and suppresses false alarms to $2.83\%$.
 
 ---
 

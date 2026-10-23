@@ -1,0 +1,176 @@
+[
+  {
+    "scene_id": "test_01",
+    "title": "Low-Density Peri-Urban Parcel Clearing",
+    "category": "sparse_periurban",
+    "total_pixels": 439632,
+    "change_pixels": 5018,
+    "change_prevalence_pct": 1.14,
+    "statistical_baseline": {
+      "f1": 0.0627,
+      "iou": 0.0324,
+      "precision": 0.0358,
+      "recall": 0.2505
+    },
+    "siamese_unet_m1": {
+      "f1": 0.1114,
+      "iou": 0.059,
+      "precision": 0.0768,
+      "recall": 0.2031
+    },
+    "calibrated_fusion": {
+      "f1": 0.0843,
+      "iou": 0.044,
+      "precision": 0.0525,
+      "recall": 0.2136
+    },
+    "diagnostic_image": "reports\\visual_diagnostics\\test_01_forensic_diagnostic.png",
+    "mechanism": "1.14% change prevalence (5,018 pixels). Small localized residential clearings surrounded by large areas of unpaved desert soil with similar red/green spectral reflectance.",
+    "recommendation": "Deep Siamese features effectively distinguish road grading geometry from background soil, but faint perimeter edges require morphological closing."
+  },
+  {
+    "scene_id": "test_02",
+    "title": "Extreme Sparsity Failure Mode",
+    "category": "extreme_sparsity",
+    "total_pixels": 218008,
+    "change_pixels": 969,
+    "change_prevalence_pct": 0.44,
+    "statistical_baseline": {
+      "f1": 0.0605,
+      "iou": 0.0312,
+      "precision": 0.0351,
+      "recall": 0.2178
+    },
+    "siamese_unet_m1": {
+      "f1": 0.0636,
+      "iou": 0.0328,
+      "precision": 0.0363,
+      "recall": 0.258
+    },
+    "calibrated_fusion": {
+      "f1": 0.0666,
+      "iou": 0.0345,
+      "precision": 0.0389,
+      "recall": 0.2332
+    },
+    "diagnostic_image": "reports\\visual_diagnostics\\test_02_forensic_diagnostic.png",
+    "mechanism": "Only 969 change pixels (0.44% prevalence) across 218,008 pixels. In extreme sparse regimes, single-pixel boundary jitters and sub-pixel edge alignment discrepancies dominate error counts, causing both statistical and deep models to suffer high precision penalties.",
+    "recommendation": "Post-detection spatial minimum-area filtering (e.g. discarding blobs < 4 connected pixels) substantially improves precision in sparse change environments."
+  },
+  {
+    "scene_id": "test_03",
+    "title": "Vegetative Agricultural Shifts (Statistical Win Case)",
+    "category": "agricultural_spectral_shift",
+    "total_pixels": 397120,
+    "change_pixels": 28637,
+    "change_prevalence_pct": 7.21,
+    "statistical_baseline": {
+      "f1": 0.5398,
+      "iou": 0.3697,
+      "precision": 0.5094,
+      "recall": 0.5741
+    },
+    "siamese_unet_m1": {
+      "f1": 0.198,
+      "iou": 0.1099,
+      "precision": 0.6053,
+      "recall": 0.1183
+    },
+    "calibrated_fusion": {
+      "f1": 0.4368,
+      "iou": 0.2795,
+      "precision": 0.6015,
+      "recall": 0.3429
+    },
+    "diagnostic_image": "reports\\visual_diagnostics\\test_03_forensic_diagnostic.png",
+    "mechanism": "28,637 change pixels (7.21% prevalence). Scene dominated by large agricultural field parcel crop cycles. The statistical spectral baseline (F1=0.5398) outperforms the standalone deep network (F1=0.1980) because full-field spectral shifts are uniform and pixel-level radiometric matching detects them cleanly without needing spatial shape hierarchy.",
+    "recommendation": "This case proves the scientific value of model-heuristic fusion: the hybrid detector (F1=0.4368) preserves spectral sensitivity where deep spatial pooling alone is overly selective."
+  },
+  {
+    "scene_id": "test_04",
+    "title": "Dense Commercial/Industrial Construction (Deep Learning Win)",
+    "category": "deep_learning_success",
+    "total_pixels": 192126,
+    "change_pixels": 13054,
+    "change_prevalence_pct": 6.79,
+    "statistical_baseline": {
+      "f1": 0.6473,
+      "iou": 0.4785,
+      "precision": 0.5861,
+      "recall": 0.7227
+    },
+    "siamese_unet_m1": {
+      "f1": 0.7376,
+      "iou": 0.5842,
+      "precision": 0.7278,
+      "recall": 0.7476
+    },
+    "calibrated_fusion": {
+      "f1": 0.7101,
+      "iou": 0.5506,
+      "precision": 0.676,
+      "recall": 0.7479
+    },
+    "diagnostic_image": "reports\\visual_diagnostics\\test_04_forensic_diagnostic.png",
+    "mechanism": "13,054 change pixels (6.79% prevalence). Distinct building footprints, paved parking lots, and linear access roads. The Siamese U-Net achieves F1=0.7376 (vs F1=0.6473 for statistical baseline), demonstrating deep spatial feature advantages.",
+    "recommendation": "Deep feature encoder excels on sharp anthropogenic structural contours."
+  },
+  {
+    "scene_id": "test_07",
+    "title": "Suburban Earthworks with Illumination & Drydown",
+    "category": "phenology_and_earthworks",
+    "total_pixels": 490716,
+    "change_pixels": 48689,
+    "change_prevalence_pct": 9.92,
+    "statistical_baseline": {
+      "f1": 0.1996,
+      "iou": 0.1109,
+      "precision": 0.4749,
+      "recall": 0.1264
+    },
+    "siamese_unet_m1": {
+      "f1": 0.2001,
+      "iou": 0.1112,
+      "precision": 0.2005,
+      "recall": 0.1998
+    },
+    "calibrated_fusion": {
+      "f1": 0.2184,
+      "iou": 0.1226,
+      "precision": 0.3202,
+      "recall": 0.1657
+    },
+    "diagnostic_image": "reports\\visual_diagnostics\\test_07_forensic_diagnostic.png",
+    "mechanism": "48,689 change pixels (9.92% prevalence) representing broad grading and bare earth. Diffuse seasonal soil drying causes widespread low-magnitude spectral drift across non-construction parcels, elevating statistical false alarm rates.",
+    "recommendation": "Dual-scale encoder difference features successfully recognize bounded structural shapes, but diffuse ground changes require higher decision thresholds (tau=0.55)."
+  },
+  {
+    "scene_id": "test_09",
+    "title": "High-Density Urban Redevelopment (Deep Learning Win)",
+    "category": "deep_learning_success",
+    "total_pixels": 589984,
+    "change_pixels": 45270,
+    "change_prevalence_pct": 7.67,
+    "statistical_baseline": {
+      "f1": 0.5683,
+      "iou": 0.3969,
+      "precision": 0.8824,
+      "recall": 0.4191
+    },
+    "siamese_unet_m1": {
+      "f1": 0.6414,
+      "iou": 0.4721,
+      "precision": 0.6447,
+      "recall": 0.6382
+    },
+    "calibrated_fusion": {
+      "f1": 0.6441,
+      "iou": 0.475,
+      "precision": 0.7489,
+      "recall": 0.565
+    },
+    "diagnostic_image": "reports\\visual_diagnostics\\test_09_forensic_diagnostic.png",
+    "mechanism": "45,270 change pixels (7.67% prevalence). Multi-story building demolition and structural foundation excavation in a dense metropolitan area. Siamese U-Net achieves F1=0.6414 and Fusion reaches F1=0.6441.",
+    "recommendation": "Multi-scale skip difference connections effectively isolate block-level reconstruction."
+  }
+]

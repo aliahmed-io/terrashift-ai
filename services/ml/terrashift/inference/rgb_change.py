@@ -157,8 +157,8 @@ def detect_change(
     # 5. Binary mask grounded directly in decision threshold tau
     clamped_tau = float(np.clip(threshold, 0.10, 0.90))
     mask = (probability >= clamped_tau) & valid
-    mask = ndimage.binary_opening(mask, structure=np.ones((3, 3), dtype=bool))
-    mask = ndimage.binary_closing(mask, structure=np.ones((3, 3), dtype=bool)) & valid
+    mask = ndimage.binary_closing(mask, structure=np.ones((3, 3), dtype=bool))
+    mask = ndimage.binary_opening(mask, structure=np.ones((3, 3), dtype=bool)) & valid
 
     valid_count = max(int(np.sum(valid)), 1)
     changed_count = int(np.sum(mask))

@@ -62,8 +62,8 @@ export default function BenchmarksPage() {
       title: models?.[0]?.name ?? "M1 Siamese U-Net + Fusion",
       sub: "Calibrated Attention Posterior",
       img: models?.[0]?.heatmap_b64 ?? getRasterUrl("magma", tau),
-      left: `${formatComma(models?.[0]?.f1_score ?? 0.403, 3)} F1`,
-      right: `${formatComma((models?.[0]?.iou_score ?? 0.252) * 100, 1)} % IoU`,
+      left: `${formatComma(models?.[0]?.f1_score ?? 0.412, 3)} F1`,
+      right: `${formatComma((models?.[0]?.iou_score ?? 0.259) * 100, 1)} % IoU`,
     },
     {
       title: models?.[1]?.name ?? "Statistical Spectral Baseline",
@@ -76,8 +76,8 @@ export default function BenchmarksPage() {
       title: models?.[2]?.name ?? "M1 Supervised Siamese U-Net",
       sub: "Dual-Branch Learned Weights",
       img: models?.[2]?.heatmap_b64 ?? getRasterUrl("nir", tau),
-      left: `${formatComma(models?.[2]?.f1_score ?? 0.37, 3)} F1`,
-      right: `${formatComma((models?.[2]?.iou_score ?? 0.227) * 100, 1)} % IoU`,
+      left: `${formatComma(models?.[2]?.f1_score ?? 0.38, 3)} F1`,
+      right: `${formatComma((models?.[2]?.iou_score ?? 0.235) * 100, 1)} % IoU`,
     },
     {
       title: models?.[3]?.name ?? "M0 Untrained Baseline",
@@ -90,12 +90,12 @@ export default function BenchmarksPage() {
 
   // Operating point marker along the PR curve driven by tau
   const prPoints: Record<string, { x: number; y: number; f1: number }> = {
-    "0.35": { x: 455, y: 78, f1: 0.385 },
-    "0.45": { x: 375, y: 46, f1: 0.403 },
-    "0.55": { x: 265, y: 36, f1: 0.372 },
-    "0.65": { x: 165, y: 31, f1: 0.31 },
+    "0.35": { x: 455, y: 78, f1: 0.395 },
+    "0.45": { x: 375, y: 46, f1: 0.412 },
+    "0.55": { x: 265, y: 36, f1: 0.386 },
+    "0.65": { x: 165, y: 31, f1: 0.324 },
   };
-  const pt = prPoints[tau.toFixed(2)] ?? { x: 375, y: 46, f1: 0.403 };
+  const pt = prPoints[tau.toFixed(2)] ?? { x: 375, y: 46, f1: 0.412 };
   const markerX = pt.x;
   const markerY = pt.y;
   const activeF1 = pt.f1;

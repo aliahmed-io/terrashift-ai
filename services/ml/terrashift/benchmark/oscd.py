@@ -133,7 +133,7 @@ if HAS_TORCH:
             self,
             split: Literal["train", "val", "test"] = "train",
             patch_size: int = 256,
-            patches_per_scene: int = 16,
+            patches_per_scene: int = 24,
             cache_dir: Optional[Path] = None,
             seed: int = 42,
         ) -> None:
@@ -144,54 +144,77 @@ if HAS_TORCH:
             self.rng = np.random.default_rng(seed)
             self.total_patches = len(self.scenes) * self.patches_per_scene
 
+            # Precompute scene-level 5-channel stacks and change coordinate indices for ultra-fast slicing
+            self.scene_stacks: List[Tuple[NDArray[np.float32], NDArray[np.float32]]] = []
+            self.change_coords: List[Tuple[NDArray[np.int64], NDArray[np.int64]]] = []
+            for s in self.scenes:
+                t1_5ch, t2_5ch, _ = build_5channel_stack(s.t1_rgb, s.t2_rgb, apply_matching=True)
+                self.scene_stacks.append((t1_5ch, t2_5ch))
+                ys, xs = np.where(s.gt_mask)
+                self.change_coords.append((ys, xs))
+
         def __len__(self) -> int:
             return self.total_patches
 
         def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
             scene_idx = idx // self.patches_per_scene
             scene = self.scenes[scene_idx]
+            t1_stack, t2_stack = self.scene_stacks[scene_idx]
+            change_ys, change_xs = self.change_coords[scene_idx]
 
             h, w = scene.height, scene.width
             ps = self.patch_size
 
-            # Balanced patch sampling: 60% chance to sample around active change pixels to mitigate 95% class imbalance
-            change_ys, change_xs = np.where(scene.gt_mask)
-            has_change = len(change_ys) > 0 and self.rng.random() < 0.60
+            # Balanced patch sampling: 50% change-focused, 50% background / hard negatives
+            sample_mode = self.rng.random()
+            has_change = len(change_ys) > 0 and sample_mode < 0.50
+
             if has_change and h > ps and w > ps:
                 pt_idx = self.rng.integers(0, len(change_ys))
                 cy, cx = int(change_ys[pt_idx]), int(change_xs[pt_idx])
                 y = int(np.clip(cy - ps // 2 + self.rng.integers(-24, 25), 0, h - ps))
                 x = int(np.clip(cx - ps // 2 + self.rng.integers(-24, 25), 0, w - ps))
-                crop_t1 = scene.t1_rgb[y : y + ps, x : x + ps]
-                crop_t2 = scene.t2_rgb[y : y + ps, x : x + ps]
-                crop_m = scene.gt_mask[y : y + ps, x : x + ps]
             elif h > ps and w > ps:
                 y = int(self.rng.integers(0, h - ps))
                 x = int(self.rng.integers(0, w - ps))
-                crop_t1 = scene.t1_rgb[y : y + ps, x : x + ps]
-                crop_t2 = scene.t2_rgb[y : y + ps, x : x + ps]
-                crop_m = scene.gt_mask[y : y + ps, x : x + ps]
             else:
-                crop_t1 = np.pad(scene.t1_rgb, ((0, max(0, ps - h)), (0, max(0, ps - w)), (0, 0)))[:ps, :ps]
-                crop_t2 = np.pad(scene.t2_rgb, ((0, max(0, ps - h)), (0, max(0, ps - w)), (0, 0)))[:ps, :ps]
-                crop_m = np.pad(scene.gt_mask, ((0, max(0, ps - h)), (0, max(0, ps - w))))[:ps, :ps]
+                y, x = 0, 0
 
-            # Data augmentation during training: random horizontal and vertical flips
+            crop_t1 = t1_stack[:, y : y + ps, x : x + ps]
+            crop_t2 = t2_stack[:, y : y + ps, x : x + ps]
+            crop_m = scene.gt_mask[y : y + ps, x : x + ps]
+
+            if crop_t1.shape[1] < ps or crop_t1.shape[2] < ps:
+                pad_h = max(0, ps - crop_t1.shape[1])
+                pad_w = max(0, ps - crop_t1.shape[2])
+                crop_t1 = np.pad(crop_t1, ((0, 0), (0, pad_h), (0, pad_w)))
+                crop_t2 = np.pad(crop_t2, ((0, 0), (0, pad_h), (0, pad_w)))
+                crop_m = np.pad(crop_m, ((0, pad_h), (0, pad_w)))
+
+            # Data augmentation during training:
             if self.split == "train":
+                # 1. Random horizontal flip
                 if self.rng.random() > 0.5:
-                    crop_t1 = np.ascontiguousarray(np.fliplr(crop_t1))
-                    crop_t2 = np.ascontiguousarray(np.fliplr(crop_t2))
-                    crop_m = np.ascontiguousarray(np.fliplr(crop_m))
+                    crop_t1 = np.ascontiguousarray(crop_t1[:, :, ::-1])
+                    crop_t2 = np.ascontiguousarray(crop_t2[:, :, ::-1])
+                    crop_m = np.ascontiguousarray(crop_m[:, ::-1])
+                # 2. Random vertical flip
                 if self.rng.random() > 0.5:
-                    crop_t1 = np.ascontiguousarray(np.flipud(crop_t1))
-                    crop_t2 = np.ascontiguousarray(np.flipud(crop_t2))
-                    crop_m = np.ascontiguousarray(np.flipud(crop_m))
-
-            # Shared unified 5-channel stack with median/MAD harmonization
-            t1_5ch, t2_5ch, _ = build_5channel_stack(crop_t1, crop_t2, apply_matching=True)
+                    crop_t1 = np.ascontiguousarray(crop_t1[:, ::-1, :])
+                    crop_t2 = np.ascontiguousarray(crop_t2[:, ::-1, :])
+                    crop_m = np.ascontiguousarray(crop_m[::-1, :])
+                # 3. Random 90-degree rotations
+                k = int(self.rng.integers(0, 4))
+                if k > 0:
+                    crop_t1 = np.ascontiguousarray(np.rot90(crop_t1, k, (1, 2)))
+                    crop_t2 = np.ascontiguousarray(np.rot90(crop_t2, k, (1, 2)))
+                    crop_m = np.ascontiguousarray(np.rot90(crop_m, k, (0, 1)))
+                # 4. Symmetric temporal swap (since binary change is invariant to time ordering)
+                if self.rng.random() > 0.5:
+                    crop_t1, crop_t2 = crop_t2, crop_t1
 
             return (
-                torch.from_numpy(t1_5ch).float(),
-                torch.from_numpy(t2_5ch).float(),
+                torch.from_numpy(crop_t1).float(),
+                torch.from_numpy(crop_t2).float(),
                 torch.from_numpy(crop_m.astype(np.float32)).unsqueeze(0),
             )
