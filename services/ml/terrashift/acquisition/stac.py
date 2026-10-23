@@ -62,13 +62,13 @@ class STACClient:
             assets_raw = feat.get("assets", {})
             asset_map: Dict[str, str] = {}
             
-            # Map canonical band aliases (Element84 uses red, green, blue, nir, visual, scl)
-            for alias in ["red", "green", "blue", "nir", "swir16", "scl", "visual"]:
+            # Map canonical band aliases (Element84 uses red, green, blue, nir, swir16, swir22, scl, visual)
+            for alias in ["red", "green", "blue", "nir", "nir08", "swir16", "swir22", "scl", "visual"]:
                 if alias in assets_raw and "href" in assets_raw[alias]:
                     asset_map[alias] = assets_raw[alias]["href"]
             
-            # Also support standard Sentinel-2 band names (B04, B03, B02, B08, B11, SCL)
-            for b_name in ["B04", "B03", "B02", "B08", "B11", "SCL"]:
+            # Also support standard Sentinel-2 band names (B04, B03, B02, B08, B8A, B11, B12, SCL)
+            for b_name in ["B04", "B03", "B02", "B08", "B8A", "B11", "B12", "SCL"]:
                 if b_name in assets_raw and "href" in assets_raw[b_name]:
                     asset_map[b_name.lower()] = assets_raw[b_name]["href"]
 

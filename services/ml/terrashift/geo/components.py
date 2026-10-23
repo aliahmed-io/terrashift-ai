@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import shapely
@@ -12,11 +12,16 @@ from scipy import ndimage
 from shapely.geometry import Polygon, mapping
 
 from terrashift.acquisition.tiles import Grid
-from terrashift.geo.classify import RGB_LABELS, classify_rgb_change
+from terrashift.geo.classify import (
+    CLASS_LABELS,
+    RGB_LABELS,
+    classify_change,
+    classify_rgb_change,
+)
 from terrashift.inference.rgb_change import bareness, greenness
 
 _geod = Geod(ellps="WGS84")
-MIN_AREA_M2 = 2_000.0
+MIN_AREA_M2 = 3_500.0
 MAX_FEATURES = 150
 
 
@@ -47,12 +52,19 @@ def vectorize_changes(
     matched2: NDArray[np.float32],
     grid: Grid,
     min_area_m2: float = MIN_AREA_M2,
+    multispectral_context: Optional[Dict[str, NDArray[np.float32]]] = None,
 ) -> Dict[str, Any]:
     labels, count = ndimage.label(mask, structure=np.ones((3, 3), dtype=int))
     a = rgb1.astype(np.float32) / 255.0
     green_delta = greenness(matched2) - greenness(a)
     bare_delta = bareness(matched2) - bareness(a)
     bright_delta = matched2.mean(axis=-1) - a.mean(axis=-1)
+
+    has_multi = multispectral_context is not None
+    t1_ndvi = multispectral_context.get("t1_ndvi") if has_multi and multispectral_context else None
+    t2_ndvi = multispectral_context.get("t2_ndvi") if has_multi and multispectral_context else None
+    t1_ndbi = multispectral_context.get("t1_ndbi") if has_multi and multispectral_context else None
+    t2_ndbi = multispectral_context.get("t2_ndbi") if has_multi and multispectral_context else None
 
     slices = ndimage.find_objects(labels)
     candidates: List[Dict[str, Any]] = []
@@ -69,18 +81,48 @@ def vectorize_changes(
         area_m2 = abs(float(_geod.polygon_area_perimeter(lon, lat)[0]))
         if area_m2 < min_area_m2:
             continue
-        dg = float(green_delta[sl][sub].mean())
-        db = float(bare_delta[sl][sub].mean())
-        dl = float(bright_delta[sl][sub].mean())
-        kind = classify_rgb_change(dg, db, dl)
+
+        conf = float(probability[sl][sub].mean())
+
+        # Physical False Alarm Suppression over Arid Landscapes:
+        # If genuine multispectral indices (NDBI, NDVI) are present, verify that either
+        # a structural change (building/grading) or vegetative change occurred.
+        # Undisturbed desert brightness shifts have near-zero NDBI and NDVI deltas.
+        d_true_ndvi: Optional[float] = None
+        d_true_ndbi: Optional[float] = None
+        if t1_ndvi is not None and t2_ndvi is not None and t1_ndbi is not None and t2_ndbi is not None:
+            m_ndvi1 = float(np.mean(t1_ndvi[sl][sub]))
+            m_ndvi2 = float(np.mean(t2_ndvi[sl][sub]))
+            m_ndbi1 = float(np.mean(t1_ndbi[sl][sub]))
+            m_ndbi2 = float(np.mean(t2_ndbi[sl][sub]))
+            d_true_ndvi = m_ndvi2 - m_ndvi1
+            d_true_ndbi = m_ndbi2 - m_ndbi1
+            spectral_delta = max(abs(d_true_ndvi), abs(d_true_ndbi))
+
+            # Suppress spectral false alarms unless confidence is high or area is extensive
+            if spectral_delta < 0.035 and conf < 0.75 and area_m2 < 15000.0:
+                continue
+
+            kind = classify_change(m_ndvi1, m_ndvi2, m_ndbi1, m_ndbi2, 0.0, 0.0)
+            label = CLASS_LABELS.get(kind, "Ground surface change")
+        else:
+            dg = float(green_delta[sl][sub].mean())
+            db = float(bare_delta[sl][sub].mean())
+            dl = float(bright_delta[sl][sub].mean())
+            kind = classify_rgb_change(dg, db, dl)
+            label = RGB_LABELS.get(kind, "Surface change")
+
         candidates.append(
             {
                 "area": area_m2,
                 "geometry": mapping(Polygon(list(zip(lon.round(6).tolist(), lat.round(6).tolist())))),
                 "kind": kind,
-                "confidence": float(probability[sl][sub].mean()),
-                "dg": dg,
-                "db": db,
+                "label": label,
+                "confidence": conf,
+                "dg": float(green_delta[sl][sub].mean()),
+                "db": float(bare_delta[sl][sub].mean()),
+                "true_ndvi_delta": round(d_true_ndvi, 3) if d_true_ndvi is not None else None,
+                "true_ndbi_delta": round(d_true_ndbi, 3) if d_true_ndbi is not None else None,
             }
         )
 
@@ -89,19 +131,25 @@ def vectorize_changes(
     total = 0.0
     for i, c in enumerate(candidates[:MAX_FEATURES], start=1):
         total += c["area"]
+        props: Dict[str, Any] = {
+            "id": i,
+            "class": c["kind"],
+            "label": c["label"],
+            "area_m2": round(c["area"], 1),
+            "confidence": round(c["confidence"], 3),
+            "greenness_delta": round(c["dg"], 3),
+            "bareness_delta": round(c["db"], 3),
+        }
+        if c["true_ndvi_delta"] is not None:
+            props["true_ndvi_delta"] = c["true_ndvi_delta"]
+        if c["true_ndbi_delta"] is not None:
+            props["true_ndbi_delta"] = c["true_ndbi_delta"]
+
         features.append(
             {
                 "type": "Feature",
                 "geometry": c["geometry"],
-                "properties": {
-                    "id": i,
-                    "class": c["kind"],
-                    "label": RGB_LABELS[c["kind"]],
-                    "area_m2": round(c["area"], 1),
-                    "confidence": round(c["confidence"], 3),
-                    "greenness_delta": round(c["dg"], 3),
-                    "bareness_delta": round(c["db"], 3),
-                },
+                "properties": props,
             }
         )
     return {

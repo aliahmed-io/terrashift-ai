@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Iterator, List, Optional
 
 import numpy as np
 from numpy.typing import NDArray
 from pyproj import Geod
+
+logger = logging.getLogger(__name__)
 
 from terrashift.acquisition import tiles
 from terrashift.acquisition.tiles import AoiError, TileError
@@ -51,53 +54,98 @@ def run_analysis(req: AnalyzeRequest, fetcher: Optional[Fetcher] = None) -> Iter
     grid = tiles.plan_grid(bbox)
     yield _event(1, "Planning imagery window", 8)
 
-    def fetch(year: int) -> NDArray[np.uint8]:
-        if fetcher is None:
-            return tiles.fetch_mosaic(year, grid)
-        return tiles.fetch_mosaic(year, grid, lambda z, x, y: fetcher(year, z, x, y))
+    stac_metadata: Dict[str, Any] = {}
+    data_mode = "eox_wmts_mosaic"
+    active_provenance = PROVENANCE
+    analysis_grid: Any = grid
+    rgb1: NDArray[np.uint8]
+    rgb2: NDArray[np.uint8]
+    valid: NDArray[np.bool_]
 
-    rgb1 = fetch(req.year_t1)
-    yield _event(2, f"Downloaded {req.year_t1} composite", 32)
-    rgb2 = fetch(req.year_t2)
-    yield _event(3, f"Downloaded {req.year_t2} composite", 56)
+    # 1. Primary Path: Attempt genuine Sentinel-2 Level-2A STAC acquisition
+    stac_success = False
+    if fetcher is None:
+        try:
+            yield _event(2, "Searching authentic Sentinel-2 Level-2A STAC acquisitions", 18)
+            from terrashift.acquisition.stac_reader import fetch_bitemporal_stac_pair
+            stac_t1, stac_t2 = fetch_bitemporal_stac_pair(
+                bbox=bbox,
+                year_t1=req.year_t1,
+                year_t2=req.year_t2,
+                target_month=getattr(req, "target_month", 6),
+            )
+            rgb1 = stac_t1.rgb
+            rgb2 = stac_t2.rgb
+            analysis_grid = stac_t1.grid
+            valid = (stac_t1.valid_mask & stac_t2.valid_mask)
+            data_mode = "authentic_stac_l2a"
+            active_provenance = "sentinel2-l2a-cogs / aws-earth-search"
+            stac_metadata = {
+                "mode": data_mode,
+                "scene_t1_id": stac_t1.scene_id,
+                "scene_t1_datetime": stac_t1.datetime,
+                "scene_t1_cloud_pct": stac_t1.cloud_cover_pct,
+                "scene_t1_aoi_valid_pct": stac_t1.aoi_valid_pct,
+                "scene_t2_id": stac_t2.scene_id,
+                "scene_t2_datetime": stac_t2.datetime,
+                "scene_t2_cloud_pct": stac_t2.cloud_cover_pct,
+                "scene_t2_aoi_valid_pct": stac_t2.aoi_valid_pct,
+                "surface_reflectance_calibrated": True,
+                "spectral_bands": list(stac_t1.bands.keys()),
+                "asset_urls": stac_t1.provenance.get("asset_urls", {}),
+            }
+            yield _event(3, f"Acquired genuine L2A COGs ({stac_t1.scene_id[:16]} & {stac_t2.scene_id[:16]})", 58)
+            stac_success = True
+        except Exception as exc:
+            data_mode = "eox_wmts_mosaic_fallback"
+            stac_metadata = {
+                "mode": data_mode,
+                "fallback_reason": str(exc),
+            }
 
-    valid = tiles.polygon_mask(ring, grid)
+    # 2. Secondary / Offline / Mock Fallback Path: EOX WMTS Mosaic Tiles
+    if not stac_success:
+        def fetch(year: int) -> NDArray[np.uint8]:
+            if fetcher is None:
+                return tiles.fetch_mosaic(year, grid)
+            return tiles.fetch_mosaic(year, grid, lambda z, x, y: fetcher(year, z, x, y))
+
+        rgb1 = fetch(req.year_t1)
+        yield _event(2, f"Downloaded {req.year_t1} composite", 32)
+        rgb2 = fetch(req.year_t2)
+        yield _event(3, f"Downloaded {req.year_t2} composite", 56)
+        valid = tiles.polygon_mask(ring, grid)
+        analysis_grid = grid
+
     if valid.sum() < 64:
         raise AoiError("AOI_TOO_SMALL", "The selected area is too small to analyse.")
 
     threshold = getattr(req, "threshold", 0.50)
-    min_area_m2 = getattr(req, "min_area_m2", 2000.0)
+    min_area_m2 = getattr(req, "min_area_m2", 3500.0)
 
     detection, matched = detect_change(rgb1, rgb2, valid, threshold=threshold)
     yield _event(4, "Aligning radiometry and detecting change", 80)
+
+    multi_ctx = None
+    if stac_success:
+        multi_ctx = {
+            "t1_ndvi": stac_t1.true_ndvi,
+            "t2_ndvi": stac_t2.true_ndvi,
+            "t1_ndbi": stac_t1.true_ndbi,
+            "t2_ndbi": stac_t2.true_ndbi,
+        }
 
     collection = vectorize_changes(
         detection.mask,
         detection.probability,
         rgb1,
         matched,
-        grid,
+        analysis_grid,
         min_area_m2=min_area_m2,
+        multispectral_context=multi_ctx,
     )
     center_lat = float(np.mean(lats))
     changed_km2 = collection["metadata"]["total_changed_km2"]
-
-    # Retrieve real STAC scene provenance if available
-    stac_metadata: Dict[str, Any] = {}
-    try:
-        from datetime import date
-        from terrashift.acquisition.stac import STACClient
-        stac = STACClient()
-        scenes_t1 = stac.search_scenes(bbox=bbox, target_date=date(req.year_t1, 6, 15), window_days=45)
-        scenes_t2 = stac.search_scenes(bbox=bbox, target_date=date(req.year_t2, 6, 15), window_days=45)
-        if scenes_t1:
-            stac_metadata["scene_t1_id"] = scenes_t1[0].scene_id
-            stac_metadata["scene_t1_cloud"] = round(scenes_t1[0].cloud_cover, 2)
-        if scenes_t2:
-            stac_metadata["scene_t2_id"] = scenes_t2[0].scene_id
-            stac_metadata["scene_t2_cloud"] = round(scenes_t2[0].cloud_cover, 2)
-    except Exception:
-        pass
 
     collection["metadata"].update(
         {
@@ -108,12 +156,13 @@ def run_analysis(req: AnalyzeRequest, fetcher: Optional[Fetcher] = None) -> Iter
             "date_t2": str(req.year_t2),
             "aoi_km2": round(area_km2, 3),
             "changed_pct": round(changed_km2 / area_km2 * 100.0, 2) if area_km2 else 0.0,
-            "resolution_m": round(grid.meters_per_pixel(center_lat), 1),
+            "resolution_m": round(analysis_grid.meters_per_pixel(center_lat), 1),
             "threshold": round(detection.threshold, 4),
             "min_area_m2": min_area_m2,
+            "data_source": data_mode,
             "model": detection.model_metadata,
             "stac_provenance": stac_metadata,
-            "provenance": PROVENANCE,
+            "provenance": active_provenance,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
     )

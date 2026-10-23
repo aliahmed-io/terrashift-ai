@@ -108,6 +108,14 @@ class MultispectralPipeline:
         # Impervious / built-up expansion: significant increase in true NDBI
         built_gain_mask = (delta_ndbi > +0.12) & joint_valid
 
+        has_valid = bool(np.any(joint_valid))
+        mean_t1_ndvi = round(float(np.mean(scene_t1.true_ndvi[joint_valid])), 4) if has_valid else 0.0
+        mean_t2_ndvi = round(float(np.mean(scene_t2.true_ndvi[joint_valid])), 4) if has_valid else 0.0
+        mean_delta_ndvi = round(float(np.mean(delta_ndvi[joint_valid])), 4) if has_valid else 0.0
+        mean_t1_ndbi = round(float(np.mean(scene_t1.true_ndbi[joint_valid])), 4) if has_valid else 0.0
+        mean_t2_ndbi = round(float(np.mean(scene_t2.true_ndbi[joint_valid])), 4) if has_valid else 0.0
+        mean_delta_ndbi = round(float(np.mean(delta_ndbi[joint_valid])), 4) if has_valid else 0.0
+
         return {
             "mode": "Genuine Sentinel-2 L2A Multispectral Analysis",
             "sensor": "Sentinel-2 MultiSpectral Instrument (MSI)",
@@ -116,13 +124,13 @@ class MultispectralPipeline:
             "t1_datetime": scene_t1.datetime,
             "t2_scene_id": scene_t2.scene_id,
             "t2_datetime": scene_t2.datetime,
-            "valid_pixel_pct": round(float(valid_px) / float(joint_valid.size) * 100.0, 2),
-            "mean_t1_ndvi": round(float(np.mean(scene_t1.true_ndvi[joint_valid])), 4),
-            "mean_t2_ndvi": round(float(np.mean(scene_t2.true_ndvi[joint_valid])), 4),
-            "mean_delta_ndvi": round(float(np.mean(delta_ndvi[joint_valid])), 4),
-            "mean_t1_ndbi": round(float(np.mean(scene_t1.true_ndbi[joint_valid])), 4),
-            "mean_t2_ndbi": round(float(np.mean(scene_t2.true_ndbi[joint_valid])), 4),
-            "mean_delta_ndbi": round(float(np.mean(delta_ndbi[joint_valid])), 4),
-            "vegetation_loss_pct": round(float(np.sum(veg_loss_mask)) / valid_px * 100.0, 2),
-            "built_expansion_pct": round(float(np.sum(built_gain_mask)) / valid_px * 100.0, 2),
+            "valid_pixel_pct": round(float(np.sum(joint_valid)) / float(joint_valid.size) * 100.0, 2),
+            "mean_t1_ndvi": mean_t1_ndvi,
+            "mean_t2_ndvi": mean_t2_ndvi,
+            "mean_delta_ndvi": mean_delta_ndvi,
+            "mean_t1_ndbi": mean_t1_ndbi,
+            "mean_t2_ndbi": mean_t2_ndbi,
+            "mean_delta_ndbi": mean_delta_ndbi,
+            "vegetation_loss_pct": round(float(np.sum(veg_loss_mask)) / valid_px * 100.0, 2) if has_valid else 0.0,
+            "built_expansion_pct": round(float(np.sum(built_gain_mask)) / valid_px * 100.0, 2) if has_valid else 0.0,
         }
