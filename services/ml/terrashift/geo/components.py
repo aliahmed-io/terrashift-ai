@@ -86,8 +86,10 @@ def vectorize_changes(
 
         # Physical False Alarm Suppression over Arid Landscapes:
         # If genuine multispectral indices (NDBI, NDVI) are present, verify that either
-        # a structural change (building/grading) or vegetative change occurred.
-        # Undisturbed desert brightness shifts have near-zero NDBI and NDVI deltas.
+        # a structural change (building/grading: positive d_true_ndbi >= 0.04) or
+        # vegetative change (|d_true_ndvi| >= 0.10) occurred, or confidence is very high (>= 0.85).
+        # Natural arid variations (sun angle, drying, sabkha salt-crust shifts) produce negative
+        # or negligible NDBI deltas and near-zero NDVI deltas.
         d_true_ndvi: Optional[float] = None
         d_true_ndbi: Optional[float] = None
         if t1_ndvi is not None and t2_ndvi is not None and t1_ndbi is not None and t2_ndbi is not None:
@@ -97,10 +99,17 @@ def vectorize_changes(
             m_ndbi2 = float(np.mean(t2_ndbi[sl][sub]))
             d_true_ndvi = m_ndvi2 - m_ndvi1
             d_true_ndbi = m_ndbi2 - m_ndbi1
-            spectral_delta = max(abs(d_true_ndvi), abs(d_true_ndbi))
 
-            # Suppress spectral false alarms unless confidence is high or area is extensive
-            if spectral_delta < 0.035 and conf < 0.75 and area_m2 < 15000.0:
+            # Directional physical verification:
+            # - Built-up expansion requires positive d_true_ndbi >= 0.04
+            # - Vegetation expansion/loss requires |d_true_ndvi| >= 0.10
+            # - Or high neural model confidence >= 0.85
+            is_valid_spectral_change = (
+                (d_true_ndbi >= 0.04)
+                or (abs(d_true_ndvi) >= 0.10)
+                or (conf >= 0.85)
+            )
+            if not is_valid_spectral_change:
                 continue
 
             kind = classify_change(m_ndvi1, m_ndvi2, m_ndbi1, m_ndbi2, 0.0, 0.0)

@@ -27,61 +27,101 @@ interface SaudiCorridorResult {
   name: string;
   region: string;
   environment_type: string;
+  is_held_out?: boolean;
   aoi_km2: number;
   data_source: string;
   scene_t1_id: string;
   scene_t1_date: string;
   scene_t2_id: string;
   scene_t2_date: string;
-  valid_coverage_pct: number;
+  scl_surface_validity_pct?: number;
+  valid_coverage_pct?: number;
   total_predicted_alerts: number;
   true_positive_alerts: number;
-  false_positive_alerts: number;
-  event_precision: number;
+  duplicate_detection_alerts?: number;
+  background_false_alerts?: number;
+  total_false_alerts?: number;
+  reference_events_total?: number;
+  reference_events_detected?: number;
+  strict_event_precision?: number;
+  event_validity_precision?: number;
+  event_precision?: number;
+  duplicate_alert_rate?: number;
   event_recall: number;
   false_alerts_per_100km2: number;
+  bg_false_alerts_per_100km2?: number;
+  false_alarms_in_negative_zones?: number;
   total_changed_km2: number;
   timing: {
     acquisition_s: number;
     inference_s: number;
     vectorization_s: number;
+    pure_compute_s?: number;
     total_latency_s: number;
   };
+}
+
+interface SaudiSummaryMode {
+  corridors_evaluated: number;
+  total_aoi_km2: number;
+  total_predicted_alerts: number;
+  total_true_positives: number;
+  total_duplicate_detections?: number;
+  total_background_false_alarms?: number;
+  total_false_positives: number;
+  total_false_alarms_in_negative_zones?: number;
+  mean_strict_event_precision?: number;
+  mean_event_precision?: number;
+  mean_event_validity_precision?: number;
+  mean_duplicate_alert_rate?: number;
+  mean_event_recall: number;
+  macro_false_alerts_per_100km2?: number;
+  pooled_false_alerts_per_100km2?: number;
+  mean_false_alerts_per_100km2?: number;
+  mean_scl_validity_pct?: number;
+  latency_benchmarks?: {
+    mean_cpu_inference_s: number;
+    mean_cpu_vectorization_s: number;
+    mean_pure_compute_latency_s: number;
+    mean_total_pipeline_latency_s: number;
+  };
+  mean_inference_s?: number;
+  mean_total_latency_s?: number;
 }
 
 interface SaudiBenchmarkData {
   benchmark_name: string;
   evaluation_timestamp: string;
-  comparative_summary: {
-    baseline_untuned: {
-      total_aoi_km2: number;
-      total_predicted_alerts: number;
-      total_true_positives: number;
-      total_false_positives: number;
-      mean_event_precision: number;
-      mean_event_recall: number;
-      mean_false_alerts_per_100km2: number;
-      mean_valid_coverage_pct: number;
-      mean_total_latency_s: number;
-      mean_inference_s: number;
-    };
-    tuned_spectrally_filtered: {
-      total_aoi_km2: number;
-      total_predicted_alerts: number;
-      total_true_positives: number;
-      total_false_positives: number;
-      mean_event_precision: number;
-      mean_event_recall: number;
-      mean_false_alerts_per_100km2: number;
-      mean_valid_coverage_pct: number;
-      mean_total_latency_s: number;
-      mean_inference_s: number;
-    };
+  description?: string;
+  methodology_notes?: Record<string, string>;
+  comparative_summary_all_corridors?: {
+    baseline_untuned: SaudiSummaryMode;
+    tuned_spectrally_filtered: SaudiSummaryMode;
     improvements: {
       false_positive_reduction_pct: number;
-      precision_gain_percentage_points: number;
+      strict_precision_gain_pp?: number;
+      precision_gain_percentage_points?: number;
+      negative_zone_false_alarms?: string;
       recall_maintained: boolean;
     };
+  };
+  comparative_summary?: {
+    baseline_untuned: SaudiSummaryMode;
+    tuned_spectrally_filtered: SaudiSummaryMode;
+    improvements: {
+      false_positive_reduction_pct: number;
+      precision_gain_percentage_points?: number;
+      recall_maintained: boolean;
+    };
+  };
+  core_corridors_summary?: {
+    baseline_untuned: SaudiSummaryMode;
+    tuned_spectrally_filtered: SaudiSummaryMode;
+  };
+  held_out_corridor_summary?: {
+    corridor_id: string;
+    baseline_untuned: SaudiSummaryMode;
+    tuned_spectrally_filtered: SaudiSummaryMode;
   };
   per_corridor_results_tuned: SaudiCorridorResult[];
   per_corridor_results_baseline: SaudiCorridorResult[];
@@ -173,33 +213,33 @@ export default function BenchmarksPage() {
       title: saudiTuned[0]?.name ?? "Riyadh ROSHN Sedra",
       sub: "Arid Limestone Plateau (17,9 km²)",
       img: getRasterUrl("magma", tau),
-      left: `${formatComma((saudiTuned[0]?.event_precision ?? 0.647) * 100, 1)} % Prec`,
-      right: `${formatComma(saudiTuned[0]?.false_alerts_per_100km2 ?? 33.5, 1)} FA/100km²`,
-      stat: `Recall: ${formatComma((saudiTuned[0]?.event_recall ?? 1.0) * 100, 0)}% (3/3 events)`,
+      left: `${formatComma(((saudiTuned[0]?.strict_event_precision ?? saudiTuned[0]?.event_precision) ?? 0.556) * 100, 1)} % Strict Prec`,
+      right: `${formatComma(saudiTuned[0]?.false_alerts_per_100km2 ?? 22.3, 1)} FA/100km²`,
+      stat: `Recall: ${formatComma((saudiTuned[0]?.event_recall ?? 1.0) * 100, 0)}% (${saudiTuned[0]?.reference_events_detected ?? 5}/5 events) · 0 Neg Hits`,
     },
     {
       title: saudiTuned[1]?.name ?? "Jeddah North Obhur",
       sub: "Coastal Marine Plain (18,3 km²)",
       img: getRasterUrl("ndbi", tau),
-      left: `${formatComma((saudiTuned[1]?.event_precision ?? 0.333) * 100, 1)} % Prec`,
-      right: `${formatComma(saudiTuned[1]?.false_alerts_per_100km2 ?? 65.5, 1)} FA/100km²`,
-      stat: `Recall: ${formatComma((saudiTuned[1]?.event_recall ?? 1.0) * 100, 0)}% (2/2 events)`,
+      left: `${formatComma(((saudiTuned[1]?.strict_event_precision ?? saudiTuned[1]?.event_precision) ?? 0.800) * 100, 1)} % Strict Prec`,
+      right: `${formatComma(saudiTuned[1]?.false_alerts_per_100km2 ?? 5.5, 1)} FA/100km²`,
+      stat: `Recall: ${formatComma((saudiTuned[1]?.event_recall ?? 1.0) * 100, 0)}% (${saudiTuned[1]?.reference_events_detected ?? 4}/4 events) · 0 Neg Hits`,
     },
     {
       title: saudiTuned[2]?.name ?? "Al-Jouf Sirhan Basin",
       sub: "Center-Pivot Irrigation (26,8 km²)",
       img: getRasterUrl("nir", tau),
-      left: `${formatComma((saudiTuned[2]?.event_precision ?? 0.318) * 100, 1)} % Prec`,
-      right: `${formatComma(saudiTuned[2]?.false_alerts_per_100km2 ?? 56.0, 1)} FA/100km²`,
-      stat: `Recall: ${formatComma((saudiTuned[2]?.event_recall ?? 1.0) * 100, 0)}% (1/1 event)`,
+      left: `${formatComma(((saudiTuned[2]?.strict_event_precision ?? saudiTuned[2]?.event_precision) ?? 0.227) * 100, 1)} % Strict Prec`,
+      right: `${formatComma(saudiTuned[2]?.false_alerts_per_100km2 ?? 63.4, 1)} FA/100km²`,
+      stat: `Recall: ${formatComma((saudiTuned[2]?.event_recall ?? 1.0) * 100, 0)}% (${saudiTuned[2]?.reference_events_detected ?? 5}/5 events) · 0 Neg Hits`,
     },
     {
-      title: "Saudi Deployment Aggregate",
-      sub: "Controlled Physical Ablation (63 km²)",
+      title: saudiTuned[3]?.name ?? "Al-Kharj Logistics Corridor",
+      sub: "Held-Out Test Corridor (28,2 km²)",
       img: getRasterUrl("confusion", tau),
-      left: `-${saudiData?.comparative_summary?.improvements?.false_positive_reduction_pct ?? 46.8} % False Alarms`,
-      right: "100 % Event Recall",
-      stat: `CPU: ${saudiData?.comparative_summary?.tuned_spectrally_filtered?.mean_inference_s ?? 0.38}s / scene`,
+      left: `${formatComma(((saudiTuned[3]?.strict_event_precision ?? saudiTuned[3]?.event_precision) ?? 0.235) * 100, 1)} % Strict Prec`,
+      right: `${formatComma(saudiTuned[3]?.false_alerts_per_100km2 ?? 46.2, 1)} FA/100km²`,
+      stat: `Recall: ${formatComma((saudiTuned[3]?.event_recall ?? 0.80) * 100, 0)}% (${saudiTuned[3]?.reference_events_detected ?? 4}/5 events) · 0 Neg Hits`,
     },
   ];
 
@@ -331,65 +371,83 @@ export default function BenchmarksPage() {
               <div>
                 <div className="flex items-center justify-between">
                   <h3 className="text-[15px] font-semibold text-[#1c1f23]">
-                    Saudi Controlled Ablation (63,04 km² Reference Benchmark)
+                    Saudi Controlled Ablation (91,19 km² · 4 Corridors)
                   </h3>
                   <span className="rounded-full bg-[#22b567]/10 px-2.5 py-0.5 text-[11.5px] font-semibold text-[#22b567]">
-                    -46.8% False Alarms
+                    -69.6% False Alarms
                   </span>
                 </div>
                 <p className="mt-0.5 text-[12px] text-[#8c929c]">
-                  Comparison between raw RGB Siamese baseline and tuned detector with L2A physical spectral filtering
+                  Strict greedy 1-to-1 matching: raw RGB Siamese baseline vs tuned detector with L2A physical spectral filtering
                 </p>
               </div>
 
               <div className="my-auto overflow-hidden rounded-xl border border-[#edf0f3]">
-                <table className="w-full text-left text-[12px]">
-                  <thead className="bg-[#f7f8fa] text-[11px] uppercase tracking-wider text-[#8c929c]">
+                <table className="w-full text-left text-[11.5px]">
+                  <thead className="bg-[#f7f8fa] text-[10.5px] uppercase tracking-wider text-[#8c929c]">
                     <tr>
-                      <th className="px-3.5 py-2">Metric</th>
-                      <th className="px-3.5 py-2">Untuned Baseline</th>
-                      <th className="px-3.5 py-2">Tuned + Spectrally Filtered</th>
-                      <th className="px-3.5 py-2 text-right">Delta</th>
+                      <th className="px-3 py-1.5">Metric</th>
+                      <th className="px-3 py-1.5">Untuned Baseline</th>
+                      <th className="px-3 py-1.5">Tuned + Spectrally Filtered</th>
+                      <th className="px-3 py-1.5 text-right">Delta</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#edf0f3] font-medium text-[#1c1f23] tabular-nums">
                     <tr>
-                      <td className="px-3.5 py-2">Mean Event Precision</td>
-                      <td className="px-3.5 py-2 text-[#5c626b]">30,3 %</td>
-                      <td className="px-3.5 py-2 font-semibold text-[#22b567]">43,3 % (Riyadh: 64,7%)</td>
-                      <td className="px-3.5 py-2 text-right text-[#22b567]">+13,0 pp</td>
+                      <td className="px-3 py-1.5">Mean Strict 1-to-1 Precision</td>
+                      <td className="px-3 py-1.5 text-[#5c626b]">14,0 %</td>
+                      <td className="px-3 py-1.5 font-semibold text-[#22b567]">45,5 % (Jeddah: 80,0%, Riyadh: 55,6%)</td>
+                      <td className="px-3 py-1.5 text-right text-[#22b567]">+31,4 pp</td>
                     </tr>
                     <tr>
-                      <td className="px-3.5 py-2">Mean Event Recall</td>
-                      <td className="px-3.5 py-2 text-[#5c626b]">88,9 %</td>
-                      <td className="px-3.5 py-2 font-semibold text-[#22b567]">100,0 % (6/6 events)</td>
-                      <td className="px-3.5 py-2 text-right text-[#22b567]">+11,1 pp</td>
+                      <td className="px-3 py-1.5">Event Validity Precision</td>
+                      <td className="px-3 py-1.5 text-[#5c626b]">15,4 %</td>
+                      <td className="px-3 py-1.5 font-semibold text-[#22b567]">50,1 % (excluding duplicate fragments)</td>
+                      <td className="px-3 py-1.5 text-right text-[#22b567]">+34,6 pp</td>
                     </tr>
                     <tr>
-                      <td className="px-3.5 py-2">Total False Positive Alerts</td>
-                      <td className="px-3.5 py-2 text-[#e94235]">62 alerts</td>
-                      <td className="px-3.5 py-2 font-semibold text-[#22b567]">33 alerts</td>
-                      <td className="px-3.5 py-2 text-right text-[#22b567]">-46,8 %</td>
+                      <td className="px-3 py-1.5">Mean Event Recall</td>
+                      <td className="px-3 py-1.5 text-[#5c626b]">90,0 %</td>
+                      <td className="px-3 py-1.5 font-semibold text-[#22b567]">95,0 % (100% Core, 80% Held-Out)</td>
+                      <td className="px-3 py-1.5 text-right text-[#22b567]">+5,0 pp</td>
                     </tr>
                     <tr>
-                      <td className="px-3.5 py-2">False Alerts per 100 km²</td>
-                      <td className="px-3.5 py-2 text-[#5c626b]">103,1</td>
-                      <td className="px-3.5 py-2 font-semibold text-[#22b567]">51,7 / 100km²</td>
-                      <td className="px-3.5 py-2 text-right text-[#22b567]">-51,4</td>
+                      <td className="px-3 py-1.5">Total False Alerts (All AOI)</td>
+                      <td className="px-3 py-1.5 text-[#e94235]">115 alerts</td>
+                      <td className="px-3 py-1.5 font-semibold text-[#22b567]">35 alerts (4 dup, 31 bg)</td>
+                      <td className="px-3 py-1.5 text-right text-[#22b567]">-69,6 %</td>
                     </tr>
                     <tr>
-                      <td className="px-3.5 py-2">CPU Inference Latency</td>
-                      <td className="px-3.5 py-2 text-[#5c626b]">0,397 s</td>
-                      <td className="px-3.5 py-2 font-semibold text-[#1c1f23]">0,383 s</td>
-                      <td className="px-3.5 py-2 text-right text-[#5c626b]">-0,014 s</td>
+                      <td className="px-3 py-1.5">Pooled False Alerts / 100 km²</td>
+                      <td className="px-3 py-1.5 text-[#5c626b]">126,1</td>
+                      <td className="px-3 py-1.5 font-semibold text-[#22b567]">38,4 / 100km²</td>
+                      <td className="px-3 py-1.5 text-right text-[#22b567]">-87,7</td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-1.5">Macro False Alerts / 100 km²</td>
+                      <td className="px-3 py-1.5 text-[#5c626b]">129,4</td>
+                      <td className="px-3 py-1.5 font-semibold text-[#22b567]">34,4 / 100km²</td>
+                      <td className="px-3 py-1.5 text-right text-[#22b567]">-95,0</td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-1.5">Negative Control Zone Hits</td>
+                      <td className="px-3 py-1.5 text-[#e94235]">3 alerts</td>
+                      <td className="px-3 py-1.5 font-semibold text-[#22b567]">0 alerts (0 in all 4 zones)</td>
+                      <td className="px-3 py-1.5 text-right text-[#22b567]">100% suppressed</td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-1.5">Pure CPU Compute Latency</td>
+                      <td className="px-3 py-1.5 text-[#5c626b]">1,509 s</td>
+                      <td className="px-3 py-1.5 font-semibold text-[#1c1f23]">1,418 s (Inference: 1,17s)</td>
+                      <td className="px-3 py-1.5 text-right text-[#5c626b]">-0,091 s</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
 
               <div className="flex items-center justify-between text-[11px] text-[#8c929c]">
-                <span>Ground truth annotated across cloudless Sentinel-2 L2A milestone archives</span>
-                <span className="font-semibold text-[#1c1f23]">100% SCL Valid Data Coverage</span>
+                <span>Preliminary Saudi Pilot (v5.1) · Greedy 1-to-1 event assignment</span>
+                <span className="font-semibold text-[#1c1f23]">100% SCL Valid Land Coverage</span>
               </div>
             </div>
 
@@ -398,32 +456,41 @@ export default function BenchmarksPage() {
               <div>
                 <h3 className="text-[15px] font-semibold text-[#1c1f23]">Authentic Multispectral Pipeline</h3>
                 <p className="mt-0.5 text-[12px] text-[#8c929c]">
-                  Physical Sentinel-2 L2A band streaming via Element 84 AWS Earth Search
+                  Physical Sentinel-2 L2A BOA reflectance streaming via AWS Earth Search
                 </p>
               </div>
 
-              <div className="space-y-2.5 text-[12px]">
-                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2.5">
+              <div className="space-y-2 text-[11.5px]">
+                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2">
                   <span className="text-[#5c626b]">AWS Open Data STAC</span>
                   <span className="font-semibold text-[#1c1f23]">Windowed COG HTTP Range Reads</span>
                 </div>
-                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2.5">
+                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2">
                   <span className="text-[#5c626b]">Multi-Resolution Alignment</span>
                   <span className="font-semibold text-[#1c1f23]">B11 (20m) & SCL aligned to 10m grid</span>
                 </div>
-                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2.5">
+                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2">
                   <span className="text-[#5c626b]">Physical Spectral Guard</span>
-                  <span className="font-semibold text-[#22b567]">True ΔNDBI (Built) + True ΔNDVI (Agri)</span>
+                  <span className="font-semibold text-[#22b567]">Directional ΔNDBI (Built) + ΔNDVI (Agri)</span>
                 </div>
-                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2.5">
-                  <span className="text-[#5c626b]">Cloud & Shadow Mask</span>
-                  <span className="font-semibold text-[#1c1f23]">SCL Quality Classes (3, 8, 9, 10 masked)</span>
+                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2">
+                  <span className="text-[#5c626b]">Held-Out Generalization</span>
+                  <span className="font-semibold text-[#1c1f23]">Al-Kharj (28,2 km²) Frozen Hyperparameters</span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2">
+                  <span className="text-[#5c626b]">SCL Surface Validity Mask</span>
+                  <span className="font-semibold text-[#1c1f23]">Quality Classes (3, 8, 9, 10 masked)*</span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-[#e2e8f0] bg-[#fafbfc] px-3 py-2 text-[11.5px]">
-                <span className="font-medium text-[#5c626b]">Workstation Profiling</span>
-                <span className="font-semibold text-[#1c1f23]">301 MB RAM · Local CPU · $0 Cloud Cost</span>
+              <div className="flex flex-col gap-1 rounded-lg border border-[#e2e8f0] bg-[#fafbfc] px-3 py-2 text-[11px] text-[#5c626b]">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Local CPU Execution</span>
+                  <span className="font-semibold text-[#1c1f23]">301 MB RAM · $0 Cloud Cost</span>
+                </div>
+                <p className="text-[10px] text-[#8c929c] leading-tight">
+                  *SCL masks guarantee clear-land surface validity under standard criteria; thin sub-pixel cirrus or dust haze can pass.
+                </p>
               </div>
             </div>
           </div>
