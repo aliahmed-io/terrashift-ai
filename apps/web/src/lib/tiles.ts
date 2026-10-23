@@ -26,8 +26,7 @@ export const HOTSPOT_PRESETS: readonly HotspotPreset[] = [
     id: "riyadh",
     name: "New Riyadh: ROSHN Sedra & King Salman Park",
     location: "Riyadh, Saudi Arabia",
-    description:
-      "Vision 2030 urban mega-district development, Sports Boulevard, and Green Riyadh canopy expansion.",
+    description: "Vision 2030 urban mega-district development, Sports Boulevard, and Green Riyadh canopy expansion.",
     yearT1: 2018,
     yearT2: 2024,
     center: [46.745, 24.835],
@@ -155,11 +154,11 @@ export const HOTSPOT_PRESETS: readonly HotspotPreset[] = [
     center: [60.05, 45.12],
     zoom: 11.5,
     polygon: [
-      [60.00, 45.08],
-      [60.10, 45.08],
-      [60.10, 45.15],
-      [60.00, 45.15],
-      [60.00, 45.08],
+      [60.0, 45.08],
+      [60.1, 45.08],
+      [60.1, 45.15],
+      [60.0, 45.15],
+      [60.0, 45.08],
     ],
   },
 ];
@@ -172,8 +171,7 @@ export function getEoxTileUrl(year: number): string {
 export function getEoxTileUrls(year: number): string[] {
   const y = Math.max(MIN_YEAR, Math.min(MAX_YEAR, year));
   return ["a", "b", "c", "d"].map(
-    (sub) =>
-      `https://${sub}.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-${y}_3857/default/g/{z}/{y}/{x}.jpg`,
+    (sub) => `https://${sub}.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-${y}_3857/default/g/{z}/{y}/{x}.jpg`,
   );
 }
 
@@ -182,9 +180,7 @@ export function getHighResTileUrl(): string {
 }
 
 export function getHighResTileUrls(): string[] {
-  return ["0", "1", "2", "3"].map(
-    (sub) => `https://mt${sub}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}`,
-  );
+  return ["0", "1", "2", "3"].map((sub) => `https://mt${sub}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}`);
 }
 
 export function getMapboxStyleUrl(): string {

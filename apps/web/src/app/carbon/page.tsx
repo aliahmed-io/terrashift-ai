@@ -45,7 +45,7 @@ export default function CarbonPage() {
             voluntary_credit_value_usd_millions?: number;
             equivalent_passenger_vehicles_yr?: number;
             pools?: CarbonPool[];
-          } | null
+          } | null,
         ) => {
           if (!cancelled && data) {
             if (typeof data.net_balance_tco2e === "number") {
@@ -61,7 +61,7 @@ export default function CarbonPage() {
               setPools(data.pools);
             }
           }
-        }
+        },
       )
       .catch(() => {
         // Fallback already in state
@@ -72,11 +72,7 @@ export default function CarbonPage() {
   }, [biome, priceUsd, temporalModifier]);
 
   const cycleBiome = () => {
-    const order = [
-      "arid_afforestation",
-      "coastal_mangrove",
-      "tropical_moist_forest",
-    ];
+    const order = ["arid_afforestation", "coastal_mangrove", "tropical_moist_forest"];
     const next = order[(order.indexOf(biome) + 1) % order.length] ?? "arid_afforestation";
     setBiome(next);
   };
@@ -114,9 +110,9 @@ export default function CarbonPage() {
 
   return (
     <StudioShell>
-      <div className="w-full h-full p-6 grid grid-cols-12 gap-5 overflow-hidden">
-        <div className="col-span-7 bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-5 flex flex-col min-h-0">
-          <div className="flex items-center justify-between mb-3">
+      <div className="grid h-full w-full grid-cols-12 gap-5 overflow-hidden p-6">
+        <div className="col-span-7 flex min-h-0 flex-col rounded-[20px] bg-white p-5 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
+          <div className="mb-3 flex items-center justify-between">
             <div>
               <h2 className="text-[16px] font-semibold text-[#1c1f23]">
                 Spatial Carbon Flux &amp; Thermal Shift (ΔLST Proxy)
@@ -129,118 +125,91 @@ export default function CarbonPage() {
               type="button"
               onClick={cycleBiome}
               title="Click to cycle IPCC biome tier (Tier-1 default ±30% uncertainty)"
-              className="text-[12px] font-semibold text-[#22b567] hover:opacity-80 transition-opacity cursor-pointer"
+              className="cursor-pointer text-[12px] font-semibold text-[#22b567] transition-opacity hover:opacity-80"
             >
               IPCC Tier-1 (±30% Est.)
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
-            <div className="flex flex-col min-h-0">
-              <div className="flex items-center justify-between text-[12px] mb-2">
-                <span className="font-medium text-[#3b4048]">
-                  Carbon Flux Density
-                </span>
+          <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
+            <div className="flex min-h-0 flex-col">
+              <div className="mb-2 flex items-center justify-between text-[12px]">
+                <span className="font-medium text-[#3b4048]">Carbon Flux Density</span>
                 <span className="font-semibold text-[#22b567]">
                   {formatComma(activeCorridor.carbonMgPerHa * temporalModifier, 1)} Mg C / ha
                 </span>
               </div>
-              <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
-                <img
-                  src={getRasterUrl("carbon")}
-                  alt="Carbon Flux Map"
-                  className="w-full h-full object-cover"
-                />
+              <div className="relative min-h-0 flex-1 overflow-hidden rounded-[14px]">
+                <img src={getRasterUrl("carbon")} alt="Carbon Flux Map" className="h-full w-full object-cover" />
               </div>
             </div>
 
-            <div className="flex flex-col min-h-0">
-              <div className="flex items-center justify-between text-[12px] mb-2">
-                <span className="font-medium text-[#3b4048]">
-                  Thermal Shift (ΔLST)
-                </span>
+            <div className="flex min-h-0 flex-col">
+              <div className="mb-2 flex items-center justify-between text-[12px]">
+                <span className="font-medium text-[#3b4048]">Thermal Shift (ΔLST)</span>
                 <span className="font-semibold text-[#f39223]">
                   {formatComma(activeCorridor.thermalDeltaC * temporalModifier, 1)} °C Canopy Cooling
                 </span>
               </div>
-              <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
-                <img
-                  src={getRasterUrl("thermal")}
-                  alt="Thermal Shift Map"
-                  className="w-full h-full object-cover"
-                />
+              <div className="relative min-h-0 flex-1 overflow-hidden rounded-[14px]">
+                <img src={getRasterUrl("thermal")} alt="Thermal Shift Map" className="h-full w-full object-cover" />
               </div>
             </div>
           </div>
         </div>
 
-        <div className="col-span-5 bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-7 flex flex-col justify-between min-h-0">
+        <div className="col-span-5 flex min-h-0 flex-col justify-between rounded-[20px] bg-white p-7 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
           <div>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-[18px] font-semibold text-[#1c1f23]">
-                IPCC 4-Pool Carbon Ledger
-              </h3>
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-[18px] font-semibold text-[#1c1f23]">IPCC 4-Pool Carbon Ledger</h3>
               <button
                 type="button"
                 onClick={() => setPriceUsd((p) => (p === 35 ? 50 : p === 50 ? 25 : 35))}
                 title="Click to toggle VCM carbon credit price ($25 / $35 / $50)"
-                className="text-[12px] text-[#8c929c] hover:text-[#1c1f23] transition-colors cursor-pointer"
+                className="cursor-pointer text-[12px] text-[#8c929c] transition-colors hover:text-[#1c1f23]"
               >
                 Verra VM0047 (${priceUsd}/t)
               </button>
             </div>
 
-            <div className="text-[13px] font-medium text-[#3b4048] mb-5">
-              Stoichiometric Pool Breakdown
-            </div>
+            <div className="mb-5 text-[13px] font-medium text-[#3b4048]">Stoichiometric Pool Breakdown</div>
 
             <div className="space-y-4">
               {displayPools.map((p, idx) => (
                 <div key={idx}>
-                  <div className="flex items-center justify-between text-[12.5px] mb-2">
-                    <span className="font-semibold text-[#1c1f23] tabular-nums">
-                      {p.val}
-                    </span>
+                  <div className="mb-2 flex items-center justify-between text-[12.5px]">
+                    <span className="font-semibold text-[#1c1f23] tabular-nums">{p.val}</span>
                     <div className="flex items-center gap-3 tabular-nums">
                       <span className="font-medium text-[#3b4048]">{p.dist}</span>
-                      <span className="text-[#9aa0aa] w-9 text-right">{p.pct}</span>
+                      <span className="w-9 text-right text-[#9aa0aa]">{p.pct}</span>
                     </div>
                   </div>
-                  <div className="h-[5px] w-full bg-[#edeff2] rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${p.color}`}
-                      style={{ width: p.w }}
-                    />
+                  <div className="h-[5px] w-full overflow-hidden rounded-full bg-[#edeff2]">
+                    <div className={`h-full rounded-full ${p.color}`} style={{ width: p.w }} />
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="pt-5 border-t border-[#edeff2] grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-3 gap-3 border-t border-[#edeff2] pt-5 text-center">
             <div>
               <div className="text-[16px] font-semibold text-[#1c1f23] tabular-nums">
                 {formatComma(netSinkTco2e / 1000, 1)}k
               </div>
-              <div className="text-[11px] text-[#8c929c] mt-0.5">
-                Net tCO2e Sink
-              </div>
+              <div className="mt-0.5 text-[11px] text-[#8c929c]">Net tCO2e Sink</div>
             </div>
             <div>
               <div className="text-[16px] font-semibold text-[#22b567] tabular-nums">
                 ${formatComma(vcmValuationM, 2)}M
               </div>
-              <div className="text-[11px] text-[#8c929c] mt-0.5">
-                VCM Valuation
-              </div>
+              <div className="mt-0.5 text-[11px] text-[#8c929c]">VCM Valuation</div>
             </div>
             <div>
               <div className="text-[16px] font-semibold text-[#1c1f23] tabular-nums">
                 {vehiclesYr.toLocaleString("en-US")}
               </div>
-              <div className="text-[11px] text-[#8c929c] mt-0.5">
-                Vehicles / Yr
-              </div>
+              <div className="mt-0.5 text-[11px] text-[#8c929c]">Vehicles / Yr</div>
             </div>
           </div>
         </div>

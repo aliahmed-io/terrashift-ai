@@ -67,8 +67,7 @@ export const KSA_MISSION_SITES: readonly KsaMissionSite[] = [
     pillBadgeTone: "amber",
     targetHeader: "RIYADH METROPOLITAN TRANSFORMATION (NORTH-CENTRAL AXIS)",
     mgrs: "MGRS: 38R MV 6842 3418",
-    acquisitionSubtitle:
-      "Acquisition: Sentinel-2 MSI L2A (10m) True Color Composites",
+    acquisitionSubtitle: "Acquisition: Sentinel-2 MSI L2A (10m) True Color Composites",
     crs: "EPSG:32638 (UTM 38N)",
     cloudCover: "0.02%",
     depth: "12-BIT BOA L2A",
@@ -77,10 +76,8 @@ export const KSA_MISSION_SITES: readonly KsaMissionSite[] = [
     lon: 46.745,
     anchorT0Label: "SENTINEL-2A: 2018-04-12 [PRE-DEVELOPMENT]",
     inferredT1Label: "SIAMESE-U-NET-M1: 2024-03-28 [TRANSFORMATION]",
-    baseImage:
-      "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/12/1778/2580.jpg",
-    overlayImage:
-      "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/12/1778/2580.jpg",
+    baseImage: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/12/1778/2580.jpg",
+    overlayImage: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/12/1778/2580.jpg",
     benchmarks: {
       iou: "25.19%",
       iouDelta: "+2.19%",
@@ -95,10 +92,8 @@ export const KSA_MISSION_SITES: readonly KsaMissionSite[] = [
     },
     bfast: {
       subtitle: "Multi-Year Velocity & Urban Expansion Trajectory (2017 - 2030 Scenario)",
-      svgPathBaseline:
-        "M 0,90 Q 30,80 60,90 T 120,92 T 180,95 L 210,110 L 260,115 L 320,60 L 390,30 L 450,20 L 500,15",
-      svgPathUpperCi:
-        "M 0,85 Q 30,75 60,85 T 120,87 T 180,90 L 210,105 L 260,110 L 320,52 L 390,24 L 450,14 L 500,10",
+      svgPathBaseline: "M 0,90 Q 30,80 60,90 T 120,92 T 180,95 L 210,110 L 260,115 L 320,60 L 390,30 L 450,20 L 500,15",
+      svgPathUpperCi: "M 0,85 Q 30,75 60,85 T 120,87 T 180,90 L 210,105 L 260,110 L 320,52 L 390,24 L 450,14 L 500,10",
       markers: [
         { cx: 210, cy: 110, color: "#FF3B5C" },
         { cx: 320, cy: 60, color: "#00F5A0" },
@@ -133,8 +128,7 @@ export const KSA_MISSION_SITES: readonly KsaMissionSite[] = [
     pillBadgeTone: "cyan",
     targetHeader: "NEOM THE LINE — LINEAR FOUNDATION CORRIDOR & SPINE",
     mgrs: "MGRS: 36R VU 9814 0821",
-    acquisitionSubtitle:
-      "Acquisition: Sentinel-2 MSI L2A (10m) Multi-Temporal Composites",
+    acquisitionSubtitle: "Acquisition: Sentinel-2 MSI L2A (10m) Multi-Temporal Composites",
     crs: "EPSG:32636 (UTM 36N)",
     cloudCover: "0.00%",
     depth: "12-BIT BOA L2A",
@@ -143,10 +137,8 @@ export const KSA_MISSION_SITES: readonly KsaMissionSite[] = [
     lon: 35.085,
     anchorT0Label: "SENTINEL-2A: 2018-05-19 [UNTOUCHED TABUK BASIN]",
     inferredT1Label: "SIAMESE-U-NET-M1: 2024-04-14 [EXCAVATION TRENCH]",
-    baseImage:
-      "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/12/1714/2447.jpg",
-    overlayImage:
-      "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/12/1714/2447.jpg",
+    baseImage: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/12/1714/2447.jpg",
+    overlayImage: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/12/1714/2447.jpg",
     benchmarks: {
       iou: "25.19%",
       iouDelta: "+2.19%",
@@ -161,10 +153,8 @@ export const KSA_MISSION_SITES: readonly KsaMissionSite[] = [
     },
     bfast: {
       subtitle: "Linear Earthworks Velocity & Spine Excavation Breakpoint (2017 - 2030 Scenario)",
-      svgPathBaseline:
-        "M 0,102 Q 40,100 90,101 T 180,100 L 225,82 L 290,48 L 360,28 L 430,18 L 500,12",
-      svgPathUpperCi:
-        "M 0,97 Q 40,95 90,96 T 180,95 L 225,75 L 290,40 L 360,21 L 430,12 L 500,7",
+      svgPathBaseline: "M 0,102 Q 40,100 90,101 T 180,100 L 225,82 L 290,48 L 360,28 L 430,18 L 500,12",
+      svgPathUpperCi: "M 0,97 Q 40,95 90,96 T 180,95 L 225,75 L 290,40 L 360,21 L 430,12 L 500,7",
       markers: [
         { cx: 225, cy: 82, color: "#FF3B5C" },
         { cx: 290, cy: 48, color: "#FFB020" },
@@ -199,8 +189,7 @@ export const KSA_MISSION_SITES: readonly KsaMissionSite[] = [
     pillBadgeTone: "emerald",
     targetHeader: "RED SEA GLOBAL — SHURA ISLAND CAUSEWAY & LAGOON",
     mgrs: "MGRS: 37R KL 9240 0912",
-    acquisitionSubtitle:
-      "Acquisition: Sentinel-2 MSI L2A Bathymetric & Coastal Stack",
+    acquisitionSubtitle: "Acquisition: Sentinel-2 MSI L2A Bathymetric & Coastal Stack",
     crs: "EPSG:32637 (UTM 37N)",
     cloudCover: "0.01%",
     depth: "12-BIT BOA L2A",
@@ -209,10 +198,8 @@ export const KSA_MISSION_SITES: readonly KsaMissionSite[] = [
     lon: 36.935,
     anchorT0Label: "SENTINEL-2A: 2018-03-08 [UNINHABITED ATOLL]",
     inferredT1Label: "SIAMESE-U-NET-M1: 2024-03-22 [3.3KM SEA BRIDGE & RESORTS]",
-    baseImage:
-      "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/12/1749/2468.jpg",
-    overlayImage:
-      "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/12/1749/2468.jpg",
+    baseImage: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/12/1749/2468.jpg",
+    overlayImage: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/12/1749/2468.jpg",
     benchmarks: {
       iou: "25.19%",
       iouDelta: "+2.19%",
@@ -227,10 +214,8 @@ export const KSA_MISSION_SITES: readonly KsaMissionSite[] = [
     },
     bfast: {
       subtitle: "Coastal Causeway Construction & Mangrove Expansion (2017 - 2030 Scenario)",
-      svgPathBaseline:
-        "M 0,95 Q 50,92 100,94 T 190,93 L 240,68 L 310,45 L 380,32 L 450,22 L 500,18",
-      svgPathUpperCi:
-        "M 0,90 Q 50,87 100,89 T 190,88 L 240,61 L 310,38 L 380,26 L 450,16 L 500,12",
+      svgPathBaseline: "M 0,95 Q 50,92 100,94 T 190,93 L 240,68 L 310,45 L 380,32 L 450,22 L 500,18",
+      svgPathUpperCi: "M 0,90 Q 50,87 100,89 T 190,88 L 240,61 L 310,38 L 380,26 L 450,16 L 500,12",
       markers: [
         { cx: 240, cy: 68, color: "#FFB020" },
         { cx: 310, cy: 45, color: "#00F5A0" },
@@ -265,8 +250,7 @@ export const KSA_MISSION_SITES: readonly KsaMissionSite[] = [
     pillBadgeTone: "slate",
     targetHeader: "AL-JOUF WADI AS-SIRHAN — CENTER-PIVOT AFFORESTATION OASIS",
     mgrs: "MGRS: 37R MP 3781 1690",
-    acquisitionSubtitle:
-      "Acquisition: Sentinel-2 MSI L2A Agricultural Composites",
+    acquisitionSubtitle: "Acquisition: Sentinel-2 MSI L2A Agricultural Composites",
     crs: "EPSG:32637 (UTM 37N)",
     cloudCover: "0.00%",
     depth: "12-BIT BOA L2A",
@@ -275,10 +259,8 @@ export const KSA_MISSION_SITES: readonly KsaMissionSite[] = [
     lon: 38.355,
     anchorT0Label: "SENTINEL-2A: 2018-03-15 [BASELINE ARID BASIN]",
     inferredT1Label: "SIAMESE-U-NET-M1: 2024-03-30 [OLIVE & PIVOT EXPANSION]",
-    baseImage:
-      "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/11/845/1242.jpg",
-    overlayImage:
-      "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/11/845/1242.jpg",
+    baseImage: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/g/11/845/1242.jpg",
+    overlayImage: "https://a.tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/11/845/1242.jpg",
     benchmarks: {
       iou: "25.19%",
       iouDelta: "+2.19%",
@@ -293,10 +275,8 @@ export const KSA_MISSION_SITES: readonly KsaMissionSite[] = [
     },
     bfast: {
       subtitle: "Multi-Year Olive Orchard Expansion Trajectory (2017 - 2030 Scenario)",
-      svgPathBaseline:
-        "M 0,98 Q 35,70 70,95 T 140,92 L 200,62 L 270,40 L 350,24 L 430,16 L 500,11",
-      svgPathUpperCi:
-        "M 0,92 Q 35,64 70,89 T 140,86 L 200,55 L 270,33 L 350,18 L 430,10 L 500,6",
+      svgPathBaseline: "M 0,98 Q 35,70 70,95 T 140,92 L 200,62 L 270,40 L 350,24 L 430,16 L 500,11",
+      svgPathUpperCi: "M 0,92 Q 35,64 70,89 T 140,86 L 200,55 L 270,33 L 350,18 L 430,10 L 500,6",
       markers: [
         { cx: 200, cy: 62, color: "#00F5A0" },
         { cx: 350, cy: 24, color: "#38E8FF" },

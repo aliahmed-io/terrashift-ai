@@ -11,7 +11,8 @@ from PIL import Image
 from pyproj import Geod
 
 from terrashift.acquisition import tiles
-from terrashift.inference.rgb_change import bareness, detect_change, greenness
+from terrashift.inference.preprocessing import bareness, greenness
+from terrashift.inference.rgb_change import detect_change
 
 
 _geod = Geod(ellps="WGS84")
@@ -181,15 +182,6 @@ def run_carbon_flux_analysis(
         loss_mask = (det.mask & (ndvi_delta < -0.02)) | (ndvi_delta < -0.09)
         gain_mask = (ndvi_delta > 0.06) & (~loss_mask)
     impervious_mask = (det.mask & (ndbi_delta > 0.03)) | (ndbi_delta > 0.08)
-
-    # Guarantee meaningful spatial masks on synthetic/subtle tiles
-    if int(np.sum(loss_mask)) < 40 and int(np.sum(gain_mask)) < 40:
-        if biome_id == "urban_afforestation":
-            gain_mask = det.probability > np.percentile(det.probability, 82)
-            loss_mask = det.probability < np.percentile(det.probability, 2)
-        else:
-            loss_mask = det.mask
-            gain_mask = (ndvi_delta > np.percentile(ndvi_delta, 92)) & (~loss_mask)
 
     loss_area_ha = round(float(np.sum(loss_mask)) * px_area_ha, 2)
     gain_area_ha = round(float(np.sum(gain_mask)) * px_area_ha, 2)

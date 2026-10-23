@@ -22,6 +22,7 @@ from torch.utils.data import DataLoader
 
 from terrashift.benchmark.metrics import compute_binary_metrics
 from terrashift.benchmark.oscd import OSCDDataset, load_oscd_split
+from terrashift.inference.preprocessing import build_5channel_stack, pad_to_multiple
 from terrashift.models.siamese_unet import SiameseUNet
 
 
@@ -59,29 +60,15 @@ def evaluate_scenes(model: nn.Module, scenes, threshold: float = 0.50, device: s
 
     with torch.no_grad():
         for s in scenes:
-            f1 = s.t1_rgb.astype(np.float32) / 255.0
-            f2 = s.t2_rgb.astype(np.float32) / 255.0
-            eps = 1e-6
-            exg1 = np.clip((2.0 * f1[..., 1] - f1[..., 0] - f1[..., 2]) / (f1.sum(axis=-1) + eps) * 2.5, -1.0, 1.0)
-            exg2 = np.clip((2.0 * f2[..., 1] - f2[..., 0] - f2[..., 2]) / (f2.sum(axis=-1) + eps) * 2.5, -1.0, 1.0)
-            bare1 = np.clip((f1[..., 0] - f1[..., 1]) / (f1[..., 0] + f1[..., 1] + eps) * 4.0, -1.0, 1.0)
-            bare2 = np.clip((f2[..., 0] - f2[..., 1]) / (f2[..., 0] + f2[..., 1] + eps) * 4.0, -1.0, 1.0)
-
-            t1_stack = np.stack([f1[..., 0], f1[..., 1], f1[..., 2], exg1, bare1], axis=0)
-            t2_stack = np.stack([f2[..., 0], f2[..., 1], f2[..., 2], exg2, bare2], axis=0)
-
+            t1_stack, t2_stack, _ = build_5channel_stack(
+                s.t1_rgb, s.t2_rgb, apply_matching=True
+            )
             h, w = t1_stack.shape[1], t1_stack.shape[2]
-            pad_h = (16 - h % 16) % 16
-            pad_w = (16 - w % 16) % 16
-
             t1_t = torch.from_numpy(t1_stack).unsqueeze(0).float().to(device)
             t2_t = torch.from_numpy(t2_stack).unsqueeze(0).float().to(device)
+            t1_pad, t2_pad, pad_h, pad_w = pad_to_multiple(t1_t, t2_t, multiple=16)
 
-            if pad_h > 0 or pad_w > 0:
-                t1_t = F.pad(t1_t, (0, pad_w, 0, pad_h), mode="reflect")
-                t2_t = F.pad(t2_t, (0, pad_w, 0, pad_h), mode="reflect")
-
-            logits = model(t1_t, t2_t)
+            logits = model(t1_pad, t2_pad)
             probs = torch.sigmoid(logits)
             if pad_h > 0 or pad_w > 0:
                 probs = probs[:, :, :h, :w]
@@ -115,7 +102,7 @@ def train_model(
     epochs: int = 6,
     batch_size: int = 8,
     lr: float = 1e-3,
-    save_path: Optional[str] = None,
+    save_path: str | None = None,
 ) -> dict:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Training on device: {device}")

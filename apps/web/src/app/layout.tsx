@@ -38,11 +38,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="en"
-      dir="ltr"
-      className={`${instrument.variable} ${spaceGrotesk.variable} ${jetbrains.variable}`}
-    >
+    <html lang="en" dir="ltr" className={`${instrument.variable} ${spaceGrotesk.variable} ${jetbrains.variable}`}>
       <head>
         <link rel="preconnect" href="https://mt0.google.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://mt1.google.com" crossOrigin="anonymous" />
@@ -53,7 +49,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <link rel="preconnect" href="https://c.tiles.maps.eox.at" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://d.tiles.maps.eox.at" crossOrigin="anonymous" />
       </head>
-      <body className="bg-white text-[#1c1f23] min-h-dvh antialiased">
+      <body className="min-h-dvh bg-white text-[#1c1f23] antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -1,8 +1,7 @@
-"""Multi-Year Time-Series Breakpoint Detection & 2026-2030 Spatial Forecasting Engine.
+"""Multi-Year Time-Series Trajectory & Spatial Scenario Forecasting Engine.
 
-Follows the BFASTmonitor (Breaks For Additive Season and Trend) formulation:
-- Reference: `diku-dk/bfast` (Verbesselt et al. / Gieseke et al. Python/NumPy BFAST implementation)
-  https://github.com/diku-dk/bfast/blob/master/bfast/monitor/python/base.py
+Computes empirical expansion velocities across annual Sentinel-2 composites (2017-2024)
+and evaluates linear trend extrapolation and morphological radial contagion scenarios.
 """
 
 from __future__ import annotations
@@ -19,13 +18,13 @@ from pyproj import Geod
 from scipy import ndimage
 
 from terrashift.acquisition import tiles
-from terrashift.inference.rgb_change import (
+from terrashift.inference.preprocessing import (
     EPS,
     bareness,
-    detect_change,
     greenness,
     match_statistics,
 )
+from terrashift.inference.rgb_change import detect_change
 
 _geod = Geod(ellps="WGS84")
 SAMPLE_YEARS = [2017, 2019, 2021, 2023, 2024]
@@ -47,8 +46,8 @@ def _ring_area_km2(ring: List[List[float]]) -> float:
 
 
 def run_timeseries_study(polygon: List[List[float]]) -> Dict[str, Any]:
-    """Fetch 5 multi-year Sentinel-2 composites in parallel, run BFAST breakpoint detection,
-    and compute 2026-2030 spatial expansion forecasts.
+    """Fetch multi-year Sentinel-2 composites, compute empirical change velocities,
+    and generate linear trend extrapolation and morphological dilation scenarios.
     """
     ring = [list(p) for p in polygon]
     if ring[0] != ring[-1]:
@@ -65,7 +64,7 @@ def run_timeseries_study(polygon: List[List[float]]) -> Dict[str, Any]:
         valid[:] = True
     valid_count = max(int(np.sum(valid)), 1)
 
-    # Fetch all 5 annual composites in parallel threads
+    # Fetch annual composites in parallel threads
     def _fetch_year(y: int) -> NDArray[np.uint8]:
         return tiles.fetch_mosaic(y, grid)
 
@@ -76,7 +75,7 @@ def run_timeseries_study(polygon: List[List[float]]) -> Dict[str, Any]:
     base_float = base_rgb.astype(np.float32) / 255.0
 
     observations: List[Dict[str, Any]] = []
-    cum_km2_series: List[float] = []
+    observed_km2_series: List[float] = []
     ndvi_series: List[float] = []
     ndbi_series: List[float] = []
 
@@ -97,20 +96,18 @@ def run_timeseries_study(polygon: List[List[float]]) -> Dict[str, Any]:
             changed_km2 = 0.0
         else:
             det, _ = detect_change(base_rgb, rgb, valid)
-            changed_Ratio = float(np.sum(det.mask)) / valid_count
-            # Cumulative urban change footprint envelope
-            prev_km2 = cum_km2_series[-1] if cum_km2_series else 0.0
-            raw_km2 = changed_Ratio * aoi_km2
-            changed_km2 = round(max(raw_km2, prev_km2), 3)
-            changed_pct = round(min((changed_km2 / aoi_km2) * 100.0, 95.0), 2)
+            changed_ratio = float(np.sum(det.mask)) / valid_count
+            # Honest, unconstrained detection for this epoch
+            changed_km2 = round(changed_ratio * aoi_km2, 3)
+            changed_pct = round((changed_km2 / aoi_km2) * 100.0, 2)
             latest_mask = det.mask
             latest_prob = det.probability
 
-        prev_val = cum_km2_series[-1] if cum_km2_series else 0.0
+        prev_val = observed_km2_series[-1] if observed_km2_series else 0.0
         dt_years = max(yr - (SAMPLE_YEARS[idx - 1] if idx > 0 else yr), 1)
-        annual_velocity = round(max(changed_km2 - prev_val, 0.0) / dt_years, 3)
+        annual_velocity = round((changed_km2 - prev_val) / dt_years, 3)
 
-        cum_km2_series.append(changed_km2)
+        observed_km2_series.append(changed_km2)
         ndvi_series.append(mean_ndvi)
         ndbi_series.append(mean_ndbi)
 
@@ -129,58 +126,71 @@ def run_timeseries_study(polygon: List[List[float]]) -> Dict[str, Any]:
         )
 
     # -------------------------------------------------------------------------
-    # BFAST MOSUM Structural Breakpoint Detection (Verbesselt et al.)
+    # Annual Velocity Excursion Analysis (Empirical Breakpoint Heuristic)
     # -------------------------------------------------------------------------
     velocities = [obs["annual_velocity_km2_yr"] for obs in observations[1:]]
     max_vel_idx = int(np.argmax(velocities)) if velocities else 0
     breakpoint_year = SAMPLE_YEARS[max_vel_idx + 1]
-    mean_vel = float(np.mean(velocities)) + EPS
+    mean_vel = float(np.mean(velocities)) if velocities else 0.0
     max_vel = float(velocities[max_vel_idx]) if velocities else 0.0
-    mosum_stat = round(max_vel / mean_vel, 2)
+    velocity_ratio = round(max_vel / (abs(mean_vel) + EPS), 2)
 
-    bfast_breakpoint = {
+    breakpoint_info = {
         "breakpoint_year": breakpoint_year,
         "peak_velocity_km2_yr": round(max_vel, 3),
-        "mosum_statistic": mosum_stat,
-        "structural_break_detected": bool(mosum_stat > 1.35),
+        "mean_velocity_km2_yr": round(mean_vel, 3),
+        "velocity_ratio": velocity_ratio,
+        "acceleration_detected": bool(velocity_ratio > 1.35),
         "dominant_driver": (
             "Vegetation Clearing / Canopy Loss (ΔNDVI Drop)"
             if (ndvi_series[-1] - ndvi_series[0]) < -0.02
             else "Urban & Impervious Surface Expansion (ΔNDBI Surge)"
         ),
-        "detection_method": "Multi-temporal annual velocity MOSUM ratio proxy (Verbesselt et al.)",
+        "metric_type": "Annual expansion velocity peak-to-mean ratio across 5 sampled Sentinel-2 epochs",
+        "disclaimer": "This is an empirical annual velocity ratio across discrete epochs. It is NOT a continuous daily OLS-MOSUM significance test.",
     }
 
     # -------------------------------------------------------------------------
-    # 2026-2030 Spatio-Temporal Regression & Morphological Frontier Forecast
+    # Linear Trend Regression & Prediction Error Envelopes
     # -------------------------------------------------------------------------
     years_arr = np.array(SAMPLE_YEARS, dtype=np.float64)
-    y_arr = np.array(cum_km2_series, dtype=np.float64)
+    y_arr = np.array(observed_km2_series, dtype=np.float64)
     slope, intercept = np.polyfit(years_arr, y_arr, 1)
-    slope = max(float(slope), 0.05 * aoi_km2 / 7.0)
+
+    # Calculate real regression residual standard error
+    residuals = y_arr - (slope * years_arr + intercept)
+    dof = max(len(years_arr) - 2, 1)
+    s_err = float(np.sqrt(np.sum(residuals ** 2) / dof))
+    mean_year = float(np.mean(years_arr))
+    ss_years = float(np.sum((years_arr - mean_year) ** 2)) + EPS
 
     forecasts: List[Dict[str, Any]] = []
-    last_km2 = cum_km2_series[-1]
+    last_km2 = observed_km2_series[-1]
     last_year = SAMPLE_YEARS[-1]
 
     for fy in FORECAST_YEARS:
         dt = fy - last_year
-        proj_km2 = min(round(last_km2 + slope * dt, 3), round(aoi_km2 * 0.92, 3))
+        proj_km2 = min(round(last_km2 + slope * dt, 3), round(aoi_km2, 3))
+        proj_km2 = max(proj_km2, 0.0)
         proj_pct = round((proj_km2 / aoi_km2) * 100.0, 2)
-        ci_band = round(0.12 * slope * dt + 0.08, 3)
+
+        # Standard statistical prediction standard error
+        se_pred = s_err * np.sqrt(1.0 + 1.0 / len(years_arr) + ((fy - mean_year) ** 2) / ss_years)
+        ci_band = round(float(1.96 * se_pred), 3)
+
         forecasts.append(
             {
                 "year": fy,
                 "projected_km2": proj_km2,
                 "projected_pct": proj_pct,
-                "lower_ci_km2": max(round(proj_km2 - ci_band, 3), last_km2),
-                "upper_ci_km2": min(round(proj_km2 + ci_band, 3), aoi_km2),
+                "lower_prediction_interval_km2": max(round(proj_km2 - ci_band, 3), 0.0),
+                "upper_prediction_interval_km2": min(round(proj_km2 + ci_band, 3), aoi_km2),
             }
         )
 
-    # Build 48x48 spatial forecast grid:
-    # 0 = stable background, 40 = historical change (2017-2024),
-    # 75 = 2028 frontier ring, 100 = 2030 high-risk contagion ring
+    # -------------------------------------------------------------------------
+    # Spatial Expansion Scenario Map (Iterative Radial Morphological Dilation)
+    # -------------------------------------------------------------------------
     dilated_2028 = ndimage.binary_dilation(latest_mask, iterations=3) & valid & (~latest_mask)
     dilated_2030 = (
         ndimage.binary_dilation(latest_mask, iterations=6)
@@ -192,7 +202,6 @@ def run_timeseries_study(polygon: List[List[float]]) -> Dict[str, Any]:
     risk_map[latest_mask] = 0.45
     risk_map[dilated_2028] = 0.78
     risk_map[dilated_2030] = 0.98
-    # Blend with continuous probability field
     risk_map = np.maximum(risk_map, latest_prob * 0.4)
 
     pil_risk = Image.fromarray((np.clip(risk_map, 0.0, 1.0) * 100.0).astype(np.uint8)).resize(
@@ -203,14 +212,11 @@ def run_timeseries_study(polygon: List[List[float]]) -> Dict[str, Any]:
     return {
         "aoi_km2": round(aoi_km2, 2),
         "observations": observations,
-        "bfast_breakpoint": bfast_breakpoint,
+        "bfast_breakpoint": breakpoint_info,
         "forecasts": forecasts,
-        "regression_slope_km2_yr": round(slope, 3),
+        "regression_slope_km2_yr": round(float(slope), 4),
+        "residual_standard_error_km2": round(s_err, 4),
         "forecast_grid": forecast_grid,
-        "projection_model": "Linear expansion rate + morphological dilation scenario (exploratory)",
-        "reference": {
-            "repo": "diku-dk/bfast",
-            "url": "https://github.com/diku-dk/bfast",
-            "algorithm": "Annual velocity MOSUM + Morphological dilation scenario (exploratory)",
-        },
+        "projection_model": "Ordinary Least Squares linear extrapolation with standard prediction error envelope",
+        "scenario_disclaimer": "2026-2030 projections are exploratory morphological scenarios assuming continuation of historical baseline trends. They do not model policy, macroeconomic, or developer phasing shifts.",
     }

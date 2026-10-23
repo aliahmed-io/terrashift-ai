@@ -52,35 +52,31 @@ export function OrbitalLoupe({
   const ringStroke = "#38BDF8";
 
   return (
-    <div className="orbital-panel rounded-lg p-3.5 flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-bone-100/10 pb-2.5">
+    <div className="orbital-panel flex flex-col gap-3 rounded-lg p-3.5">
+      <div className="border-bone-100/10 flex flex-wrap items-center justify-between gap-2 border-b pb-2.5">
         <div className="flex items-center gap-2 text-xs">
-          <span className="rounded bg-ink-950 px-2 py-0.5 font-mono text-[11px] font-medium text-bone-300 border border-bone-100/10">
+          <span className="bg-ink-950 text-bone-300 border-bone-100/10 rounded border px-2 py-0.5 font-mono text-[11px] font-medium">
             {baseLabel}
           </span>
-          <span className="font-mono text-bone-400">vs</span>
-          <span className="rounded bg-signal-400/12 px-2 py-0.5 font-mono text-[11px] font-semibold text-signal-400 border border-signal-400/30">
+          <span className="text-bone-400 font-mono">vs</span>
+          <span className="bg-signal-400/12 text-signal-400 border-signal-400/30 rounded border px-2 py-0.5 font-mono text-[11px] font-semibold">
             {overlayLabel}
           </span>
           {telemetryTag ? (
-            <span className="hidden sm:inline font-mono text-[10px] text-bone-400 ms-1">
-              [{telemetryTag}]
-            </span>
+            <span className="text-bone-400 ms-1 hidden font-mono text-[10px] sm:inline">[{telemetryTag}]</span>
           ) : null}
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="hidden sm:inline font-mono text-[10px] text-bone-400 tabular-nums">
+          <span className="text-bone-400 hidden font-mono text-[10px] tabular-nums sm:inline">
             {pos.x.toFixed(0)}% / {pos.y.toFixed(0)}%
           </span>
-          <div className="flex items-center rounded-md bg-ink-950 border border-bone-100/12 p-0.5 text-xs">
+          <div className="bg-ink-950 border-bone-100/12 flex items-center rounded-md border p-0.5 text-xs">
             <button
               type="button"
               onClick={() => setMode("curtain")}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                mode === "curtain"
-                  ? "bg-signal-400 text-ink-950 font-semibold"
-                  : "text-bone-300 hover:text-bone-100"
+              className={`rounded px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+                mode === "curtain" ? "bg-signal-400 text-ink-950 font-semibold" : "text-bone-300 hover:text-bone-100"
               }`}
             >
               Curtain
@@ -88,10 +84,8 @@ export function OrbitalLoupe({
             <button
               type="button"
               onClick={() => setMode("loupe")}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                mode === "loupe"
-                  ? "bg-signal-400 text-ink-950 font-semibold"
-                  : "text-bone-300 hover:text-bone-100"
+              className={`rounded px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+                mode === "loupe" ? "bg-signal-400 text-ink-950 font-semibold" : "text-bone-300 hover:text-bone-100"
               }`}
             >
               Aperture
@@ -110,12 +104,12 @@ export function OrbitalLoupe({
         aria-valuenow={Math.round(pos.x)}
         onPointerMove={handlePointerMove}
         onKeyDown={handleKeyDown}
-        className="relative aspect-square w-full overflow-hidden rounded-md border border-bone-100/15 bg-ink-950 cursor-crosshair select-none touch-none focus-visible:ring-2 focus-visible:ring-signal-400"
+        className="border-bone-100/15 bg-ink-950 focus-visible:ring-signal-400 relative aspect-square w-full cursor-crosshair touch-none overflow-hidden rounded-md border select-none focus-visible:ring-2"
       >
         <img
           src={baseImage}
           alt={baseLabel}
-          className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
         />
 
         <img
@@ -127,20 +121,20 @@ export function OrbitalLoupe({
                 ? `circle(24% at ${pos.x}% ${pos.y}%)`
                 : `polygon(${pos.x}% 0%, 100% 0%, 100% 100%, ${pos.x}% 100%)`,
           }}
-          className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
         />
 
         {/* Corner Photogrammetric Fiducial Marks */}
-        <span className="pointer-events-none absolute top-2 left-2 size-2.5 border-t border-l border-bone-100/50" />
-        <span className="pointer-events-none absolute top-2 right-2 size-2.5 border-t border-r border-bone-100/50" />
-        <span className="pointer-events-none absolute bottom-2 left-2 size-2.5 border-b border-l border-bone-100/50" />
-        <span className="pointer-events-none absolute bottom-2 right-2 size-2.5 border-b border-r border-bone-100/50" />
+        <span className="border-bone-100/50 pointer-events-none absolute top-2 left-2 size-2.5 border-t border-l" />
+        <span className="border-bone-100/50 pointer-events-none absolute top-2 right-2 size-2.5 border-t border-r" />
+        <span className="border-bone-100/50 pointer-events-none absolute bottom-2 left-2 size-2.5 border-b border-l" />
+        <span className="border-bone-100/50 pointer-events-none absolute right-2 bottom-2 size-2.5 border-r border-b" />
 
         {/* Epoch Corner Watermarks */}
-        <span className="pointer-events-none absolute bottom-2.5 left-3 rounded bg-ink-950/85 px-1.5 py-0.5 font-mono text-[10px] text-bone-300 border border-bone-100/15">
+        <span className="bg-ink-950/85 text-bone-300 border-bone-100/15 pointer-events-none absolute bottom-2.5 left-3 rounded border px-1.5 py-0.5 font-mono text-[10px]">
           {baseLabel}
         </span>
-        <span className="pointer-events-none absolute bottom-2.5 right-3 rounded bg-ink-950/85 px-1.5 py-0.5 font-mono text-[10px] text-signal-400 border border-signal-400/30">
+        <span className="bg-ink-950/85 text-signal-400 border-signal-400/30 pointer-events-none absolute right-3 bottom-2.5 rounded border px-1.5 py-0.5 font-mono text-[10px]">
           {overlayLabel}
         </span>
 
@@ -154,9 +148,9 @@ export function OrbitalLoupe({
               height: "48%",
               borderColor: ringStroke,
             }}
-            className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-signal-400 shadow-[0_0_0_1px_rgba(7,10,15,0.8)]"
+            className="border-signal-400 pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border shadow-[0_0_0_1px_rgba(7,10,15,0.8)]"
           >
-            <span className="absolute top-1/2 left-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-signal-400" />
+            <span className="bg-signal-400 absolute top-1/2 left-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full" />
           </div>
         ) : (
           <div
@@ -166,15 +160,9 @@ export function OrbitalLoupe({
           >
             <div
               style={{ borderColor: ringStroke }}
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex size-6 items-center justify-center rounded border bg-ink-950 text-signal-400 shadow-lg"
+              className="bg-ink-950 text-signal-400 absolute top-1/2 left-1/2 flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded border shadow-lg"
             >
-              <svg
-                className="size-3"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-              >
+              <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                 <path d="m9 18-6-6 6-6" />
                 <path d="m15 6 6 6-6 6" />
               </svg>
@@ -185,4 +173,3 @@ export function OrbitalLoupe({
     </div>
   );
 }
-

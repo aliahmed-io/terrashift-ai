@@ -4,15 +4,15 @@ Evaluates change detection models on the official 10 held-out test scenes of the
 Onera Satellite Change Detection (OSCD) Sentinel-2 dataset.
 
 Models evaluated:
-1. M0: Untrained Siamese U-Net (random initialization baseline)
-2. Statistical Spectral Baseline (Radiometric matching + Euclidean RGB dist + MAD baseline)
+1. Statistical Spectral Baseline (Radiometric matching + Euclidean RGB dist + MAD baseline)
+2. M0: Untrained Siamese U-Net (random initialization baseline)
 3. M0 + Statistical 60/40 Fusion (Original implementation)
 4. M1: Supervised Trained Siamese U-Net (OSCD checkpoint)
 5. M1 + Statistical Fusion
 
 Outputs:
-- Machine-readable JSON: `reports/benchmark_scorecard.json`
-- Prints full markdown scorecard and reliability / calibration analysis.
+- Machine-readable JSON: `reports/benchmark_scorecard.json` (pooled metrics and per-scene breakdown)
+- Prints full markdown scorecard, per-scene table, and calibration analysis.
 """
 
 from __future__ import annotations
@@ -22,21 +22,27 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Any, Dict, List
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "services" / "ml"))
 
 import numpy as np
+from scipy import ndimage
 import torch
-import torch.nn.functional as F
 
 from terrashift.benchmark.metrics import compute_binary_metrics, compute_calibration_metrics
-from terrashift.benchmark.oscd import load_oscd_split
-from terrashift.inference.rgb_change import EPS, detect_change, match_statistics
+from terrashift.benchmark.oscd import OSCDScene, load_oscd_split
+from terrashift.inference.preprocessing import (
+    EPS,
+    build_5channel_stack,
+    match_statistics,
+    pad_to_multiple,
+)
 from terrashift.models.siamese_unet import SiameseUNet
 
 
-def evaluate_statistical_baseline(scenes, threshold: float = 0.45) -> dict:
+def evaluate_statistical_baseline(scenes: List[OSCDScene], threshold: float = 0.45) -> Dict[str, Any]:
     """Run pure physics-guided / statistical spectral change detection on all test scenes."""
     t_start = time.perf_counter()
     total_tp = 0
@@ -45,6 +51,7 @@ def evaluate_statistical_baseline(scenes, threshold: float = 0.45) -> dict:
     total_tn = 0
     all_probs = []
     all_gts = []
+    per_scene: List[Dict[str, Any]] = []
 
     for s in scenes:
         a = s.t1_rgb.astype(np.float32) / 255.0
@@ -53,8 +60,6 @@ def evaluate_statistical_baseline(scenes, threshold: float = 0.45) -> dict:
         matched = match_statistics(b, a, valid)
 
         dist = np.sqrt(np.sum((matched - a) ** 2, axis=-1))
-        # Uniform 3x3 filter
-        from scipy import ndimage
         score = ndimage.uniform_filter(dist, size=3).astype(np.float32)
 
         vals = score[valid]
@@ -70,6 +75,26 @@ def evaluate_statistical_baseline(scenes, threshold: float = 0.45) -> dict:
         total_fp += m["fp"]
         total_fn += m["fn"]
         total_tn += m["tn"]
+
+        scene_prec = m["tp"] / (m["tp"] + m["fp"] + EPS)
+        scene_rec = m["tp"] / (m["tp"] + m["fn"] + EPS)
+        scene_f1 = 2.0 * scene_prec * scene_rec / (scene_prec + scene_rec + EPS)
+        scene_iou = m["tp"] / (m["tp"] + m["fp"] + m["fn"] + EPS)
+        scene_fpr = m["fp"] / (m["fp"] + m["tn"] + EPS)
+
+        per_scene.append({
+            "scene_id": s.scene_id,
+            "height": s.height,
+            "width": s.width,
+            "total_pixels": s.height * s.width,
+            "change_pixels": int(np.sum(s.gt_mask)),
+            "change_pct": round(float(np.mean(s.gt_mask) * 100), 2),
+            "f1": round(float(scene_f1), 4),
+            "iou": round(float(scene_iou), 4),
+            "precision": round(float(scene_prec), 4),
+            "recall": round(float(scene_rec), 4),
+            "false_positive_rate": round(float(scene_fpr), 4),
+        })
 
         all_probs.append(physics_prob.flatten())
         all_gts.append(s.gt_mask.flatten())
@@ -96,16 +121,17 @@ def evaluate_statistical_baseline(scenes, threshold: float = 0.45) -> dict:
         "brier_score": cal["brier_score"],
         "avg_latency_ms": round(elapsed_ms, 1),
         "confusion": {"tp": total_tp, "fp": total_fp, "fn": total_fn, "tn": total_tn},
+        "per_scene": per_scene,
     }
 
 
 def evaluate_neural_model(
     model: torch.nn.Module,
-    scenes,
+    scenes: List[OSCDScene],
     threshold: float = 0.45,
     fuse_with_physics: bool = False,
     model_name: str = "Neural Model",
-) -> dict:
+) -> Dict[str, Any]:
     model.eval()
     t_start = time.perf_counter()
     total_tp = 0
@@ -114,44 +140,30 @@ def evaluate_neural_model(
     total_tn = 0
     all_probs = []
     all_gts = []
+    per_scene: List[Dict[str, Any]] = []
 
     with torch.no_grad():
         for s in scenes:
-            a = s.t1_rgb.astype(np.float32) / 255.0
-            b = s.t2_rgb.astype(np.float32) / 255.0
-            valid = np.ones((s.height, s.width), dtype=bool)
-            matched = match_statistics(b, a, valid)
-
-            eps = 1e-6
-            exg1 = np.clip((2.0 * a[..., 1] - a[..., 0] - a[..., 2]) / (a.sum(axis=-1) + eps) * 2.5, -1.0, 1.0)
-            exg2 = np.clip((2.0 * matched[..., 1] - matched[..., 0] - matched[..., 2]) / (matched.sum(axis=-1) + eps) * 2.5, -1.0, 1.0)
-            bare1 = np.clip((a[..., 0] - a[..., 1]) / (a[..., 0] + a[..., 1] + eps) * 4.0, -1.0, 1.0)
-            bare2 = np.clip((matched[..., 0] - matched[..., 1]) / (matched[..., 0] + matched[..., 1] + eps) * 4.0, -1.0, 1.0)
-
-            t1_stack = np.stack([a[..., 0], a[..., 1], a[..., 2], exg1, bare1], axis=0)
-            t2_stack = np.stack([matched[..., 0], matched[..., 1], matched[..., 2], exg2, bare2], axis=0)
-
+            # Unified shared preprocessing
+            t1_stack, t2_stack, b_matched = build_5channel_stack(
+                s.t1_rgb, s.t2_rgb, apply_matching=True
+            )
             h, w = t1_stack.shape[1], t1_stack.shape[2]
-            pad_h = (16 - h % 16) % 16
-            pad_w = (16 - w % 16) % 16
-
             t1_t = torch.from_numpy(t1_stack).unsqueeze(0).float()
             t2_t = torch.from_numpy(t2_stack).unsqueeze(0).float()
+            t1_pad, t2_pad, pad_h, pad_w = pad_to_multiple(t1_t, t2_t, multiple=16)
 
-            if pad_h > 0 or pad_w > 0:
-                t1_t = F.pad(t1_t, (0, pad_w, 0, pad_h), mode="reflect")
-                t2_t = F.pad(t2_t, (0, pad_w, 0, pad_h), mode="reflect")
-
-            logits = model(t1_t, t2_t)
+            logits = model(t1_pad, t2_pad)
             probs = torch.sigmoid(logits)
             if pad_h > 0 or pad_w > 0:
                 probs = probs[:, :, :h, :w]
             deep_prob = probs.squeeze().cpu().numpy().astype(np.float32)
 
             if fuse_with_physics:
-                dist = np.sqrt(np.sum((matched - a) ** 2, axis=-1))
-                from scipy import ndimage
+                a = s.t1_rgb.astype(np.float32) / 255.0
+                dist = np.sqrt(np.sum((b_matched - a) ** 2, axis=-1))
                 score = ndimage.uniform_filter(dist, size=3).astype(np.float32)
+                valid = np.ones((h, w), dtype=bool)
                 vals = score[valid]
                 med = float(np.median(vals))
                 mad = float(1.4826 * np.median(np.abs(vals - med)))
@@ -168,6 +180,26 @@ def evaluate_neural_model(
             total_fp += m["fp"]
             total_fn += m["fn"]
             total_tn += m["tn"]
+
+            scene_prec = m["tp"] / (m["tp"] + m["fp"] + EPS)
+            scene_rec = m["tp"] / (m["tp"] + m["fn"] + EPS)
+            scene_f1 = 2.0 * scene_prec * scene_rec / (scene_prec + scene_rec + EPS)
+            scene_iou = m["tp"] / (m["tp"] + m["fp"] + m["fn"] + EPS)
+            scene_fpr = m["fp"] / (m["fp"] + m["tn"] + EPS)
+
+            per_scene.append({
+                "scene_id": s.scene_id,
+                "height": s.height,
+                "width": s.width,
+                "total_pixels": s.height * s.width,
+                "change_pixels": int(np.sum(s.gt_mask)),
+                "change_pct": round(float(np.mean(s.gt_mask) * 100), 2),
+                "f1": round(float(scene_f1), 4),
+                "iou": round(float(scene_iou), 4),
+                "precision": round(float(scene_prec), 4),
+                "recall": round(float(scene_rec), 4),
+                "false_positive_rate": round(float(scene_fpr), 4),
+            })
 
             all_probs.append(final_prob.flatten())
             all_gts.append(s.gt_mask.flatten())
@@ -194,6 +226,7 @@ def evaluate_neural_model(
         "brier_score": cal["brier_score"],
         "avg_latency_ms": round(elapsed_ms, 1),
         "confusion": {"tp": total_tp, "fp": total_fp, "fn": total_fn, "tn": total_tn},
+        "per_scene": per_scene,
     }
 
 
@@ -206,7 +239,8 @@ def run_full_benchmark():
     print(f"Loaded {len(test_scenes)} official held-out test scenes from OSCD Sentinel-2 dataset.")
     total_test_pixels = sum(s.height * s.width for s in test_scenes)
     total_change_pixels = sum(int(np.sum(s.gt_mask)) for s in test_scenes)
-    print(f"Total evaluation pixels: {total_test_pixels:,} (Change prevalence: {total_change_pixels/total_test_pixels*100:.2f}%)\n")
+    change_prev = total_change_pixels / total_test_pixels * 100
+    print(f"Total evaluation pixels: {total_test_pixels:,} (Change prevalence: {change_prev:.2f}%)\n")
 
     results = []
 
@@ -236,6 +270,8 @@ def run_full_benchmark():
 
     # 4. M1 Trained Siamese U-Net (if checkpoint exists)
     m1_path = ROOT / "services" / "ml" / "terrashift" / "models" / "siamese_unet_oscd_m1.pt"
+    res_m1 = None
+    res_fuse1 = None
     if m1_path.exists():
         print("Evaluating 4/5: M1 Trained Siamese U-Net (OSCD Supervised)...")
         m1_model = SiameseUNet(in_channels=5, base_channels=32)
@@ -252,6 +288,28 @@ def run_full_benchmark():
         results.append(res_fuse1)
         print(f"  -> F1: {res_fuse1['f1']:.4f} | IoU: {res_fuse1['iou']:.4f} | Prec: {res_fuse1['precision']:.4f} | Rec: {res_fuse1['recall']:.4f} | ECE: {res_fuse1['ece']:.4f}")
 
+    # Compile Per-Scene Comparison Matrix
+    per_scene_breakdown: List[Dict[str, Any]] = []
+    for idx, s in enumerate(test_scenes):
+        scene_row: Dict[str, Any] = {
+            "scene_id": s.scene_id,
+            "height": s.height,
+            "width": s.width,
+            "total_pixels": s.height * s.width,
+            "change_pixels": int(np.sum(s.gt_mask)),
+            "change_pct": round(float(np.mean(s.gt_mask) * 100), 2),
+            "statistical_baseline_f1": res_stat["per_scene"][idx]["f1"],
+            "statistical_baseline_iou": res_stat["per_scene"][idx]["iou"],
+            "m0_f1": res_m0["per_scene"][idx]["f1"],
+            "m0_fusion_f1": res_fuse0["per_scene"][idx]["f1"],
+        }
+        if res_m1 is not None and res_fuse1 is not None:
+            scene_row["m1_trained_f1"] = res_m1["per_scene"][idx]["f1"]
+            scene_row["m1_trained_iou"] = res_m1["per_scene"][idx]["iou"]
+            scene_row["m1_fusion_f1"] = res_fuse1["per_scene"][idx]["f1"]
+            scene_row["m1_fusion_iou"] = res_fuse1["per_scene"][idx]["iou"]
+        per_scene_breakdown.append(scene_row)
+
     # Save to reports/benchmark_scorecard.json
     out_dir = ROOT / "reports"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -264,8 +322,10 @@ def run_full_benchmark():
                 "scenes_count": len(test_scenes),
                 "total_pixels": total_test_pixels,
                 "change_pixels": total_change_pixels,
+                "change_prevalence_pct": round(change_prev, 2),
                 "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 "results": results,
+                "per_scene_breakdown": per_scene_breakdown,
             },
             f,
             indent=2,
@@ -274,10 +334,24 @@ def run_full_benchmark():
     print(f"\nScorecard successfully written to: {scorecard_path}\n")
 
     # Print Markdown Summary Table
+    print("### Overall Held-Out Test Set Scorecard (Pooled 3,077,936 Pixels)")
     print("| Model Architecture | Parameters | F1 Score | IoU | Precision | Recall | False Alarm (FPR) | ECE | Latency |")
     print("| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |")
     for r in results:
         print(f"| {r['model_name']} | {r['parameters']:,} | {r['f1']:.4f} | {r['iou']:.4f} | {r['precision']:.4f} | {r['recall']:.4f} | {r['false_positive_rate']*100:.2f}% | {r['ece']:.4f} | {r['avg_latency_ms']} ms |")
+
+    # Print Per-Scene Breakdown Table
+    print("\n### Per-Scene Test Performance Breakdown (10 OSCD Scenes)")
+    if res_m1 is not None and res_fuse1 is not None:
+        print("| Scene ID | Dimensions | Pixels | Change Pixels | Change % | Stat Baseline F1 | M1 Trained F1 | M1 Fusion F1 |")
+        print("| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |")
+        for row in per_scene_breakdown:
+            print(f"| `{row['scene_id']}` | {row['height']}×{row['width']} | {row['total_pixels']:,} | {row['change_pixels']:,} | {row['change_pct']}% | {row['statistical_baseline_f1']:.4f} | {row.get('m1_trained_f1', 0.0):.4f} | {row.get('m1_fusion_f1', 0.0):.4f} |")
+    else:
+        print("| Scene ID | Dimensions | Pixels | Change Pixels | Change % | Stat Baseline F1 | M0 F1 | M0 Fusion F1 |")
+        print("| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |")
+        for row in per_scene_breakdown:
+            print(f"| `{row['scene_id']}` | {row['height']}×{row['width']} | {row['total_pixels']:,} | {row['change_pixels']:,} | {row['change_pct']}% | {row['statistical_baseline_f1']:.4f} | {row['m0_f1']:.4f} | {row['m0_fusion_f1']:.4f} |")
 
     return results
 

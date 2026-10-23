@@ -62,14 +62,7 @@ const WATCHLIST_ITEMS: {
 ];
 
 export default function WatchlistPage() {
-  const {
-    activeCorridor,
-    activeCorridorId,
-    setActiveCorridorId,
-    activeYear,
-    activeMonth,
-    temporalModifier,
-  } = useAoi();
+  const { activeCorridor, activeCorridorId, setActiveCorridorId, activeYear, activeMonth, temporalModifier } = useAoi();
 
   const stacManifest = {
     stac_version: "1.0.0",
@@ -83,12 +76,8 @@ export default function WatchlistPage() {
       "eo:cloud_cover": 0.12,
       "proj:epsg": activeCorridor.epsg,
       "terrashift:model": "SiameseResUNet-10ch",
-      "terrashift:change_pct": Number(
-        (activeCorridor.baseChangePct * temporalModifier).toFixed(2)
-      ),
-      "terrashift:affected_area_ha": Number(
-        (activeCorridor.baseAreaHa * temporalModifier).toFixed(1)
-      ),
+      "terrashift:change_pct": Number((activeCorridor.baseChangePct * temporalModifier).toFixed(2)),
+      "terrashift:affected_area_ha": Number((activeCorridor.baseAreaHa * temporalModifier).toFixed(1)),
       "terrashift:confidence": 0.962,
     },
   };
@@ -107,72 +96,49 @@ export default function WatchlistPage() {
 
   return (
     <StudioShell>
-      <div className="w-full h-full p-6 grid grid-cols-12 gap-5 overflow-hidden">
-        <div className="col-span-7 bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-6 flex flex-col justify-between min-h-0">
+      <div className="grid h-full w-full grid-cols-12 gap-5 overflow-hidden p-6">
+        <div className="col-span-7 flex min-h-0 flex-col justify-between rounded-[20px] bg-white p-6 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-[16px] font-semibold text-[#1c1f23]">
                 Planetary Watchlist &amp; Automated STAC Rules
               </h2>
-              <p className="text-[12px] text-[#8c929c] mt-0.5">
+              <p className="mt-0.5 text-[12px] text-[#8c929c]">
                 5-Day Sentinel-2 L2A revisit monitoring via Element84 Earth Search ({activeMonth} {activeYear})
               </p>
             </div>
-            <span className="text-[12px] font-semibold text-[#22b567]">
-              5 Active Corridors
-            </span>
+            <span className="text-[12px] font-semibold text-[#22b567]">5 Active Corridors</span>
           </div>
 
-          <div className="space-y-3 my-auto">
+          <div className="my-auto space-y-3">
             {WATCHLIST_ITEMS.map((item) => {
               const isSelected = activeCorridorId === item.id;
-              const modDelta = (item.delta * (0.94 + temporalModifier * 0.06))
-                .toFixed(3)
-                .replace(".", ",");
-              const modArea = Math.round(
-                item.areaHa * (0.9 + temporalModifier * 0.1)
-              ).toLocaleString("en-US");
+              const modDelta = (item.delta * (0.94 + temporalModifier * 0.06)).toFixed(3).replace(".", ",");
+              const modArea = Math.round(item.areaHa * (0.9 + temporalModifier * 0.1)).toLocaleString("en-US");
               return (
                 <div
                   key={item.name}
                   onClick={() => setActiveCorridorId(item.id)}
-                  className={`p-3.5 rounded-[16px] flex items-center justify-between gap-4 transition-colors cursor-pointer ${
-                    isSelected
-                      ? "bg-[#f0f3f1]"
-                      : "bg-[#f8f9fb] hover:bg-[#f2f4f7]"
+                  className={`flex cursor-pointer items-center justify-between gap-4 rounded-[16px] p-3.5 transition-colors ${
+                    isSelected ? "bg-[#f0f3f1]" : "bg-[#f8f9fb] hover:bg-[#f2f4f7]"
                   }`}
                 >
-                  <div className="flex items-center gap-3.5 min-w-[260px]">
-                    <img
-                      src={item.thumb}
-                      alt={item.name}
-                      className="w-14 h-11 rounded-[10px] object-cover shrink-0"
-                    />
+                  <div className="flex min-w-[260px] items-center gap-3.5">
+                    <img src={item.thumb} alt={item.name} className="h-11 w-14 shrink-0 rounded-[10px] object-cover" />
                     <div>
-                      <div className="text-[13.5px] font-semibold text-[#1c1f23]">
-                        {item.name}
-                      </div>
-                      <div className="text-[11.5px] text-[#8c929c] mt-0.5">
-                        {item.coords}
-                      </div>
+                      <div className="text-[13.5px] font-semibold text-[#1c1f23]">{item.name}</div>
+                      <div className="mt-0.5 text-[11.5px] text-[#8c929c]">{item.coords}</div>
                     </div>
                   </div>
 
-                  <div className="flex-1 max-w-[220px]">
-                    <div className="flex items-center justify-between text-[12px] mb-1.5 tabular-nums">
-                      <span className="font-semibold text-[#1c1f23]">
-                        {modDelta}
-                      </span>
-                      <span className="font-medium text-[#3b4048]">
-                        {modArea} ha
-                      </span>
+                  <div className="max-w-[220px] flex-1">
+                    <div className="mb-1.5 flex items-center justify-between text-[12px] tabular-nums">
+                      <span className="font-semibold text-[#1c1f23]">{modDelta}</span>
+                      <span className="font-medium text-[#3b4048]">{modArea} ha</span>
                       <span className="text-[#9aa0aa]">{item.pct} %</span>
                     </div>
-                    <div className="h-[5px] w-full bg-[#e6e8ec] rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${item.color}`}
-                        style={{ width: item.w }}
-                      />
+                    <div className="h-[5px] w-full overflow-hidden rounded-full bg-[#e6e8ec]">
+                      <div className={`h-full rounded-full ${item.color}`} style={{ width: item.w }} />
                     </div>
                   </div>
                 </div>
@@ -181,51 +147,38 @@ export default function WatchlistPage() {
           </div>
         </div>
 
-        <div className="col-span-5 bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-6 flex flex-col justify-between min-h-0">
+        <div className="col-span-5 flex min-h-0 flex-col justify-between rounded-[20px] bg-white p-6 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
           <div>
-            <div className="flex items-center justify-between mb-3">
+            <div className="mb-3 flex items-center justify-between">
               <div>
-                <h3 className="text-[15px] font-semibold text-[#1c1f23]">
-                  OGC STAC 1.0.0 Item Manifest
-                </h3>
-                <p className="text-[12px] text-[#8c929c] mt-0.5">
-                  Standardized eo + proj + mlm metadata extensions
-                </p>
+                <h3 className="text-[15px] font-semibold text-[#1c1f23]">OGC STAC 1.0.0 Item Manifest</h3>
+                <p className="mt-0.5 text-[12px] text-[#8c929c]">Standardized eo + proj + mlm metadata extensions</p>
               </div>
               <button
                 type="button"
                 onClick={handleDownloadGeoJson}
-                className="text-[12px] font-medium text-[#8c929c] hover:text-[#1c1f23] transition-colors cursor-pointer"
+                className="cursor-pointer text-[12px] font-medium text-[#8c929c] transition-colors hover:text-[#1c1f23]"
               >
                 GeoJSON
               </button>
             </div>
 
-            <pre className="p-4 rounded-[14px] bg-[#f8f9fb] text-[11.5px] font-mono text-[#3b4048] leading-relaxed overflow-hidden">
-              { JSON.stringify(stacManifest, null, 2).replace(
+            <pre className="overflow-hidden rounded-[14px] bg-[#f8f9fb] p-4 font-mono text-[11.5px] leading-relaxed text-[#3b4048]">
+              {JSON.stringify(stacManifest, null, 2).replace(
                 /"bbox": \[\s+([^\]]+)\s+\]/,
-                (_, inner: string) =>
-                  `"bbox": [${inner.replace(/\s+/g, " ").trim()}]`
-              ) }
+                (_, inner: string) => `"bbox": [${inner.replace(/\s+/g, " ").trim()}]`,
+              )}
             </pre>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="p-3.5 rounded-[14px] bg-[#f8f9fb]">
-              <div className="text-[12.5px] font-semibold text-[#1c1f23]">
-                {activeCorridor.tileId}
-              </div>
-              <div className="text-[11.5px] text-[#22b567] font-medium mt-0.5">
-                Cloud 0,12 % · 10 m Optical
-              </div>
+            <div className="rounded-[14px] bg-[#f8f9fb] p-3.5">
+              <div className="text-[12.5px] font-semibold text-[#1c1f23]">{activeCorridor.tileId}</div>
+              <div className="mt-0.5 text-[11.5px] font-medium text-[#22b567]">Cloud 0,12 % · 10 m Optical</div>
             </div>
-            <div className="p-3.5 rounded-[14px] bg-[#f8f9fb]">
-              <div className="text-[12.5px] font-semibold text-[#1c1f23]">
-                S2A_38RMV_{activeYear}0525
-              </div>
-              <div className="text-[11.5px] text-[#22b567] font-medium mt-0.5">
-                Cloud 0,04 % · 10 m Optical
-              </div>
+            <div className="rounded-[14px] bg-[#f8f9fb] p-3.5">
+              <div className="text-[12.5px] font-semibold text-[#1c1f23]">S2A_38RMV_{activeYear}0525</div>
+              <div className="mt-0.5 text-[11.5px] font-medium text-[#22b567]">Cloud 0,04 % · 10 m Optical</div>
             </div>
           </div>
         </div>

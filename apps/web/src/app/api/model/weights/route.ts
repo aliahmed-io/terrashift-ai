@@ -11,10 +11,7 @@ export async function GET() {
     });
 
     if (!res.ok) {
-      return NextResponse.json(
-        { error: "Model checkpoint not found on ML service" },
-        { status: 502 },
-      );
+      return NextResponse.json({ error: "Model checkpoint not found on ML service" }, { status: 502 });
     }
 
     const data = await res.arrayBuffer();
@@ -27,9 +24,6 @@ export async function GET() {
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Service unavailable";
-    return NextResponse.json(
-      { error: `Cannot fetch model weights: ${msg}` },
-      { status: 503 },
-    );
+    return NextResponse.json({ error: `Cannot fetch model weights: ${msg}` }, { status: 503 });
   }
 }

@@ -1,9 +1,17 @@
-"""Model Ablation & Explainable AI (XAI) Benchmark Engine.
+"""Model Ablation & Multi-Scale Feature Difference Engine.
 
-Implements comparative evaluation inspired by:
-- Daudt et al. (ICIP 2018): `rcdaudt/fully_convolutional_change_detection`
-  (FC-EF, FC-Siam-conc, FC-Siam-diff)
-- Open-CD Toolbox: `likyoo/open-cd`
+Implements comparative multi-method evaluation across:
+1. Naive RGB Differencing (L1)
+2. Spectral Proxy Delta (Excess-Green + Bareness)
+3. Statistical Spectral Baseline (Median/MAD outlier detection)
+4. PyTorch Siamese U-Net (5-channel weight-sharing encoder)
+
+Scientific Integrity:
+- Zero manufactured F1/IoU values when ground truth is absent.
+- Inter-method Jaccard agreement matrix between methods.
+- Real measured latencies without synthetic padding.
+- Accurately labeled intermediate feature difference maps (not Grad-CAM++).
+- Authentic metric computation if and only if ground-truth labels are provided.
 """
 
 from __future__ import annotations
@@ -11,21 +19,22 @@ from __future__ import annotations
 import base64
 import io
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 from scipy import ndimage
 
-from terrashift.inference.rgb_change import (
+from terrashift.inference.preprocessing import (
     EPS,
-    HAS_TORCH,
     bareness,
-    get_siamese_model,
+    build_5channel_stack,
     greenness,
     match_statistics,
+    pad_to_multiple,
 )
+from terrashift.inference.rgb_change import HAS_TORCH, get_siamese_model
 
 if HAS_TORCH:
     import torch
@@ -58,29 +67,36 @@ def _normalize_map(arr: NDArray[np.float32]) -> NDArray[np.float32]:
     return np.clip((arr - p5) / (p99 - p5 + EPS), 0.0, 1.0).astype(np.float32)
 
 
-def _compute_metrics_against_reference(
-    pred_mask: NDArray[np.bool_],
-    ref_mask: NDArray[np.bool_],
+def _compute_jaccard_iou(mask_a: NDArray[np.bool_], mask_b: NDArray[np.bool_]) -> float:
+    intersection = float(np.sum(mask_a & mask_b))
+    union = float(np.sum(mask_a | mask_b))
+    return round(intersection / (union + EPS), 4)
+
+
+def _compute_binary_metrics(
+    pred: NDArray[np.bool_],
+    gt: NDArray[np.bool_],
     valid: NDArray[np.bool_],
 ) -> Dict[str, float]:
-    p = pred_mask & valid
-    r = ref_mask & valid
-    tp = float(np.sum(p & r))
-    fp = float(np.sum(p & ~r))
-    fn = float(np.sum(~p & r))
+    p = pred & valid
+    g = gt & valid
+    tp = float(np.sum(p & g))
+    fp = float(np.sum(p & ~g))
+    fn = float(np.sum(~p & g))
+    tn = float(np.sum(~p & ~g))
 
-    precision = tp / (tp + fp + EPS)
-    recall = tp / (tp + fn + EPS)
-    f1 = 2.0 * precision * recall / (precision + recall + EPS)
+    prec = tp / (tp + fp + EPS)
+    rec = tp / (tp + fn + EPS)
+    f1 = 2.0 * prec * rec / (prec + rec + EPS)
     iou = tp / (tp + fp + fn + EPS)
-    far = fp / (float(np.sum(valid)) + EPS) * 100.0
+    fpr = fp / (fp + tn + EPS)
 
     return {
-        "f1": round(float(np.clip(f1, 0.0, 0.99)), 3),
-        "iou": round(float(np.clip(iou, 0.0, 0.99)), 3),
-        "precision": round(float(np.clip(precision, 0.0, 0.99)), 3),
-        "recall": round(float(np.clip(recall, 0.0, 0.99)), 3),
-        "false_alarm_rate_pct": round(float(far), 2),
+        "f1_score": round(float(f1), 4),
+        "iou_score": round(float(iou), 4),
+        "precision": round(float(prec), 4),
+        "recall": round(float(rec), 4),
+        "false_positive_rate": round(float(fpr), 4),
     }
 
 
@@ -90,16 +106,22 @@ def run_ablation_study(
     valid: NDArray[np.bool_],
     year_t1: int = 2018,
     year_t2: int = 2024,
+    gt_mask: Optional[NDArray[np.bool_]] = None,
 ) -> Dict[str, Any]:
-    """Run all 4 change detection architectures on the same bi-temporal scene and extract XAI maps."""
+    """Run 4 change detection pipelines on the scene and extract multi-scale activations."""
     a = rgb1.astype(np.float32) / 255.0
     b_raw = rgb2.astype(np.float32) / 255.0
-    b_matched = match_statistics(b_raw, a, valid)
 
     valid_pixels = max(int(np.sum(valid)), 1)
+    has_gt = gt_mask is not None
+
+    # Shared unified preprocessing
+    t1_stack, t2_stack, b_matched = build_5channel_stack(
+        rgb1, rgb2, valid=valid, apply_matching=True
+    )
 
     # -------------------------------------------------------------------------
-    # Method 1: Naive RGB L1 Differencing (Unaligned, No Spectral Indices)
+    # Method 1: Naive RGB L1 Differencing (No radiometric harmonization)
     # -------------------------------------------------------------------------
     t0 = time.perf_counter()
     raw_l1 = np.mean(np.abs(b_raw - a), axis=-1).astype(np.float32)
@@ -108,261 +130,236 @@ def run_ablation_study(
     lat_naive = round((time.perf_counter() - t0) * 1000.0, 1)
 
     # -------------------------------------------------------------------------
-    # Method 2: Spectral Index Delta (NDVI + NDBI Otsu Thresholding)
+    # Method 2: Spectral Index Proxy Delta (ΔExG + ΔBareness)
     # -------------------------------------------------------------------------
     t0 = time.perf_counter()
-    ndvi1 = greenness(a)
-    ndvi2 = greenness(b_matched)
-    ndbi1 = bareness(a)
-    ndbi2 = bareness(b_matched)
-    spectral_delta = (0.55 * np.abs(ndvi2 - ndvi1) + 0.45 * np.abs(ndbi2 - ndbi1)).astype(
-        np.float32
-    )
+    exg1 = greenness(a)
+    exg2 = greenness(b_matched)
+    bare1 = bareness(a)
+    bare2 = bareness(b_matched)
+    spectral_delta = (0.55 * np.abs(exg2 - exg1) + 0.45 * np.abs(bare2 - bare1)).astype(np.float32)
     prob_spectral = _normalize_map(ndimage.uniform_filter(spectral_delta, size=2))
     mask_spectral = (prob_spectral > 0.48) & valid
     lat_spectral = round((time.perf_counter() - t0) * 1000.0, 1)
 
     # -------------------------------------------------------------------------
-    # Method 3: Early-Fusion Concatenated U-Net (FC-EF, Daudt et al. 2018)
+    # Method 3: Statistical Spectral Baseline (Median/MAD Outlier Detection)
     # -------------------------------------------------------------------------
     t0 = time.perf_counter()
-    rgb_euclid = np.sqrt(np.sum((b_matched - a) ** 2, axis=-1)).astype(np.float32)
-    fc_ef_field = ndimage.gaussian_filter(
-        0.65 * rgb_euclid + 0.35 * spectral_delta, sigma=1.2
+    dist = np.sqrt(np.sum((b_matched - a) ** 2, axis=-1)).astype(np.float32)
+    score_stat = ndimage.uniform_filter(dist, size=3).astype(np.float32)
+    vals = score_stat[valid]
+    med = float(np.median(vals)) if len(vals) > 0 else 0.0
+    mad = float(1.4826 * np.median(np.abs(vals - med))) if len(vals) > 0 else 0.01
+    baseline_stat = max(med + 3.6 * mad, 0.08)
+
+    prob_stat = (
+        1.0 / (1.0 + np.exp(-(score_stat - baseline_stat) / (0.22 * baseline_stat + EPS)))
     ).astype(np.float32)
-    prob_fc_ef = _normalize_map(fc_ef_field)
-    mask_fc_ef = ndimage.binary_opening((prob_fc_ef > 0.50) & valid, structure=np.ones((2, 2)))
-    lat_fc_ef = round((time.perf_counter() - t0) * 1000.0 + 48.0, 1)
+    mask_stat = (prob_stat >= 0.50) & valid
+    lat_stat = round((time.perf_counter() - t0) * 1000.0, 1)
 
     # -------------------------------------------------------------------------
-    # Method 4: 5-Channel Weight-Sharing Siamese Difference U-Net (FC-Siam-diff)
+    # Method 4: 5-Channel Weight-Sharing Siamese U-Net (PyTorch 2.1)
     # -------------------------------------------------------------------------
     t0 = time.perf_counter()
     model = get_siamese_model()
 
-    stage1_map = _normalize_map(np.abs(b_matched[..., 0] - a[..., 0]) + np.abs(ndvi2 - ndvi1))
+    stage1_map = _normalize_map(np.abs(b_matched[..., 0] - a[..., 0]) + np.abs(exg2 - exg1))
     stage2_map = _normalize_map(ndimage.uniform_filter(stage1_map, size=4))
     stage3_map = _normalize_map(ndimage.gaussian_filter(spectral_delta, sigma=2.5))
-    stage4_map = _normalize_map(ndimage.gaussian_filter(fc_ef_field, sigma=4.5))
-    deep_prob: NDArray[np.float32] = prob_fc_ef
+    stage4_map = _normalize_map(score_stat)
+    deep_prob: Optional[NDArray[np.float32]] = None
+    neural_error: Optional[str] = None
 
     if model is not None and HAS_TORCH:
         try:
-            # Downsample tensor to 160x160 for fast multi-stage XAI extraction
-            pil_size = 160
-            t1_stack = np.stack([a[..., 0], a[..., 1], a[..., 2], ndvi1, ndbi1], axis=0)
-            t2_stack = np.stack(
-                [b_matched[..., 0], b_matched[..., 1], b_matched[..., 2], ndvi2, ndbi2], axis=0
-            )
-            t1_t = F.interpolate(
-                torch.from_numpy(t1_stack).unsqueeze(0).float(),
-                size=(pil_size, pil_size),
-                mode="bilinear",
-                align_corners=False,
-            )
-            t2_t = F.interpolate(
-                torch.from_numpy(t2_stack).unsqueeze(0).float(),
-                size=(pil_size, pil_size),
-                mode="bilinear",
-                align_corners=False,
-            )
-            with torch.no_grad():
-                e1_1, e2_1, e3_1, e4_1 = model.forward_encoder(t1_t)
-                e1_2, e2_2, e3_2, e4_2 = model.forward_encoder(t2_t)
+            h, w = t1_stack.shape[1], t1_stack.shape[2]
+            t1_t = torch.from_numpy(t1_stack).unsqueeze(0).float()
+            t2_t = torch.from_numpy(t2_stack).unsqueeze(0).float()
+            t1_pad, t2_pad, pad_h, pad_w = pad_to_multiple(t1_t, t2_t, multiple=16)
 
-                # Extract L1 feature difference across channels at each spatial scale
+            with torch.no_grad():
+                # Extract intermediate feature difference activations across scales
+                e1_1, e2_1, e3_1, e4_1 = model.forward_encoder(t1_pad)
+                e1_2, e2_2, e3_2, e4_2 = model.forward_encoder(t2_pad)
+
                 d1 = torch.mean(torch.abs(e1_1 - e1_2), dim=1).squeeze().cpu().numpy()
                 d2 = torch.mean(torch.abs(e2_1 - e2_2), dim=1).squeeze().cpu().numpy()
                 d3 = torch.mean(torch.abs(e3_1 - e3_2), dim=1).squeeze().cpu().numpy()
                 d4 = torch.mean(torch.abs(e4_1 - e4_2), dim=1).squeeze().cpu().numpy()
 
-                stage1_map = _normalize_map(0.5 * _normalize_map(d1) + 0.5 * _normalize_map(
-                    np.asarray(
-                        Image.fromarray((stage1_map * 255).astype(np.uint8)).resize(
-                            (d1.shape[1], d1.shape[0])
-                        ),
-                        dtype=np.float32,
-                    ) / 255.0
-                ))
-                stage2_map = _normalize_map(d2)
-                stage3_map = _normalize_map(d3)
-                stage4_map = _normalize_map(d4)
+                stage1_map = _normalize_map(d1[:h, :w] if pad_h or pad_w else d1)
+                stage2_map = _normalize_map(d2[: h // 2, : w // 2])
+                stage3_map = _normalize_map(d3[: h // 4, : w // 4])
+                stage4_map = _normalize_map(d4[: h // 8, : w // 8])
 
-                logits = model(t1_t, t2_t)
+                logits = model(t1_pad, t2_pad)
                 probs = torch.sigmoid(logits)
-                probs_full = F.interpolate(
-                    probs, size=(a.shape[0], a.shape[1]), mode="bilinear", align_corners=False
-                )
-                deep_raw = probs_full.squeeze().cpu().numpy().astype(np.float32)
-                deep_prob = _normalize_map(0.45 * deep_raw + 0.55 * fc_ef_field)
-        except Exception:
-            pass
+                if pad_h > 0 or pad_w > 0:
+                    probs = probs[:, :, :h, :w]
+                deep_prob = probs.squeeze().cpu().numpy().astype(np.float32)
+        except Exception as exc:
+            deep_prob = None
+            neural_error = str(exc)
 
-    siam_score = ndimage.uniform_filter(0.6 * fc_ef_field + 0.4 * spectral_delta, size=3).astype(
-        np.float32
-    )
-    vals = siam_score[valid]
-    med = float(np.median(vals))
-    mad = float(1.4826 * np.median(np.abs(vals - med)))
-    thr = max(med + 3.8 * mad, 0.085)
+    if deep_prob is not None:
+        prob_siam = (0.60 * deep_prob + 0.40 * prob_stat).astype(np.float32)
+        model_status = "trained_neural_ensemble"
+    else:
+        prob_siam = prob_stat
+        model_status = f"statistical_fallback (neural offline: {neural_error})"
 
-    prob_siam = _normalize_map(
-        0.5 * deep_prob + 0.5 / (1.0 + np.exp(-(siam_score - thr) / (0.25 * thr + EPS)))
-    )
-    mask_siam = (prob_siam > 0.54) & valid
+    mask_siam = (prob_siam >= 0.50) & valid
     mask_siam = ndimage.binary_opening(mask_siam, structure=np.ones((3, 3), dtype=bool))
     mask_siam = ndimage.binary_closing(mask_siam, structure=np.ones((3, 3), dtype=bool)) & valid
     lat_siam = round((time.perf_counter() - t0) * 1000.0, 1)
 
-    # Construct high-confidence reference ground-truth consensus for ablation scoring
-    consensus_ref = mask_siam | (mask_fc_ef & mask_spectral)
-    if np.sum(consensus_ref) < 32:
-        consensus_ref = (prob_siam > float(np.percentile(prob_siam[valid], 92))) & valid
+    # -------------------------------------------------------------------------
+    # Pairwise Inter-Method Jaccard Agreement Matrix
+    # -------------------------------------------------------------------------
+    all_masks = [mask_naive, mask_spectral, mask_stat, mask_siam]
+    pairwise_iou: List[List[float]] = []
+    for m_row in all_masks:
+        row_vals = [_compute_jaccard_iou(m_row, m_col) for m_col in all_masks]
+        pairwise_iou.append(row_vals)
 
-    m_naive = _compute_metrics_against_reference(mask_naive, consensus_ref, valid)
-    m_spec = _compute_metrics_against_reference(mask_spectral, consensus_ref, valid)
-    m_fcef = _compute_metrics_against_reference(mask_fc_ef, consensus_ref, valid)
+    # -------------------------------------------------------------------------
+    # Threshold Sensitivity Analysis (Actual % pixels active per threshold)
+    # -------------------------------------------------------------------------
+    taus = [0.15, 0.25, 0.35, 0.50, 0.65, 0.75, 0.85]
+    method_probs = {
+        "naive_rgb": prob_naive,
+        "spectral_index": prob_spectral,
+        "statistical_baseline": prob_stat,
+        "fc_siam_diff": prob_siam,
+    }
 
-    # Calibrate benchmark-anchored scores (OSCD / LEVIR-CD + scene specificity)
-    methods = [
+    methods: List[Dict[str, Any]] = [
         {
             "id": "naive_rgb",
             "name": "Naive RGB Differencing (L1)",
             "short_name": "L1-RGB",
             "architecture": "Pixel-wise |I₂ - I₁| without radiometric alignment",
-            "paper": "Baseline Pixel Subtraction",
-            "github": "https://github.com/rcdaudt/fully_convolutional_change_detection",
             "parameters": 0,
-            "latency_ms": max(lat_naive, 4.2),
-            "f1_score": round(0.582 + 0.08 * m_naive["f1"], 3),
-            "iou": round(0.415 + 0.08 * m_naive["iou"], 3),
-            "precision": round(0.491 + 0.08 * m_naive["precision"], 3),
-            "recall": round(0.718 + 0.05 * m_naive["recall"], 3),
-            "false_alarm_rate_pct": round(max(m_naive["false_alarm_rate_pct"], 14.8), 2),
+            "latency_ms": lat_naive,
             "changed_pct": round(float(np.sum(mask_naive)) / valid_pixels * 100.0, 2),
+            "changed_pixels": int(np.sum(mask_naive)),
+            "mean_score": round(float(np.mean(prob_naive[valid])), 4),
             "blob_count": int(ndimage.label(mask_naive)[1]),
+            "agreement_with_primary_iou": pairwise_iou[0][3],
             "heatmap_grid": _downsample_grid(prob_naive, 48),
-            "verdict": "Severe false positives from seasonal illumination & cloud shadows.",
+            "verdict": "Unnormalized; vulnerable to seasonal lighting drift and cloud shadows.",
         },
         {
             "id": "spectral_index",
-            "name": "Spectral Index Delta (ΔNDVI + ΔNDBI)",
-            "short_name": "Spectral-Otsu",
-            "architecture": "Histogram-matched bi-spectral index Otsu thresholding",
-            "paper": "Sentinel-2 Custom Scripts Baseline",
-            "github": "https://github.com/sentinel-hub/custom-scripts",
+            "name": "Spectral Proxy Delta (ΔExG + ΔBareness)",
+            "short_name": "Spectral-Delta",
+            "architecture": "Thresholding on Excess-Green and Red/Green bareness proxies",
             "parameters": 0,
-            "latency_ms": max(lat_spectral, 11.5),
-            "f1_score": round(0.714 + 0.08 * m_spec["f1"], 3),
-            "iou": round(0.568 + 0.08 * m_spec["iou"], 3),
-            "precision": round(0.695 + 0.08 * m_spec["precision"], 3),
-            "recall": round(0.742 + 0.06 * m_spec["recall"], 3),
-            "false_alarm_rate_pct": round(max(m_spec["false_alarm_rate_pct"], 6.4), 2),
+            "latency_ms": lat_spectral,
             "changed_pct": round(float(np.sum(mask_spectral)) / valid_pixels * 100.0, 2),
+            "changed_pixels": int(np.sum(mask_spectral)),
+            "mean_score": round(float(np.mean(prob_spectral[valid])), 4),
             "blob_count": int(ndimage.label(mask_spectral)[1]),
+            "agreement_with_primary_iou": pairwise_iou[1][3],
             "heatmap_grid": _downsample_grid(prob_spectral, 48),
-            "verdict": "Suppresses brightness drift, but produces salt-and-pepper boundary speckle.",
+            "verdict": "Sensitive to canopy clearing and bare ground, but produces boundary speckle.",
         },
         {
-            "id": "fc_ef",
-            "name": "Early-Fusion U-Net (FC-EF)",
-            "short_name": "FC-EF (10-ch)",
-            "architecture": "Single-branch U-Net on concatenated [T₁, T₂] 10-channel stack",
-            "paper": "Daudt et al., IEEE ICIP 2018",
-            "github": "https://github.com/rcdaudt/fully_convolutional_change_detection/blob/master/unet.py",
-            "parameters": 1352897,
-            "latency_ms": max(lat_fc_ef, 94.0),
-            "f1_score": round(0.812 + 0.05 * m_fcef["f1"], 3),
-            "iou": round(0.708 + 0.05 * m_fcef["iou"], 3),
-            "precision": round(0.825 + 0.04 * m_fcef["precision"], 3),
-            "recall": round(0.799 + 0.04 * m_fcef["recall"], 3),
-            "false_alarm_rate_pct": round(min(max(m_fcef["false_alarm_rate_pct"], 2.9), 5.8), 2),
-            "changed_pct": round(float(np.sum(mask_fc_ef)) / valid_pixels * 100.0, 2),
-            "blob_count": int(ndimage.label(mask_fc_ef)[1]),
-            "heatmap_grid": _downsample_grid(prob_fc_ef, 48),
-            "verdict": "Good spatial context, but lacks explicit weight symmetry between dates.",
+            "id": "statistical_baseline",
+            "name": "Statistical Spectral Baseline",
+            "short_name": "Median-MAD",
+            "architecture": "Radiometrically harmonized Euclidean distance with robust MAD threshold",
+            "parameters": 0,
+            "latency_ms": lat_stat,
+            "changed_pct": round(float(np.sum(mask_stat)) / valid_pixels * 100.0, 2),
+            "changed_pixels": int(np.sum(mask_stat)),
+            "mean_score": round(float(np.mean(prob_stat[valid])), 4),
+            "blob_count": int(ndimage.label(mask_stat)[1]),
+            "agreement_with_primary_iou": pairwise_iou[2][3],
+            "heatmap_grid": _downsample_grid(prob_stat, 48),
+            "verdict": "Robust against lighting drift; native pixel resolution.",
         },
         {
             "id": "fc_siam_diff",
-            "name": "5-Ch Weight-Sharing Siamese U-Net (Ours)",
-            "short_name": "FC-Siam-diff (Ours)",
-            "architecture": "Dual-branch shared encoder + multi-scale |f₁ - f₂| skip fusion + BCE/Dice",
-            "paper": "Daudt et al. ICIP 2018 + Open-CD Multispectral Extension",
-            "github": "https://github.com/rcdaudt/fully_convolutional_change_detection/blob/master/siamunet_diff.py",
+            "name": "5-Ch Siamese U-Net + Ensemble (Primary)",
+            "short_name": "SiameseUNet-5Ch",
+            "architecture": "Weight-sharing dual encoder + skip feature difference fusion",
             "parameters": 2102145,
-            "latency_ms": max(lat_siam, 142.0),
-            "f1_score": 0.891,
-            "iou": 0.824,
-            "precision": 0.913,
-            "recall": 0.870,
-            "false_alarm_rate_pct": 1.12,
+            "status": model_status,
+            "latency_ms": lat_siam,
             "changed_pct": round(float(np.sum(mask_siam)) / valid_pixels * 100.0, 2),
+            "changed_pixels": int(np.sum(mask_siam)),
+            "mean_score": round(float(np.mean(prob_siam[valid])), 4),
             "blob_count": int(ndimage.label(mask_siam)[1]),
+            "agreement_with_primary_iou": 1.0,
             "heatmap_grid": _downsample_grid(prob_siam, 48),
-            "verdict": "Highest F1 (+18.4% over Spectral) with symmetric seasonal invariance.",
+            "verdict": "Primary operational detector; balances deep boundary context with spectral sensitivity.",
         },
     ]
 
+    # Threshold sweeps and conditional ground-truth evaluation
+    for m in methods:
+        mid = str(m["id"])
+        pmap = method_probs[mid]
+        sensitivity_curve: List[Dict[str, Any]] = []
+
+        for tau in taus:
+            t_mask = (pmap >= tau) & valid
+            active_pct = round(float(np.sum(t_mask)) / valid_pixels * 100.0, 2)
+            pt_dict: Dict[str, Any] = {
+                "tau": tau,
+                "changed_pct": active_pct,
+            }
+
+            if has_gt and gt_mask is not None:
+                m_tau = _compute_binary_metrics(t_mask, gt_mask, valid)
+                pt_dict.update(m_tau)
+
+            sensitivity_curve.append(pt_dict)
+
+        m["sensitivity_curve"] = sensitivity_curve
+        m["pr_curve"] = sensitivity_curve
+
+        if has_gt and gt_mask is not None:
+            m_eval = _compute_binary_metrics(
+                (pmap >= 0.50) & valid, gt_mask, valid
+            )
+            m["ground_truth_metrics"] = m_eval
+        else:
+            m["ground_truth_metrics"] = None
+
     xai_stages = [
         {
-            "stage": "Stage 1 · High-Res Edge Difference |f₁(T₁) - f₁(T₂)|",
-            "resolution": "1/1 Scale (32 Channels)",
-            "description": "Captures fine linear disturbances: new logging roads, building perimeters, and shoreline shifts.",
+            "stage": "Stage 1 · High-Res Feature Difference |E₁(T₁) - E₁(T₂)|",
+            "resolution": "1/1 Native Scale (32 Channels)",
+            "description": "Encoder stage 1 activations: fine spatial edges, road cuts, parcel boundaries.",
             "grid": _downsample_grid(stage1_map, 48),
         },
         {
-            "stage": "Stage 2 · Texture & Canopy Difference |f₂(T₁) - f₂(T₂)|",
-            "resolution": "1/2 Scale (64 Channels)",
-            "description": "Filters out single-pixel speckle while isolating forest canopy thinning and graded soil.",
+            "stage": "Stage 2 · Sub-Sampled Texture Difference |E₂(T₁) - E₂(T₂)|",
+            "resolution": "1/2 Spatial Scale (64 Channels)",
+            "description": "Encoder stage 2 activations: canopy density shifts, cleared plots.",
             "grid": _downsample_grid(stage2_map, 48),
         },
         {
-            "stage": "Stage 3 · Parcel & Structure Fusion |f₃(T₁) - f₃(T₂)|",
-            "resolution": "1/4 Scale (128 Channels)",
-            "description": "Aggregates agricultural fields, urban blocks, and water body recession zones.",
+            "stage": "Stage 3 · Regional Context Difference |E₃(T₁) - E₃(T₂)|",
+            "resolution": "1/4 Spatial Scale (128 Channels)",
+            "description": "Encoder stage 3 activations: suburban subdivision grading, large industrial pads.",
             "grid": _downsample_grid(stage3_map, 48),
         },
         {
-            "stage": "Stage 4 · Deep Semantic Bottleneck |f₄(T₁) - f₄(T₂)|",
-            "resolution": "1/8 Scale (256 Channels)",
-            "description": "High-level semantic representation immune to solar azimuth and seasonal phenology.",
+            "stage": "Stage 4 · Bottleneck Semantic Representation |E₄(T₁) - E₄(T₂)|",
+            "resolution": "1/8 Spatial Scale (256 Channels)",
+            "description": "Encoder bottleneck activations: high-level semantic representation.",
             "grid": _downsample_grid(stage4_map, 48),
         },
     ]
 
-    # Compute Precision-Recall curve operating points across thresholds tau in [0.15..0.85]
-    taus = [0.15, 0.25, 0.35, 0.50, 0.65, 0.75, 0.85]
-    prob_maps = {
-        "naive_rgb": (prob_naive, 0.49, 0.72),
-        "spectral_index": (prob_spectral, 0.70, 0.74),
-        "fc_ef": (prob_fc_ef, 0.83, 0.80),
-        "fc_siam_diff": (prob_siam, 0.913, 0.870),
-    }
-    for m in methods:
-        mid = str(m["id"])
-        pmap, base_p, base_r = prob_maps[mid]
-        curve: List[Dict[str, float]] = []
-        for tau in taus:
-            shift = tau - 0.50
-            p_tau = round(float(np.clip(base_p + 0.26 * shift, 0.18, 0.985)), 3)
-            r_tau = round(float(np.clip(base_r - 0.34 * shift, 0.15, 0.985)), 3)
-            f1_tau = round(2.0 * p_tau * r_tau / (p_tau + r_tau + EPS), 3)
-            active_frac = round(float(np.sum((pmap >= tau) & valid)) / valid_pixels * 100.0, 2)
-            curve.append(
-                {
-                    "tau": tau,
-                    "precision": p_tau,
-                    "recall": r_tau,
-                    "f1": f1_tau,
-                    "changed_pct": active_frac,
-                }
-            )
-        m["pr_curve"] = curve
-
-    # Render NIR False-Color & Spectral Delta diagnostic composites
-    nir_fc = np.stack(
+    veg_comp = np.stack(
         [
-            np.clip((b_matched[..., 1] * 1.35 + np.maximum(ndvi2, 0.0) * 0.55) * 255.0, 0, 255),
+            np.clip((b_matched[..., 1] * 1.35 + np.maximum(exg2, 0.0) * 0.55) * 255.0, 0, 255),
             np.clip(b_matched[..., 0] * 230.0, 0, 255),
             np.clip(b_matched[..., 2] * 210.0, 0, 255),
         ],
@@ -376,25 +373,20 @@ def run_ablation_study(
         "image_t2_base64": _to_base64_jpeg(
             (b_matched * 255.0).clip(0, 255).astype(np.uint8), 224
         ),
-        "image_nir_false_color_base64": _to_base64_jpeg(nir_fc, 224),
+        "image_nir_false_color_base64": _to_base64_jpeg(veg_comp, 224),
+        "has_ground_truth": has_gt,
+        "evaluation_mode": (
+            "Independent Ground-Truth Evaluation"
+            if has_gt
+            else "Unsupervised Inter-Method Agreement Analysis"
+        ),
+        "disclaimer": (
+            "Independent ground truth labels available."
+            if has_gt
+            else "No ground truth labels exist for this operational scene. Inter-method Jaccard agreement matrix and detection statistics reported without manufactured F1 scores."
+        ),
+        "pairwise_iou_matrix": pairwise_iou,
         "methods": methods,
         "xai_stages": xai_stages,
-        "references": [
-            {
-                "title": "Fully Convolutional Siamese Networks for Change Detection (Daudt et al., ICIP 2018)",
-                "repo": "rcdaudt/fully_convolutional_change_detection",
-                "url": "https://github.com/rcdaudt/fully_convolutional_change_detection",
-            },
-            {
-                "title": "Open-CD: Open-Source Change Detection Toolbox (ACMMM 2025)",
-                "repo": "likyoo/open-cd",
-                "url": "https://github.com/likyoo/open-cd",
-            },
-            {
-                "title": "Microsoft TorchGeo: Geospatial Deep Learning Datasets & Benchmarks",
-                "repo": "microsoft/torchgeo",
-                "url": "https://github.com/microsoft/torchgeo",
-            },
-        ],
+        "xai_disclaimer": "Attribution Note: Multi-scale maps display layer feature differences |E_i(T1) - E_i(T2)| from the Siamese encoder hierarchy. These visualize activation differences across spatial scales, not validated Grad-CAM++ attribution maps.",
     }
-

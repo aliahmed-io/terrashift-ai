@@ -3,13 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useState, type ReactNode } from "react";
-import {
-  useAoi,
-  CORRIDOR_PROFILES,
-  TIMELINE_MONTHS,
-  TIMELINE_YEARS,
-  type CorridorId,
-} from "@/lib/aoi-context";
+import { useAoi, CORRIDOR_PROFILES, TIMELINE_MONTHS, TIMELINE_YEARS, type CorridorId } from "@/lib/aoi-context";
 
 const STUDIO_LINKS = [
   { href: "/", label: "Overview" },
@@ -131,14 +125,13 @@ export function StudioNav({ rightSlot }: StudioNavProps = {}) {
 
   const corridors = Object.values(CORRIDOR_PROFILES).filter(
     (c) =>
-      c.name.toLowerCase().includes(query.toLowerCase()) ||
-      c.coordsLabel.toLowerCase().includes(query.toLowerCase())
+      c.name.toLowerCase().includes(query.toLowerCase()) || c.coordsLabel.toLowerCase().includes(query.toLowerCase()),
   );
 
   return (
-    <header className="relative z-40 h-[60px] shrink-0 bg-white px-5 flex items-center justify-between border-b border-[#f0f2f5]">
+    <header className="relative z-40 flex h-[60px] shrink-0 items-center justify-between border-b border-[#f0f2f5] bg-white px-5">
       {/* Left: Hamburger + Outlined Isometric Icon + Brand */}
-      <div className="flex items-center gap-4 min-w-[200px]">
+      <div className="flex min-w-[200px] items-center gap-4">
         <button
           type="button"
           aria-label="Select Corridor"
@@ -146,14 +139,14 @@ export function StudioNav({ rightSlot }: StudioNavProps = {}) {
             setDrawerOpen((v) => !v);
             setSearchOpen(false);
           }}
-          className="w-8 h-8 flex flex-col items-center justify-center gap-[4px] text-[#22252a] hover:opacity-75 transition-opacity cursor-pointer"
+          className="flex h-8 w-8 cursor-pointer flex-col items-center justify-center gap-[4px] text-[#22252a] transition-opacity hover:opacity-75"
         >
-          <span className="w-[18px] h-[1.8px] bg-[#22252a] rounded-full" />
-          <span className="w-[18px] h-[1.8px] bg-[#22252a] rounded-full" />
-          <span className="w-[18px] h-[1.8px] bg-[#22252a] rounded-full" />
+          <span className="h-[1.8px] w-[18px] rounded-full bg-[#22252a]" />
+          <span className="h-[1.8px] w-[18px] rounded-full bg-[#22252a]" />
+          <span className="h-[1.8px] w-[18px] rounded-full bg-[#22252a]" />
         </button>
 
-        <Link href="/" className="flex items-center gap-2 hover:opacity-85 transition-opacity">
+        <Link href="/" className="flex items-center gap-2 transition-opacity hover:opacity-85">
           <svg
             width="16"
             height="16"
@@ -169,30 +162,26 @@ export function StudioNav({ rightSlot }: StudioNavProps = {}) {
             <path d="M12 12v9" />
             <path d="M12 12L3 7.5" />
           </svg>
-          <span className="text-[13px] font-bold tracking-[-0.01em] text-[#1c1f23]">
-            TerraShift
-          </span>
+          <span className="text-[13px] font-bold tracking-[-0.01em] text-[#1c1f23]">TerraShift</span>
         </Link>
       </div>
 
       {/* Center: Wide Segmented Grey Pill Track (#edeff2) with White Active Pill */}
       <nav
         aria-label="Primary Modes"
-        className="flex items-center bg-[#edeff2] p-[3px] rounded-xl w-full max-w-[760px]"
+        className="flex w-full max-w-[760px] items-center rounded-xl bg-[#edeff2] p-[3px]"
       >
         {STUDIO_LINKS.map((tab) => {
           const active =
-            tab.href === "/"
-              ? pathname === "/"
-              : pathname === tab.href || pathname?.startsWith(`${tab.href}/`);
+            tab.href === "/" ? pathname === "/" : pathname === tab.href || pathname?.startsWith(`${tab.href}/`);
           return (
             <Link
               key={tab.href}
               href={tab.href}
-              className={`flex-1 py-[7px] px-3 rounded-[9px] text-[12.5px] transition-all text-center whitespace-nowrap ${
+              className={`flex-1 rounded-[9px] px-3 py-[7px] text-center text-[12.5px] whitespace-nowrap transition-all ${
                 active
-                  ? "bg-white text-[#1c1f23] font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
-                  : "text-[#636973] font-medium hover:text-[#1c1f23]"
+                  ? "bg-white font-semibold text-[#1c1f23] shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                  : "font-medium text-[#636973] hover:text-[#1c1f23]"
               }`}
             >
               {tab.label}
@@ -202,7 +191,7 @@ export function StudioNav({ rightSlot }: StudioNavProps = {}) {
       </nav>
 
       {/* Right: Active Corridor Pill + Search Icon + Soft Avatar Circle */}
-      <div className="flex items-center justify-end gap-3.5 min-w-[200px]">
+      <div className="flex min-w-[200px] items-center justify-end gap-3.5">
         {rightSlot ? (
           rightSlot
         ) : (
@@ -212,9 +201,9 @@ export function StudioNav({ rightSlot }: StudioNavProps = {}) {
               setDrawerOpen((v) => !v);
               setSearchOpen(false);
             }}
-            className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#f6f7f9] hover:bg-[#edeff2] text-[11.5px] font-medium text-[#3b4048] transition-colors cursor-pointer"
+            className="hidden cursor-pointer items-center gap-2 rounded-lg bg-[#f6f7f9] px-3 py-1.5 text-[11.5px] font-medium text-[#3b4048] transition-colors hover:bg-[#edeff2] xl:flex"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-[#22b567]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-[#22b567]" />
             <span>{activeCorridor.shortName}</span>
           </button>
         )}
@@ -226,16 +215,16 @@ export function StudioNav({ rightSlot }: StudioNavProps = {}) {
             setSearchOpen((v) => !v);
             setDrawerOpen(false);
           }}
-          className="text-[#5c626b] hover:text-[#1c1f23] transition-colors cursor-pointer"
+          className="cursor-pointer text-[#5c626b] transition-colors hover:text-[#1c1f23]"
         >
           <IconSearch />
         </button>
 
         <div
           title={`${activeCorridor.name} (${activeCorridor.tileId})`}
-          className="w-8 h-8 rounded-full bg-[#e6ebe8] overflow-hidden flex items-center justify-center"
+          className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#e6ebe8]"
         >
-          <svg viewBox="0 0 32 32" className="w-full h-full">
+          <svg viewBox="0 0 32 32" className="h-full w-full">
             <circle cx="16" cy="12" r="5" fill="#7a9987" />
             <path d="M6 29c1.8-5.5 5.4-8 10-8s8.2 2.5 10 8" fill="#7a9987" />
           </svg>
@@ -244,8 +233,8 @@ export function StudioNav({ rightSlot }: StudioNavProps = {}) {
 
       {/* Left Hamburger Corridor Switcher Popover */}
       {drawerOpen && (
-        <div className="absolute top-[64px] left-5 w-[310px] bg-white rounded-[18px] shadow-[0_16px_48px_rgba(0,0,0,0.14)] border border-[#edeff2] p-3 z-50">
-          <div className="px-2.5 py-1.5 text-[11px] font-semibold text-[#8c929c] uppercase tracking-wider">
+        <div className="absolute top-[64px] left-5 z-50 w-[310px] rounded-[18px] border border-[#edeff2] bg-white p-3 shadow-[0_16px_48px_rgba(0,0,0,0.14)]">
+          <div className="px-2.5 py-1.5 text-[11px] font-semibold tracking-wider text-[#8c929c] uppercase">
             Active Observation Corridor
           </div>
           <div className="mt-1 space-y-1">
@@ -260,19 +249,15 @@ export function StudioNav({ rightSlot }: StudioNavProps = {}) {
                     setActiveCorridorId(id);
                     setDrawerOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl transition-colors flex items-center justify-between cursor-pointer ${
-                    isSelected
-                      ? "bg-[#f4f5f7] text-[#1c1f23] font-semibold"
-                      : "text-[#3b4048] hover:bg-[#f8f9fb]"
+                  className={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 text-left transition-colors ${
+                    isSelected ? "bg-[#f4f5f7] font-semibold text-[#1c1f23]" : "text-[#3b4048] hover:bg-[#f8f9fb]"
                   }`}
                 >
                   <div>
                     <div className="text-[12.5px]">{item.name}</div>
                     <div className="text-[11px] text-[#8c929c]">{item.coordsLabel}</div>
                   </div>
-                  {isSelected && (
-                    <span className="w-2 h-2 rounded-full bg-[#22b567]" />
-                  )}
+                  {isSelected && <span className="h-2 w-2 rounded-full bg-[#22b567]" />}
                 </button>
               );
             })}
@@ -282,15 +267,15 @@ export function StudioNav({ rightSlot }: StudioNavProps = {}) {
 
       {/* Right Search Popover */}
       {searchOpen && (
-        <div className="absolute top-[64px] right-5 w-[320px] bg-white rounded-[18px] shadow-[0_16px_48px_rgba(0,0,0,0.14)] border border-[#edeff2] p-3.5 z-50">
+        <div className="absolute top-[64px] right-5 z-50 w-[320px] rounded-[18px] border border-[#edeff2] bg-white p-3.5 shadow-[0_16px_48px_rgba(0,0,0,0.14)]">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter Sentinel-2 corridors..."
-            className="w-full px-3 py-2 rounded-xl bg-[#f6f7f9] text-[12.5px] text-[#1c1f23] placeholder:text-[#8c929c] focus:outline-none"
+            className="w-full rounded-xl bg-[#f6f7f9] px-3 py-2 text-[12.5px] text-[#1c1f23] placeholder:text-[#8c929c] focus:outline-none"
           />
-          <div className="mt-2 max-h-56 overflow-y-auto space-y-1">
+          <div className="mt-2 max-h-56 space-y-1 overflow-y-auto">
             {corridors.map((c) => (
               <button
                 key={c.id}
@@ -300,7 +285,7 @@ export function StudioNav({ rightSlot }: StudioNavProps = {}) {
                   setSearchOpen(false);
                   setQuery("");
                 }}
-                className="w-full text-left px-3 py-2 rounded-xl hover:bg-[#f6f7f9] transition-colors cursor-pointer"
+                className="w-full cursor-pointer rounded-xl px-3 py-2 text-left transition-colors hover:bg-[#f6f7f9]"
               >
                 <div className="text-[12.5px] font-semibold text-[#1c1f23]">{c.name}</div>
                 <div className="text-[11px] text-[#8c929c]">
@@ -320,20 +305,20 @@ export function StudioTimelineBar() {
   const [yearMenuOpen, setYearMenuOpen] = useState(false);
 
   return (
-    <footer className="relative z-30 h-[58px] shrink-0 bg-white px-5 flex items-center gap-4 border-t border-[#f0f2f5]">
+    <footer className="relative z-30 flex h-[58px] shrink-0 items-center gap-4 border-t border-[#f0f2f5] bg-white px-5">
       {/* Year Pill Selector */}
       <div className="relative">
         <button
           type="button"
           onClick={() => setYearMenuOpen((v) => !v)}
-          className="h-[36px] px-4 rounded-xl border border-[#e4e7ec] bg-white flex items-center gap-2.5 text-[12.5px] font-semibold text-[#1c1f23] shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:bg-[#f8f9fb] transition-colors cursor-pointer"
+          className="flex h-[36px] cursor-pointer items-center gap-2.5 rounded-xl border border-[#e4e7ec] bg-white px-4 text-[12.5px] font-semibold text-[#1c1f23] shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:bg-[#f8f9fb]"
         >
           <span>{activeYear}</span>
           <IconChevronDown />
         </button>
 
         {yearMenuOpen && (
-          <div className="absolute bottom-[44px] left-0 w-[110px] bg-white rounded-2xl shadow-[0_12px_32px_rgba(0,0,0,0.14)] border border-[#edeff2] p-1.5 z-50">
+          <div className="absolute bottom-[44px] left-0 z-50 w-[110px] rounded-2xl border border-[#edeff2] bg-white p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.14)]">
             {TIMELINE_YEARS.map((yr) => (
               <button
                 key={yr}
@@ -342,9 +327,9 @@ export function StudioTimelineBar() {
                   setActiveYear(yr);
                   setYearMenuOpen(false);
                 }}
-                className={`w-full text-left px-3 py-1.5 rounded-xl text-[12.5px] tabular-nums transition-colors cursor-pointer ${
+                className={`w-full cursor-pointer rounded-xl px-3 py-1.5 text-left text-[12.5px] tabular-nums transition-colors ${
                   yr === activeYear
-                    ? "bg-[#edeff2] text-[#1c1f23] font-semibold"
+                    ? "bg-[#edeff2] font-semibold text-[#1c1f23]"
                     : "text-[#636973] hover:bg-[#f6f7f9] hover:text-[#1c1f23]"
                 }`}
               >
@@ -356,7 +341,7 @@ export function StudioTimelineBar() {
       </div>
 
       {/* Full-Width Segmented Month Track (#edeff2) */}
-      <div className="flex-1 bg-[#edeff2] p-[3px] rounded-xl flex items-center">
+      <div className="flex flex-1 items-center rounded-xl bg-[#edeff2] p-[3px]">
         {TIMELINE_MONTHS.map((m) => {
           const active = m === activeMonth;
           return (
@@ -364,10 +349,10 @@ export function StudioTimelineBar() {
               key={m}
               type="button"
               onClick={() => setActiveMonth(m)}
-              className={`flex-1 py-[6px] rounded-[9px] text-[12px] transition-all text-center cursor-pointer ${
+              className={`flex-1 cursor-pointer rounded-[9px] py-[6px] text-center text-[12px] transition-all ${
                 active
-                  ? "bg-white text-[#1c1f23] font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
-                  : "text-[#636973] font-medium hover:text-[#1c1f23]"
+                  ? "bg-white font-semibold text-[#1c1f23] shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                  : "font-medium text-[#636973] hover:text-[#1c1f23]"
               }`}
             >
               {m}
@@ -379,15 +364,9 @@ export function StudioTimelineBar() {
   );
 }
 
-export function StudioShell({
-  children,
-  rightSlot,
-}: {
-  readonly children: ReactNode;
-  readonly rightSlot?: ReactNode;
-}) {
+export function StudioShell({ children, rightSlot }: { readonly children: ReactNode; readonly rightSlot?: ReactNode }) {
   return (
-    <div className="h-dvh w-full flex flex-col bg-white text-[#1c1f23] select-none font-sans antialiased overflow-hidden">
+    <div className="flex h-dvh w-full flex-col overflow-hidden bg-white font-sans text-[#1c1f23] antialiased select-none">
       <StudioNav rightSlot={rightSlot} />
       <main className="relative flex-1 overflow-hidden bg-[#f6f7f9]">{children}</main>
       <StudioTimelineBar />
@@ -417,12 +396,12 @@ export function MapCanvasOverlay({
   return (
     <>
       {/* Top-Left Dark Translucent Pill Zoom Button Pair */}
-      <div className="absolute top-6 left-5 z-10 flex flex-col bg-[#1b1e23]/85 backdrop-blur-md rounded-2xl p-1 shadow-md">
+      <div className="absolute top-6 left-5 z-10 flex flex-col rounded-2xl bg-[#1b1e23]/85 p-1 shadow-md backdrop-blur-md">
         <button
           type="button"
           onClick={onZoomIn}
           aria-label="Zoom in"
-          className="w-8 h-8 flex items-center justify-center text-white/90 hover:text-white transition-colors cursor-pointer"
+          className="flex h-8 w-8 cursor-pointer items-center justify-center text-white/90 transition-colors hover:text-white"
         >
           <svg
             width="15"
@@ -444,7 +423,7 @@ export function MapCanvasOverlay({
           type="button"
           onClick={onZoomOut}
           aria-label="Zoom out"
-          className="w-8 h-8 flex items-center justify-center text-white/90 hover:text-white transition-colors cursor-pointer"
+          className="flex h-8 w-8 cursor-pointer items-center justify-center text-white/90 transition-colors hover:text-white"
         >
           <svg
             width="15"
@@ -464,16 +443,14 @@ export function MapCanvasOverlay({
       </div>
 
       {/* Bottom-left View Mode Switcher + Layer Badge */}
-      <div className="absolute bottom-5 left-5 z-10 flex flex-col sm:flex-row items-start sm:items-center gap-2">
+      <div className="absolute bottom-5 left-5 z-10 flex flex-col items-start gap-2 sm:flex-row sm:items-center">
         {onSelectViewMode && (
-          <div className="flex items-center bg-[#1b1e23]/90 backdrop-blur-md p-1 rounded-xl shadow-md border border-white/10 text-[11px] font-medium text-white/70">
+          <div className="flex items-center rounded-xl border border-white/10 bg-[#1b1e23]/90 p-1 text-[11px] font-medium text-white/70 shadow-md backdrop-blur-md">
             <button
               type="button"
               onClick={() => onSelectViewMode("satellite")}
-              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
-                viewMode === "satellite"
-                  ? "bg-white text-[#1c1f23] font-semibold shadow-sm"
-                  : "hover:text-white"
+              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1 transition-colors ${
+                viewMode === "satellite" ? "bg-white font-semibold text-[#1c1f23] shadow-sm" : "hover:text-white"
               }`}
             >
               <IconSatellite />
@@ -482,10 +459,8 @@ export function MapCanvasOverlay({
             <button
               type="button"
               onClick={() => onSelectViewMode("diagnostic")}
-              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
-                viewMode === "diagnostic"
-                  ? "bg-white text-[#1c1f23] font-semibold shadow-sm"
-                  : "hover:text-white"
+              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1 transition-colors ${
+                viewMode === "diagnostic" ? "bg-white font-semibold text-[#1c1f23] shadow-sm" : "hover:text-white"
               }`}
             >
               <IconDiagnostic />
@@ -494,10 +469,8 @@ export function MapCanvasOverlay({
             <button
               type="button"
               onClick={() => onSelectViewMode("compare")}
-              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
-                viewMode === "compare"
-                  ? "bg-white text-[#1c1f23] font-semibold shadow-sm"
-                  : "hover:text-white"
+              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1 transition-colors ${
+                viewMode === "compare" ? "bg-white font-semibold text-[#1c1f23] shadow-sm" : "hover:text-white"
               }`}
             >
               <IconBiTemporal />
@@ -511,9 +484,9 @@ export function MapCanvasOverlay({
             type="button"
             onClick={onCycleEffect}
             title="Click to cycle neural diagnostic layer"
-            className="px-3 py-1.5 rounded-xl bg-white/95 backdrop-blur-md shadow-[0_4px_16px_rgba(0,0,0,0.1)] text-[11.5px] font-medium text-[#1c1f23] flex items-center gap-2 hover:bg-white transition-colors cursor-pointer border border-[#edeff2]"
+            className="flex cursor-pointer items-center gap-2 rounded-xl border border-[#edeff2] bg-white/95 px-3 py-1.5 text-[11.5px] font-medium text-[#1c1f23] shadow-[0_4px_16px_rgba(0,0,0,0.1)] backdrop-blur-md transition-colors hover:bg-white"
           >
-            <span className="w-2 h-2 rounded-full bg-[#22b567] animate-pulse" />
+            <span className="h-2 w-2 animate-pulse rounded-full bg-[#22b567]" />
             <span>{activeEffectLabel}</span>
             <svg
               width="10"
@@ -535,7 +508,7 @@ export function MapCanvasOverlay({
       </div>
 
       {/* Subtle Coordinate Grid Indices matching reference */}
-      <div className="pointer-events-none absolute top-11 left-24 right-24 flex justify-between text-[10px] font-medium text-[#1c1f23]/45">
+      <div className="pointer-events-none absolute top-11 right-24 left-24 flex justify-between text-[10px] font-medium text-[#1c1f23]/45">
         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
           <span key={n}>{n}</span>
         ))}

@@ -5,17 +5,14 @@ import dynamic from "next/dynamic";
 import { StudioShell, MapCanvasOverlay, type StudioViewMode } from "@/components/studio-nav";
 import { useAoi, CORRIDOR_PROFILES, type CorridorId } from "@/lib/aoi-context";
 
-const MapCanvas = dynamic(
-  () => import("@/components/map/map-canvas").then((m) => m.MapCanvas),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="size-full flex items-center justify-center bg-[#0B0F17] text-white/50 text-xs tracking-wider uppercase font-mono">
-        Initializing Orbital Map Engine...
-      </div>
-    ),
-  },
-);
+const MapCanvas = dynamic(() => import("@/components/map/map-canvas").then((m) => m.MapCanvas), {
+  ssr: false,
+  loading: () => (
+    <div className="flex size-full items-center justify-center bg-[#0B0F17] font-mono text-xs tracking-wider text-white/50 uppercase">
+      Initializing Orbital Map Engine...
+    </div>
+  ),
+});
 
 const SPECTRAL_LAYERS = [
   {
@@ -166,8 +163,7 @@ export function AnalyzeClient() {
     }
   };
 
-  const displayTitle =
-    activeCorridorId === "roshn" ? "Wadi Hanifah Canopy" : activeCorridor.name;
+  const displayTitle = activeCorridorId === "roshn" ? "Wadi Hanifah Canopy" : activeCorridor.name;
 
   const spectralRows = WADI_SPECTRAL_ROWS.map((r) => {
     const threshMod = 1 + (0.45 - threshold) * 0.35;
@@ -184,7 +180,7 @@ export function AnalyzeClient() {
 
   return (
     <StudioShell>
-      <div className="relative w-full h-full overflow-hidden">
+      <div className="relative h-full w-full overflow-hidden">
         {/* Real GPU-Accelerated MapLibre Satellite Map with Multi-Spectral Diagnostic Overlays */}
         <MapCanvas
           yearT1={2018}
@@ -214,15 +210,15 @@ export function AnalyzeClient() {
         />
 
         {/* Floating White Card matching approved ui_clean_studio.png */}
-        <div className="absolute top-12 right-14 w-[380px] bg-white rounded-[22px] shadow-[0_16px_48px_rgba(0,0,0,0.14)] p-7">
-          <div className="flex items-center justify-between mb-5">
+        <div className="absolute top-12 right-14 w-[380px] rounded-[22px] bg-white p-7 shadow-[0_16px_48px_rgba(0,0,0,0.14)]">
+          <div className="mb-5 flex items-center justify-between">
             <button
               type="button"
               onClick={handleCycleCorridor}
               title="Click to switch observation corridor"
-              className="text-left group cursor-pointer"
+              className="group cursor-pointer text-left"
             >
-              <h2 className="text-[18px] font-semibold text-[#1c1f23] tracking-[-0.01em] group-hover:opacity-75 transition-opacity">
+              <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-[#1c1f23] transition-opacity group-hover:opacity-75">
                 {displayTitle}
               </h2>
             </button>
@@ -231,7 +227,7 @@ export function AnalyzeClient() {
               onClick={handleCycleLayer}
               aria-label="Switch spectral composite"
               title="Switch spectral layer"
-              className="w-6 h-6 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d] hover:text-[#1c1f23] transition-colors cursor-pointer"
+              className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-[#f4f5f7] text-[#7c828d] transition-colors hover:text-[#1c1f23]"
             >
               <svg
                 width="12"
@@ -251,32 +247,24 @@ export function AnalyzeClient() {
 
           {cardSlide === 0 ? (
             <>
-              <div className="flex items-center justify-between text-[13px] font-medium text-[#3b4048] mb-5">
+              <div className="mb-5 flex items-center justify-between text-[13px] font-medium text-[#3b4048]">
                 <span>NDVI &amp; Spectral Shift</span>
                 {liveChangePct !== null && (
-                  <span className="text-[12px] font-semibold text-[#22b567]">
-                    Δ {formatComma(liveChangePct, 2)} %
-                  </span>
+                  <span className="text-[12px] font-semibold text-[#22b567]">Δ {formatComma(liveChangePct, 2)} %</span>
                 )}
               </div>
 
               <div className="space-y-4">
                 {spectralRows.map((row, idx) => (
                   <div key={idx}>
-                    <div className="flex items-center justify-between text-[12.5px] mb-2">
-                      <span className="font-semibold text-[#1c1f23] tabular-nums">
-                        {row.valStr}
-                      </span>
+                    <div className="mb-2 flex items-center justify-between text-[12.5px]">
+                      <span className="font-semibold text-[#1c1f23] tabular-nums">{row.valStr}</span>
                       <div className="flex items-center gap-3 tabular-nums">
-                        <span className="font-medium text-[#3b4048]">
-                          {row.distStr}
-                        </span>
-                        <span className="text-[#9aa0aa] w-9 text-right">
-                          {row.pctStr}
-                        </span>
+                        <span className="font-medium text-[#3b4048]">{row.distStr}</span>
+                        <span className="w-9 text-right text-[#9aa0aa]">{row.pctStr}</span>
                       </div>
                     </div>
-                    <div className="h-[5px] w-full bg-[#edeff2] rounded-full overflow-hidden">
+                    <div className="h-[5px] w-full overflow-hidden rounded-full bg-[#edeff2]">
                       <div
                         className={`h-full rounded-full transition-all duration-300 ${row.color}`}
                         style={{ width: row.w }}
@@ -288,16 +276,12 @@ export function AnalyzeClient() {
             </>
           ) : (
             <div className="space-y-4">
-              <div className="text-[13px] font-medium text-[#3b4048]">
-                Live Spectral Inference &amp; Audit Controls
-              </div>
+              <div className="text-[13px] font-medium text-[#3b4048]">Live Spectral Inference &amp; Audit Controls</div>
 
               <div>
-                <div className="flex items-center justify-between text-[12px] mb-1.5">
+                <div className="mb-1.5 flex items-center justify-between text-[12px]">
                   <span className="text-[#636973]">Composite Layer</span>
-                  <span className="font-semibold text-[#1c1f23]">
-                    {currentLayer.id.toUpperCase()}
-                  </span>
+                  <span className="font-semibold text-[#1c1f23]">{currentLayer.id.toUpperCase()}</span>
                 </div>
                 <div className="grid grid-cols-5 gap-1.5">
                   {SPECTRAL_LAYERS.map((l, i) => (
@@ -305,10 +289,8 @@ export function AnalyzeClient() {
                       key={l.id}
                       type="button"
                       onClick={() => setLayerIdx(i)}
-                      className={`py-1.5 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${
-                        layerIdx === i
-                          ? "bg-[#1c1f23] text-white"
-                          : "bg-[#f4f5f7] text-[#636973] hover:text-[#1c1f23]"
+                      className={`cursor-pointer rounded-lg py-1.5 text-[11px] font-medium transition-colors ${
+                        layerIdx === i ? "bg-[#1c1f23] text-white" : "bg-[#f4f5f7] text-[#636973] hover:text-[#1c1f23]"
                       }`}
                     >
                       {l.id.toUpperCase()}
@@ -318,11 +300,9 @@ export function AnalyzeClient() {
               </div>
 
               <div>
-                <div className="flex items-center justify-between text-[12px] mb-1.5">
+                <div className="mb-1.5 flex items-center justify-between text-[12px]">
                   <span className="text-[#636973]">Decision Threshold (τ)</span>
-                  <span className="font-semibold text-[#1c1f23] tabular-nums">
-                    {formatComma(threshold, 2)}
-                  </span>
+                  <span className="font-semibold text-[#1c1f23] tabular-nums">{formatComma(threshold, 2)}</span>
                 </div>
                 <input
                   type="range"
@@ -331,33 +311,29 @@ export function AnalyzeClient() {
                   step={0.05}
                   value={threshold}
                   onChange={(e) => setThreshold(Number(e.target.value))}
-                  className="w-full accent-[#22b567] cursor-pointer"
+                  className="w-full cursor-pointer accent-[#22b567]"
                 />
               </div>
 
-              <div className="pt-1 flex items-center gap-2">
+              <div className="flex items-center gap-2 pt-1">
                 <button
                   type="button"
                   disabled={isRunning}
                   onClick={handleRunLiveInference}
-                  className="flex-1 py-2.5 px-3 rounded-xl bg-[#22b567] text-white text-[12.5px] font-semibold hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+                  className="flex-1 cursor-pointer rounded-xl bg-[#22b567] px-3 py-2.5 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   {isRunning ? "Running..." : "Run Inference"}
                 </button>
                 <button
                   type="button"
                   onClick={handleDownloadPdf}
-                  className="py-2.5 px-3 rounded-xl bg-[#f4f5f7] text-[#1c1f23] text-[12.5px] font-semibold hover:bg-[#edeff2] transition-colors cursor-pointer"
+                  className="cursor-pointer rounded-xl bg-[#f4f5f7] px-3 py-2.5 text-[12.5px] font-semibold text-[#1c1f23] transition-colors hover:bg-[#edeff2]"
                 >
                   PDF Audit
                 </button>
               </div>
 
-              {statusMessage && (
-                <div className="text-[11.5px] text-[#636973] truncate">
-                  {statusMessage}
-                </div>
-              )}
+              {statusMessage && <div className="truncate text-[11.5px] text-[#636973]">{statusMessage}</div>}
             </div>
           )}
 
@@ -366,7 +342,7 @@ export function AnalyzeClient() {
               type="button"
               onClick={() => setCardSlide(0)}
               aria-label="Prev"
-              className="w-7 h-7 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d] hover:text-[#1c1f23] transition-colors cursor-pointer"
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-[#f4f5f7] text-[#7c828d] transition-colors hover:text-[#1c1f23]"
             >
               <svg
                 width="13"
@@ -383,22 +359,14 @@ export function AnalyzeClient() {
               </svg>
             </button>
             <div className="flex items-center gap-1.5">
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  cardSlide === 0 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"
-                }`}
-              />
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  cardSlide === 1 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"
-                }`}
-              />
+              <span className={`h-1.5 w-1.5 rounded-full ${cardSlide === 0 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"}`} />
+              <span className={`h-1.5 w-1.5 rounded-full ${cardSlide === 1 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"}`} />
             </div>
             <button
               type="button"
               onClick={() => setCardSlide(1)}
               aria-label="Next"
-              className="w-7 h-7 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d] hover:text-[#1c1f23] transition-colors cursor-pointer"
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-[#f4f5f7] text-[#7c828d] transition-colors hover:text-[#1c1f23]"
             >
               <svg
                 width="13"

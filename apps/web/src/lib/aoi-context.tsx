@@ -98,7 +98,7 @@ export function AoiProvider({ children }: { children: React.ReactNode }) {
         source: "preset",
       });
     },
-    [activeYear, setActiveAoi]
+    [activeYear, setActiveAoi],
   );
 
   const updatePolygon = useCallback((polygon: [number, number][], name = "Custom Map Studio AOI") => {
@@ -116,7 +116,7 @@ export function AoiProvider({ children }: { children: React.ReactNode }) {
         polygon,
         yearT1: prev?.yearT1 ?? 2018,
         yearT2: prev?.yearT2 ?? 2024,
-        threshold: prev?.threshold ?? 0.50,
+        threshold: prev?.threshold ?? 0.5,
         center,
         zoom: prev?.zoom ?? 13,
         source: "drawn",
@@ -170,17 +170,14 @@ export function AoiProvider({ children }: { children: React.ReactNode }) {
   }, [activeCorridorId, activeYear, activeMonth, activeAoi?.threshold]);
 
   const activeCorridor = liveCorridor || CORRIDOR_PROFILES[activeCorridorId];
-  const temporalModifier = useMemo(
-    () => getTemporalModifier(activeYear, activeMonth),
-    [activeYear, activeMonth]
-  );
+  const temporalModifier = useMemo(() => getTemporalModifier(activeYear, activeMonth), [activeYear, activeMonth]);
 
   const getRasterUrl = useCallback(
     (effect: string, customThreshold?: number) => {
       const tau = customThreshold ?? activeAoi?.threshold ?? 0.45;
       return `/api/raster/${activeCorridorId}/${effect}?yearT1=2018&yearT2=${activeYear}&threshold=${tau}`;
     },
-    [activeCorridorId, activeYear, activeAoi?.threshold]
+    [activeCorridorId, activeYear, activeAoi?.threshold],
   );
 
   const value = useMemo(
@@ -211,7 +208,7 @@ export function AoiProvider({ children }: { children: React.ReactNode }) {
       activeMonth,
       temporalModifier,
       getRasterUrl,
-    ]
+    ],
   );
 
   return <AoiContext.Provider value={value}>{children}</AoiContext.Provider>;

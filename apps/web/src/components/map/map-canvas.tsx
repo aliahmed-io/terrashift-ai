@@ -3,13 +3,7 @@
 import { useEffect, useRef, useState, useCallback, type KeyboardEvent } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import {
-  getEoxTileUrls,
-  getHighResTileUrls,
-  calculatePolygonAreaKm2,
-  formatArea,
-  MAX_AOI_KM2,
-} from "@/lib/tiles";
+import { getEoxTileUrls, getHighResTileUrls, calculatePolygonAreaKm2, formatArea, MAX_AOI_KM2 } from "@/lib/tiles";
 
 if (typeof window !== "undefined") {
   maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
@@ -124,8 +118,7 @@ function buildPolygonGeoJson(polygon: [number, number][] | null): GeoJSON.Featur
     return { type: "FeatureCollection", features: [] };
   }
   const ring =
-    polygon[0]?.[0] === polygon[polygon.length - 1]?.[0] &&
-    polygon[0]?.[1] === polygon[polygon.length - 1]?.[1]
+    polygon[0]?.[0] === polygon[polygon.length - 1]?.[0] && polygon[0]?.[1] === polygon[polygon.length - 1]?.[1]
       ? polygon
       : [...polygon, polygon[0] ?? [0, 0]];
 
@@ -646,9 +639,7 @@ export function MapCanvas({
     }
     const compareMap = compareMapRef.current;
     if (compareMap && compareMap.isStyleLoaded()) {
-      const compareSrc = compareMap.getSource("compare-aoi-source") as
-        | maplibregl.GeoJSONSource
-        | undefined;
+      const compareSrc = compareMap.getSource("compare-aoi-source") as maplibregl.GeoJSONSource | undefined;
       compareSrc?.setData(geojson);
     }
   }, [polygon]);
@@ -699,7 +690,6 @@ export function MapCanvas({
     }
   }, [layerOpacity, classFilter]);
 
-
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded() || selectedFeatureId == null) return;
@@ -743,10 +733,7 @@ export function MapCanvas({
     };
 
     const onMouseMove = (e: maplibregl.MapMouseEvent) => {
-      const currentPoint: [number, number] = [
-        Number(e.lngLat.lng.toFixed(6)),
-        Number(e.lngLat.lat.toFixed(6)),
-      ];
+      const currentPoint: [number, number] = [Number(e.lngLat.lng.toFixed(6)), Number(e.lngLat.lat.toFixed(6))];
       setCursorPos(currentPoint);
 
       const src = map.getSource("drawing-source") as maplibregl.GeoJSONSource | undefined;
@@ -785,10 +772,7 @@ export function MapCanvas({
     };
 
     const onClick = (e: maplibregl.MapMouseEvent) => {
-      const clickPoint: [number, number] = [
-        Number(e.lngLat.lng.toFixed(6)),
-        Number(e.lngLat.lat.toFixed(6)),
-      ];
+      const clickPoint: [number, number] = [Number(e.lngLat.lng.toFixed(6)), Number(e.lngLat.lat.toFixed(6))];
 
       const currentVertices = activeVerticesRef.current;
       if (currentVertices.length >= 3 && currentVertices[0]) {
@@ -841,28 +825,26 @@ export function MapCanvas({
     [isDrawing, activeVertices, onDrawingChange, onPolygonChange],
   );
 
-  const currentDrawPoints =
-    cursorPos && activeVertices.length >= 2 ? [...activeVertices, cursorPos] : activeVertices;
-  const liveAreaKm2 =
-    currentDrawPoints.length >= 3 ? calculatePolygonAreaKm2(currentDrawPoints) : 0;
+  const currentDrawPoints = cursorPos && activeVertices.length >= 2 ? [...activeVertices, cursorPos] : activeVertices;
+  const liveAreaKm2 = currentDrawPoints.length >= 3 ? calculatePolygonAreaKm2(currentDrawPoints) : 0;
   const isAreaOversized = liveAreaKm2 > MAX_AOI_KM2;
 
   return (
     <div
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      className="relative flex size-full overflow-hidden bg-ink-950 select-none outline-none"
+      className="bg-ink-950 relative flex size-full overflow-hidden outline-none select-none"
     >
       {/* Left Compare Container (Year T1) */}
       <div
         className={`relative h-full overflow-hidden transition-[width] duration-300 ease-out ${
-          compareMode ? "w-1/2 border-r border-bone-100/15" : "w-0 hidden pointer-events-none"
+          compareMode ? "border-bone-100/15 w-1/2 border-r" : "pointer-events-none hidden w-0"
         }`}
       >
         <div ref={compareContainerRef} className="size-full" />
         {compareMode && (
-          <div className="pointer-events-none absolute top-4 end-4 z-10 flex items-center gap-2 rounded-lg border border-bone-100/15 bg-ink-900/90 px-3 py-1.5 text-xs font-medium text-bone-100 backdrop-blur-md">
-            <span className="size-2 rounded-full bg-bone-300" aria-hidden="true" />
+          <div className="border-bone-100/15 bg-ink-900/90 text-bone-100 pointer-events-none absolute end-4 top-4 z-10 flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium backdrop-blur-md">
+            <span className="bg-bone-300 size-2 rounded-full" aria-hidden="true" />
             <span>Baseline ({yearT1})</span>
           </div>
         )}
@@ -876,19 +858,19 @@ export function MapCanvas({
       >
         <div ref={containerRef} className="size-full" />
         {compareMode && (
-          <div className="pointer-events-none absolute top-4 start-4 z-10 flex items-center gap-2 rounded-lg border border-signal-400/30 bg-ink-900/90 px-3 py-1.5 text-xs font-medium text-signal-400 backdrop-blur-md">
-            <span className="size-2 rounded-full bg-signal-400 animate-pulse" aria-hidden="true" />
+          <div className="border-signal-400/30 bg-ink-900/90 text-signal-400 pointer-events-none absolute start-4 top-4 z-10 flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium backdrop-blur-md">
+            <span className="bg-signal-400 size-2 animate-pulse rounded-full" aria-hidden="true" />
             <span>Target ({yearT2})</span>
           </div>
         )}
 
         {/* Minimal Zoom Controls */}
         {showDefaultZoomControls && (
-          <div className="pointer-events-auto absolute bottom-6 end-6 z-20 flex flex-col overflow-hidden rounded-xl border border-bone-100/15 bg-ink-900/90 backdrop-blur-md shadow-xl">
+          <div className="border-bone-100/15 bg-ink-900/90 pointer-events-auto absolute end-6 bottom-6 z-20 flex flex-col overflow-hidden rounded-xl border shadow-xl backdrop-blur-md">
             <button
               type="button"
               onClick={() => mapRef.current?.zoomIn({ duration: 250 })}
-              className="flex size-9 items-center justify-center border-b border-bone-100/10 text-base text-bone-100 hover:bg-bone-100/10 transition-colors focus-visible:outline-none"
+              className="border-bone-100/10 text-bone-100 hover:bg-bone-100/10 flex size-9 items-center justify-center border-b text-base transition-colors focus-visible:outline-none"
               aria-label="Zoom in"
             >
               +
@@ -896,7 +878,7 @@ export function MapCanvas({
             <button
               type="button"
               onClick={() => mapRef.current?.zoomOut({ duration: 250 })}
-              className="flex size-9 items-center justify-center text-base text-bone-100 hover:bg-bone-100/10 transition-colors focus-visible:outline-none"
+              className="text-bone-100 hover:bg-bone-100/10 flex size-9 items-center justify-center text-base transition-colors focus-visible:outline-none"
               aria-label="Zoom out"
             >
               −
@@ -907,7 +889,7 @@ export function MapCanvas({
 
       {/* Live Polygon Drawing Status Bar */}
       {isDrawing ? (
-        <div className="pointer-events-none absolute top-4 inset-x-0 z-30 flex justify-center px-4">
+        <div className="pointer-events-none absolute inset-x-0 top-4 z-30 flex justify-center px-4">
           <div
             role="status"
             aria-live="polite"
@@ -918,9 +900,7 @@ export function MapCanvas({
             }`}
           >
             <span
-              className={`size-2 rounded-full animate-ping ${
-                isAreaOversized ? "bg-crimson-400" : "bg-signal-400"
-              }`}
+              className={`size-2 animate-ping rounded-full ${isAreaOversized ? "bg-crimson-400" : "bg-signal-400"}`}
               aria-hidden="true"
             />
             <div className="flex items-center gap-2">

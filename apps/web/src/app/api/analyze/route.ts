@@ -1,15 +1,12 @@
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 
-
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const bodySchema = z
   .object({
-    polygon: z
-      .array(z.tuple([z.number(), z.number()]))
-      .min(3, { message: "Polygon must contain at least 3 vertices" }),
+    polygon: z.array(z.tuple([z.number(), z.number()])).min(3, { message: "Polygon must contain at least 3 vertices" }),
     yearT1: z.number().int().min(2017).max(2025),
     yearT2: z.number().int().min(2017).max(2025),
     threshold: z.number().min(0.1).max(0.9).optional().default(0.5),
@@ -48,13 +45,10 @@ export async function POST(req: NextRequest) {
   const parsed = bodySchema.safeParse(rawJson);
   if (!parsed.success) {
     const msg = parsed.error.issues[0]?.message ?? "Invalid analysis parameters";
-    return new Response(
-      `data: ${JSON.stringify({ error: { code: "INVALID_REQUEST", message: msg } })}\n\n`,
-      {
-        status: 422,
-        headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
-      },
-    );
+    return new Response(`data: ${JSON.stringify({ error: { code: "INVALID_REQUEST", message: msg } })}\n\n`, {
+      status: 422,
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+    });
   }
 
   const { polygon, yearT1, yearT2, threshold, minAreaM2 } = parsed.data;
@@ -90,13 +84,10 @@ export async function POST(req: NextRequest) {
         ? "Analysis request timed out while downloading satellite imagery."
         : "Inference backend is currently unreachable. Please start the Python service on port 8000.";
 
-    return new Response(
-      `data: ${JSON.stringify({ error: { code: "SERVICE_UNAVAILABLE", message: errorMsg } })}\n\n`,
-      {
-        status: 503,
-        headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
-      },
-    );
+    return new Response(`data: ${JSON.stringify({ error: { code: "SERVICE_UNAVAILABLE", message: errorMsg } })}\n\n`, {
+      status: 503,
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+    });
   }
 
   return new Response(

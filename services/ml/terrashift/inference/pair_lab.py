@@ -18,12 +18,13 @@ from numpy.typing import NDArray
 from PIL import Image
 from scipy import ndimage
 
-from terrashift.inference.rgb_change import (
+from terrashift.inference.preprocessing import (
     EPS,
     bareness,
-    detect_change,
     greenness,
+    match_statistics,
 )
+from terrashift.inference.rgb_change import detect_change
 
 
 def _decode_base64_image(data_url: str, size: int = 256) -> NDArray[np.uint8]:
@@ -178,11 +179,11 @@ def _build_benchmark_sample(
         if rgb1.shape[0] != size or rgb1.shape[1] != size:
             rgb1 = np.asarray(Image.fromarray(rgb1).resize((size, size)), dtype=np.uint8)
             rgb2 = np.asarray(Image.fromarray(rgb2).resize((size, size)), dtype=np.uint8)
-    except Exception:
-        rng = np.random.default_rng(seed=101)
-        rgb1 = (rng.normal(120, 30, (size, size, 3))).clip(0, 255).astype(np.uint8)
-        rgb2 = rgb1.copy()
-        rgb2[50:180, 50:180] = (rgb2[50:180, 50:180] * 0.4 + [180, 50, 40]).clip(0, 255).astype(np.uint8)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Unable to fetch satellite imagery for '{sample_id}' from WMTS: {exc}. "
+            "Please check network connection or select an OSCD cached benchmark sample."
+        ) from exc
 
     # Operational scene: no human-annotated ground-truth mask exists (avoids circular self-evaluation)
     gt = None
@@ -247,7 +248,7 @@ def run_pair_lab_analysis(
                 "id": len(blobs) + 1,
                 "pixel_area": px_count,
                 "scene_pct": round((px_count / float(size * size)) * 100.0, 2),
-                "confidence": round(min(max(conf, 0.65), 0.99), 3),
+                "confidence": round(float(conf), 3),
                 "class_label": cls_label,
                 "ndvi_delta": round(d_ndvi, 3),
                 "ndbi_delta": round(d_ndbi, 3),

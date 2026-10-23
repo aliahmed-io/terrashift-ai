@@ -39,7 +39,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       {
         headers: { Accept: "image/jpeg, image/*" },
         signal: AbortSignal.timeout(6000),
-      }
+      },
     );
 
     if (mlRes.ok) {

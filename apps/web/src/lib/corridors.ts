@@ -1,18 +1,6 @@
 export type CorridorId = "roshn" | "wadi" | "neom" | "redsea" | "rondonia";
 
-export type MonthLabel =
-  | "Jan"
-  | "Feb"
-  | "Mar"
-  | "Apr"
-  | "May"
-  | "Jun"
-  | "Jul"
-  | "Aug"
-  | "Sep"
-  | "Oct"
-  | "Nov"
-  | "Dec";
+export type MonthLabel = "Jan" | "Feb" | "Mar" | "Apr" | "May" | "Jun" | "Jul" | "Aug" | "Sep" | "Oct" | "Nov" | "Dec";
 
 export const TIMELINE_MONTHS: readonly MonthLabel[] = [
   "Jan",
@@ -29,9 +17,7 @@ export const TIMELINE_MONTHS: readonly MonthLabel[] = [
   "Dec",
 ] as const;
 
-export const TIMELINE_YEARS: readonly number[] = [
-  2018, 2019, 2020, 2021, 2022, 2023, 2024,
-] as const;
+export const TIMELINE_YEARS: readonly number[] = [2018, 2019, 2020, 2021, 2022, 2023, 2024] as const;
 
 export interface CorridorProfile {
   id: CorridorId;
@@ -97,7 +83,7 @@ export const CORRIDOR_PROFILES: Record<CorridorId, CorridorProfile> = {
       { label: "Riparian Buffer & Canopy Infill", baseVal: 0.24, baseAreaHa: 200, pct: 4, tone: "emerald" },
     ],
     spectralBands2018: [0.14, 0.17, 0.22, 0.25, 0.28, 0.31, 0.34, 0.36, 0.41, 0.38],
-    spectralBands2024: [0.19, 0.23, 0.30, 0.33, 0.37, 0.42, 0.45, 0.47, 0.52, 0.49],
+    spectralBands2024: [0.19, 0.23, 0.3, 0.33, 0.37, 0.42, 0.45, 0.47, 0.52, 0.49],
     carbonMgPerHa: -49.4,
     thermalDeltaC: -3.8,
   },
@@ -168,7 +154,7 @@ export const CORRIDOR_PROFILES: Record<CorridorId, CorridorProfile> = {
       { label: "Substation & Solar Array Pads", baseVal: 0.085, baseAreaHa: 85, pct: 6, tone: "crimson" },
       { label: "Coastal Desalination Pipeline", baseVal: 0.19, baseAreaHa: 40, pct: 3, tone: "emerald" },
     ],
-    spectralBands2018: [0.16, 0.20, 0.26, 0.29, 0.32, 0.34, 0.36, 0.38, 0.44, 0.41],
+    spectralBands2018: [0.16, 0.2, 0.26, 0.29, 0.32, 0.34, 0.36, 0.38, 0.44, 0.41],
     spectralBands2024: [0.22, 0.27, 0.35, 0.39, 0.43, 0.46, 0.49, 0.51, 0.56, 0.53],
     carbonMgPerHa: 18.6,
     thermalDeltaC: 1.9,
@@ -204,8 +190,8 @@ export const CORRIDOR_PROFILES: Record<CorridorId, CorridorProfile> = {
       { label: "Lagoon Channel Carbonate Sand", baseVal: 0.06, baseAreaHa: 38, pct: 6, tone: "crimson" },
       { label: "Native Dune Halophyte Planting", baseVal: 0.28, baseAreaHa: 25, pct: 4, tone: "emerald" },
     ],
-    spectralBands2018: [0.18, 0.21, 0.24, 0.22, 0.19, 0.17, 0.15, 0.14, 0.12, 0.10],
-    spectralBands2024: [0.16, 0.22, 0.20, 0.29, 0.35, 0.39, 0.42, 0.44, 0.28, 0.24],
+    spectralBands2018: [0.18, 0.21, 0.24, 0.22, 0.19, 0.17, 0.15, 0.14, 0.12, 0.1],
+    spectralBands2024: [0.16, 0.22, 0.2, 0.29, 0.35, 0.39, 0.42, 0.44, 0.28, 0.24],
     carbonMgPerHa: -58.4,
     thermalDeltaC: -2.9,
   },
@@ -241,7 +227,7 @@ export const CORRIDOR_PROFILES: Record<CorridorId, CorridorProfile> = {
       { label: "Riparian Gallery Buffer Zone", baseVal: 0.34, baseAreaHa: 66, pct: 3, tone: "emerald" },
     ],
     spectralBands2018: [0.09, 0.12, 0.08, 0.26, 0.41, 0.49, 0.54, 0.56, 0.24, 0.16],
-    spectralBands2024: [0.14, 0.17, 0.22, 0.25, 0.31, 0.35, 0.38, 0.40, 0.42, 0.36],
+    spectralBands2024: [0.14, 0.17, 0.22, 0.25, 0.31, 0.35, 0.38, 0.4, 0.42, 0.36],
     carbonMgPerHa: 118.4,
     thermalDeltaC: 4.2,
   },

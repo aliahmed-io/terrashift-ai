@@ -31,7 +31,12 @@ describe("tiles and spherical geometry", () => {
 
   it("returns zero area for empty or degenerate polygon", () => {
     expect(calculatePolygonAreaM2([])).toBe(0);
-    expect(calculatePolygonAreaM2([[10, 20], [10, 21]])).toBe(0);
+    expect(
+      calculatePolygonAreaM2([
+        [10, 20],
+        [10, 21],
+      ]),
+    ).toBe(0);
   });
 
   it("formats area thresholds cleanly", () => {

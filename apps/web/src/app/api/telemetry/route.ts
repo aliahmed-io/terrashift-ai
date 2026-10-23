@@ -65,9 +65,7 @@ export async function POST(req: NextRequest) {
   const profile = CORRIDOR_PROFILES[corridorId];
   const tMod = getTemporalModifier(yearT2, month);
   const areaHa = Number((profile.baseAreaHa * tMod).toFixed(1));
-  const chgPct = Number(
-    (profile.baseChangePct * tMod * (1.0 + (0.45 - threshold) * 0.4)).toFixed(1)
-  );
+  const chgPct = Number((profile.baseChangePct * tMod * (1.0 + (0.45 - threshold) * 0.4)).toFixed(1));
 
   const fallbackRows = profile.anomalyRows.map((r) => ({
     label: r.label,

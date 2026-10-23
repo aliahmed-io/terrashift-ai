@@ -124,6 +124,8 @@ def load_oscd_split(
 
 
 if HAS_TORCH:
+    from terrashift.inference.preprocessing import build_5channel_stack
+
     class OSCDDataset(Dataset):
         """PyTorch Dataset yielding 256x256 bitemporal patches for Siamese training."""
 
@@ -135,6 +137,7 @@ if HAS_TORCH:
             cache_dir: Optional[Path] = None,
             seed: int = 42,
         ) -> None:
+            self.split = split
             self.scenes = load_oscd_split(split, cache_dir)
             self.patch_size = patch_size
             self.patches_per_scene = patches_per_scene
@@ -151,10 +154,20 @@ if HAS_TORCH:
             h, w = scene.height, scene.width
             ps = self.patch_size
 
-            # Random crop
-            if h > ps and w > ps:
-                y = self.rng.integers(0, h - ps)
-                x = self.rng.integers(0, w - ps)
+            # Balanced patch sampling: 60% chance to sample around active change pixels to mitigate 95% class imbalance
+            change_ys, change_xs = np.where(scene.gt_mask)
+            has_change = len(change_ys) > 0 and self.rng.random() < 0.60
+            if has_change and h > ps and w > ps:
+                pt_idx = self.rng.integers(0, len(change_ys))
+                cy, cx = int(change_ys[pt_idx]), int(change_xs[pt_idx])
+                y = int(np.clip(cy - ps // 2 + self.rng.integers(-24, 25), 0, h - ps))
+                x = int(np.clip(cx - ps // 2 + self.rng.integers(-24, 25), 0, w - ps))
+                crop_t1 = scene.t1_rgb[y : y + ps, x : x + ps]
+                crop_t2 = scene.t2_rgb[y : y + ps, x : x + ps]
+                crop_m = scene.gt_mask[y : y + ps, x : x + ps]
+            elif h > ps and w > ps:
+                y = int(self.rng.integers(0, h - ps))
+                x = int(self.rng.integers(0, w - ps))
                 crop_t1 = scene.t1_rgb[y : y + ps, x : x + ps]
                 crop_t2 = scene.t2_rgb[y : y + ps, x : x + ps]
                 crop_m = scene.gt_mask[y : y + ps, x : x + ps]
@@ -163,19 +176,19 @@ if HAS_TORCH:
                 crop_t2 = np.pad(scene.t2_rgb, ((0, max(0, ps - h)), (0, max(0, ps - w)), (0, 0)))[:ps, :ps]
                 crop_m = np.pad(scene.gt_mask, ((0, max(0, ps - h)), (0, max(0, ps - w))))[:ps, :ps]
 
-            # 5-channel stack: [R, G, B, ExcessGreen, RedGreenRatio]
-            f1 = crop_t1.astype(np.float32) / 255.0
-            f2 = crop_t2.astype(np.float32) / 255.0
+            # Data augmentation during training: random horizontal and vertical flips
+            if self.split == "train":
+                if self.rng.random() > 0.5:
+                    crop_t1 = np.ascontiguousarray(np.fliplr(crop_t1))
+                    crop_t2 = np.ascontiguousarray(np.fliplr(crop_t2))
+                    crop_m = np.ascontiguousarray(np.fliplr(crop_m))
+                if self.rng.random() > 0.5:
+                    crop_t1 = np.ascontiguousarray(np.flipud(crop_t1))
+                    crop_t2 = np.ascontiguousarray(np.flipud(crop_t2))
+                    crop_m = np.ascontiguousarray(np.flipud(crop_m))
 
-            eps = 1e-6
-            exg1 = np.clip((2.0 * f1[..., 1] - f1[..., 0] - f1[..., 2]) / (f1.sum(axis=-1) + eps) * 2.5, -1.0, 1.0)
-            exg2 = np.clip((2.0 * f2[..., 1] - f2[..., 0] - f2[..., 2]) / (f2.sum(axis=-1) + eps) * 2.5, -1.0, 1.0)
-
-            bare1 = np.clip((f1[..., 0] - f1[..., 1]) / (f1[..., 0] + f1[..., 1] + eps) * 4.0, -1.0, 1.0)
-            bare2 = np.clip((f2[..., 0] - f2[..., 1]) / (f2[..., 0] + f2[..., 1] + eps) * 4.0, -1.0, 1.0)
-
-            t1_5ch = np.stack([f1[..., 0], f1[..., 1], f1[..., 2], exg1, bare1], axis=0)
-            t2_5ch = np.stack([f2[..., 0], f2[..., 1], f2[..., 2], exg2, bare2], axis=0)
+            # Shared unified 5-channel stack with median/MAD harmonization
+            t1_5ch, t2_5ch, _ = build_5channel_stack(crop_t1, crop_t2, apply_matching=True)
 
             return (
                 torch.from_numpy(t1_5ch).float(),

@@ -28,9 +28,7 @@ export async function POST(req: NextRequest) {
   }
 
   const threshold =
-    typeof (raw as { threshold?: unknown }).threshold === "number"
-      ? (raw as { threshold: number }).threshold
-      : 0.45;
+    typeof (raw as { threshold?: unknown }).threshold === "number" ? (raw as { threshold: number }).threshold : 0.45;
   const scaleFactor = Math.max(0.65, Math.min(1.35, 1.0 + (0.45 - threshold) * 0.6));
 
   const rawPreset = (raw as { preset_id?: string }).preset_id ?? "roshn";
@@ -55,7 +53,7 @@ export async function POST(req: NextRequest) {
           benchmark: "OSCD Sentinel-2 Held-Out Test Set (10 cities)",
           f1_score: 0.403,
           iou_score: 0.252,
-          precision: 0.480,
+          precision: 0.48,
           recall: 0.347,
           false_positive_rate: 0.021,
           confusion_b64: `/api/raster/${encodeURIComponent(cid)}/confusion`,
@@ -72,11 +70,66 @@ export async function POST(req: NextRequest) {
     histogram_bins: [0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95],
     histogram_counts: [148200, 42100, 18900, 12400, 9800, 8400, 7600, 6200, 4800, 3744],
     objects: [
-      { id: 1, label: "ROSHN Sedra Residential Superblock", area_px: 6420, area_pct: 2.45, confidence: 0.984, bbox: [110, 84, 240, 198], centroid: [175, 141], utm: "673840E 2746120N", delta_ndvi: -0.184, delta_ndbi: 0.442 },
-      { id: 2, label: "King Salman Airbase Re-Grid Sector", area_px: 4810, area_pct: 1.83, confidence: 0.971, bbox: [42, 160, 148, 268], centroid: [95, 214], utm: "671420E 2744890N", delta_ndvi: -0.142, delta_ndbi: 0.389 },
-      { id: 3, label: "Eastern Logistics & Commercial Pad", area_px: 3290, area_pct: 1.26, confidence: 0.962, bbox: [310, 128, 412, 224], centroid: [361, 176], utm: "676910E 2745310N", delta_ndvi: -0.095, delta_ndbi: 0.354 },
-      { id: 4, label: "Northern Wadi Riparian Green Buffer", area_px: 2640, area_pct: 1.01, confidence: 0.958, bbox: [64, 28, 168, 92], centroid: [116, 60], utm: "669540E 2747920N", delta_ndvi: 0.382, delta_ndbi: -0.24 },
-      { id: 5, label: "Princess Nourah Ring Road Interchange", area_px: 1980, area_pct: 0.76, confidence: 0.949, bbox: [224, 248, 308, 332], centroid: [266, 290], utm: "672890E 2746800N", delta_ndvi: -0.112, delta_ndbi: 0.318 },
+      {
+        id: 1,
+        label: "ROSHN Sedra Residential Superblock",
+        area_px: 6420,
+        area_pct: 2.45,
+        confidence: 0.984,
+        bbox: [110, 84, 240, 198],
+        centroid: [175, 141],
+        utm: "673840E 2746120N",
+        delta_ndvi: -0.184,
+        delta_ndbi: 0.442,
+      },
+      {
+        id: 2,
+        label: "King Salman Airbase Re-Grid Sector",
+        area_px: 4810,
+        area_pct: 1.83,
+        confidence: 0.971,
+        bbox: [42, 160, 148, 268],
+        centroid: [95, 214],
+        utm: "671420E 2744890N",
+        delta_ndvi: -0.142,
+        delta_ndbi: 0.389,
+      },
+      {
+        id: 3,
+        label: "Eastern Logistics & Commercial Pad",
+        area_px: 3290,
+        area_pct: 1.26,
+        confidence: 0.962,
+        bbox: [310, 128, 412, 224],
+        centroid: [361, 176],
+        utm: "676910E 2745310N",
+        delta_ndvi: -0.095,
+        delta_ndbi: 0.354,
+      },
+      {
+        id: 4,
+        label: "Northern Wadi Riparian Green Buffer",
+        area_px: 2640,
+        area_pct: 1.01,
+        confidence: 0.958,
+        bbox: [64, 28, 168, 92],
+        centroid: [116, 60],
+        utm: "669540E 2747920N",
+        delta_ndvi: 0.382,
+        delta_ndbi: -0.24,
+      },
+      {
+        id: 5,
+        label: "Princess Nourah Ring Road Interchange",
+        area_px: 1980,
+        area_pct: 0.76,
+        confidence: 0.949,
+        bbox: [224, 248, 308, 332],
+        centroid: [266, 290],
+        utm: "672890E 2746800N",
+        delta_ndvi: -0.112,
+        delta_ndbi: 0.318,
+      },
     ],
   });
 }

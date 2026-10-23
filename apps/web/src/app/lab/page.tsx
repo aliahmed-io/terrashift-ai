@@ -85,24 +85,20 @@ export default function LabPage() {
         (
           data: {
             validation?: { has_ground_truth?: boolean; f1_score?: number; iou_score?: number };
-          } | null
+          } | null,
         ) => {
           if (!cancelled && data?.validation) {
             if (data.validation.has_ground_truth && data.validation.f1_score) {
-              setF1Score(
-                `${data.validation.f1_score.toFixed(3).replace(".", ",")} F1`
-              );
+              setF1Score(`${data.validation.f1_score.toFixed(3).replace(".", ",")} F1`);
               if (data.validation.iou_score) {
-                setIouScore(
-                  `${(data.validation.iou_score * 100).toFixed(1).replace(".", ",")} % IoU`
-                );
+                setIouScore(`${(data.validation.iou_score * 100).toFixed(1).replace(".", ",")} % IoU`);
               }
             } else if (!data.validation.has_ground_truth) {
               setF1Score("P ≥ 0,45 τ");
               setIouScore("Operational (No GT)");
             }
           }
-        }
+        },
       )
       .catch(() => {
         // Fallback already in state
@@ -144,16 +140,10 @@ export default function LabPage() {
 
   return (
     <StudioShell>
-      <div className="w-full h-full p-6 grid grid-rows-[1.12fr_0.88fr] gap-5 overflow-hidden">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFileUpload}
-          className="hidden"
-        />
+      <div className="grid h-full w-full grid-rows-[1.12fr_0.88fr] gap-5 overflow-hidden p-6">
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
 
-        <div className="grid grid-cols-3 gap-5 min-h-0">
+        <div className="grid min-h-0 grid-cols-3 gap-5">
           {panels.map((panel, idx) => (
             <div
               key={panel.title}
@@ -161,55 +151,41 @@ export default function LabPage() {
                 if (idx === 0) fileInputRef.current?.click();
               }}
               title={idx === 0 ? "Click to upload custom optical image" : panel.title}
-              className="bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-4 flex flex-col min-h-0 cursor-pointer hover:shadow-[0_12px_32px_rgba(0,0,0,0.08)] transition-shadow"
+              className="flex min-h-0 cursor-pointer flex-col rounded-[20px] bg-white p-4 shadow-[0_8px_28px_rgba(0,0,0,0.05)] transition-shadow hover:shadow-[0_12px_32px_rgba(0,0,0,0.08)]"
             >
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-[14.5px] font-semibold text-[#1c1f23]">
-                  {panel.title}
-                </h3>
-                <span className="text-[12px] font-medium text-[#22b567] tabular-nums">
-                  {panel.sub}
-                </span>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-[14.5px] font-semibold text-[#1c1f23]">{panel.title}</h3>
+                <span className="text-[12px] font-medium text-[#22b567] tabular-nums">{panel.sub}</span>
               </div>
-              <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
-                <img
-                  src={panel.img}
-                  alt={panel.title}
-                  className="w-full h-full object-cover"
-                />
+              <div className="relative min-h-0 flex-1 overflow-hidden rounded-[14px]">
+                <img src={panel.img} alt={panel.title} className="h-full w-full object-cover" />
               </div>
             </div>
           ))}
         </div>
 
-        <div className="bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-6 flex flex-col justify-between min-h-0">
+        <div className="flex min-h-0 flex-col justify-between rounded-[20px] bg-white p-6 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-[15px] font-semibold text-[#1c1f23]">
-                Connected-Component Segmented Footprints
-              </h3>
-              <p className="text-[12px] text-[#8c929c] mt-0.5">
-                8-Connectivity Labeling + Douglas-Peucker Polygon Vectorization ·{" "}
-                {activeCorridor.shortName} ({activeMonth} {activeYear})
+              <h3 className="text-[15px] font-semibold text-[#1c1f23]">Connected-Component Segmented Footprints</h3>
+              <p className="mt-0.5 text-[12px] text-[#8c929c]">
+                8-Connectivity Labeling + Douglas-Peucker Polygon Vectorization · {activeCorridor.shortName} (
+                {activeMonth} {activeYear})
               </p>
             </div>
             <div className="flex items-center gap-4">
               <button
                 type="button"
-                onClick={() =>
-                  setObjects((prev) => [...prev].reverse())
-                }
-                className="text-[12px] font-medium text-[#8c929c] hover:text-[#1c1f23] transition-colors cursor-pointer"
+                onClick={() => setObjects((prev) => [...prev].reverse())}
+                className="cursor-pointer text-[12px] font-medium text-[#8c929c] transition-colors hover:text-[#1c1f23]"
               >
                 Sort by Area
               </button>
-              <span className="text-[12.5px] font-semibold text-[#22b567]">
-                Precision 94,8 % · Recall 92,1 %
-              </span>
+              <span className="text-[12.5px] font-semibold text-[#22b567]">Precision 94,8 % · Recall 92,1 %</span>
             </div>
           </div>
 
-          <table className="w-full text-left border-collapse my-auto">
+          <table className="my-auto w-full border-collapse text-left">
             <thead>
               <tr className="border-b border-[#edeff2] text-[11.5px] font-medium text-[#8c929c]">
                 <th className="pb-2">Object ID</th>
@@ -230,14 +206,10 @@ export default function LabPage() {
                     <td className="py-2 font-semibold text-[#1c1f23]">{row.id}</td>
                     <td className="py-2 font-medium text-[#1c1f23]">{row.name}</td>
                     <td className="py-2 text-[#8c929c]">{row.utm}</td>
-                    <td className="py-2 text-[#3b4048]">
-                      {scaledArea.toLocaleString("en-US")} px²
-                    </td>
+                    <td className="py-2 text-[#3b4048]">{scaledArea.toLocaleString("en-US")} px²</td>
                     <td className="py-2 text-[#3b4048]">{row.ndvi}</td>
                     <td className="py-2 text-[#3b4048]">{row.ndbi}</td>
-                    <td className="py-2 text-right font-semibold text-[#22b567]">
-                      {row.conf}
-                    </td>
+                    <td className="py-2 text-right font-semibold text-[#22b567]">{row.conf}</td>
                   </tr>
                 );
               })}

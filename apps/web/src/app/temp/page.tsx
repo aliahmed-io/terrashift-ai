@@ -4,7 +4,16 @@ import React, { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 function IconSearch() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="11" cy="11" r="8" />
       <path d="m21 21-4.3-4.3" />
     </svg>
@@ -13,7 +22,16 @@ function IconSearch() {
 
 function IconZoomIn() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="11" cy="11" r="8" />
       <path d="m21 21-4.3-4.3" />
       <path d="M11 8v6" />
@@ -24,7 +42,16 @@ function IconZoomIn() {
 
 function IconZoomOut() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="11" cy="11" r="8" />
       <path d="m21 21-4.3-4.3" />
       <path d="M8 11h6" />
@@ -34,7 +61,16 @@ function IconZoomOut() {
 
 function IconClose() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
     </svg>
@@ -43,7 +79,16 @@ function IconClose() {
 
 function IconChevronDown() {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="m6 9 6 6 6-6" />
     </svg>
   );
@@ -51,7 +96,16 @@ function IconChevronDown() {
 
 function IconArrowLeft() {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="m12 19-7-7 7-7" />
       <path d="M19 12H5" />
     </svg>
@@ -60,36 +114,25 @@ function IconArrowLeft() {
 
 function IconArrowRight() {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M5 12h14" />
       <path d="m12 5 7 7-7 7" />
     </svg>
   );
 }
 
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-] as const;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 
-type ScreenId =
-  | "dossier"
-  | "studio"
-  | "benchmarks"
-  | "timeline"
-  | "lab"
-  | "carbon"
-  | "watchlist";
+type ScreenId = "dossier" | "studio" | "benchmarks" | "timeline" | "lab" | "carbon" | "watchlist";
 
 const NAV_TABS: { id: ScreenId; label: string }[] = [
   { id: "dossier", label: "Overview" },
@@ -109,19 +152,19 @@ function TempDesignShowcaseInner() {
   const [cardSlide, setCardSlide] = useState<0 | 1>(0);
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col bg-white text-[#1c1f23] select-none font-sans antialiased overflow-hidden">
+    <div className="fixed inset-0 z-[9999] flex flex-col overflow-hidden bg-white font-sans text-[#1c1f23] antialiased select-none">
       {/* 1. EXACT TOP HEADER BAR FROM REFERENCE */}
-      <header className="h-[60px] shrink-0 bg-white px-5 flex items-center justify-between">
+      <header className="flex h-[60px] shrink-0 items-center justify-between bg-white px-5">
         {/* Left: Hamburger + Outlined Icon + Brand */}
-        <div className="flex items-center gap-4 min-w-[180px]">
+        <div className="flex min-w-[180px] items-center gap-4">
           <button
             type="button"
             aria-label="Menu"
-            className="w-8 h-8 flex flex-col items-center justify-center gap-[4px] text-[#22252a] hover:opacity-75 transition-opacity"
+            className="flex h-8 w-8 flex-col items-center justify-center gap-[4px] text-[#22252a] transition-opacity hover:opacity-75"
           >
-            <span className="w-[18px] h-[1.8px] bg-[#22252a] rounded-full" />
-            <span className="w-[18px] h-[1.8px] bg-[#22252a] rounded-full" />
-            <span className="w-[18px] h-[1.8px] bg-[#22252a] rounded-full" />
+            <span className="h-[1.8px] w-[18px] rounded-full bg-[#22252a]" />
+            <span className="h-[1.8px] w-[18px] rounded-full bg-[#22252a]" />
+            <span className="h-[1.8px] w-[18px] rounded-full bg-[#22252a]" />
           </button>
 
           <div className="flex items-center gap-2">
@@ -141,16 +184,14 @@ function TempDesignShowcaseInner() {
               <path d="M12 12v9" />
               <path d="M12 12L3 7.5" />
             </svg>
-            <span className="text-[13px] font-bold tracking-[-0.01em] text-[#1c1f23]">
-              TerraShift
-            </span>
+            <span className="text-[13px] font-bold tracking-[-0.01em] text-[#1c1f23]">TerraShift</span>
           </div>
         </div>
 
         {/* Center: Wide Segmented Grey Pill Track (#edeff2) with White Active Pill */}
         <nav
           aria-label="Primary Modes"
-          className="flex items-center bg-[#edeff2] p-[3px] rounded-xl w-full max-w-[760px]"
+          className="flex w-full max-w-[760px] items-center rounded-xl bg-[#edeff2] p-[3px]"
         >
           {NAV_TABS.map((tab) => {
             const active = screen === tab.id;
@@ -162,10 +203,10 @@ function TempDesignShowcaseInner() {
                   setScreen(tab.id);
                   setCardSlide(0);
                 }}
-                className={`flex-1 py-[7px] px-3 rounded-[9px] text-[12.5px] transition-all text-center whitespace-nowrap ${
+                className={`flex-1 rounded-[9px] px-3 py-[7px] text-center text-[12.5px] whitespace-nowrap transition-all ${
                   active
-                    ? "bg-white text-[#1c1f23] font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
-                    : "text-[#636973] font-medium hover:text-[#1c1f23]"
+                    ? "bg-white font-semibold text-[#1c1f23] shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                    : "font-medium text-[#636973] hover:text-[#1c1f23]"
                 }`}
               >
                 {tab.label}
@@ -175,21 +216,14 @@ function TempDesignShowcaseInner() {
         </nav>
 
         {/* Right: Search Icon + Soft Avatar Circle */}
-        <div className="flex items-center justify-end gap-3.5 min-w-[180px]">
-          <button
-            type="button"
-            aria-label="Search"
-            className="text-[#5c626b] hover:text-[#1c1f23] transition-colors"
-          >
+        <div className="flex min-w-[180px] items-center justify-end gap-3.5">
+          <button type="button" aria-label="Search" className="text-[#5c626b] transition-colors hover:text-[#1c1f23]">
             <IconSearch />
           </button>
-          <div className="w-8 h-8 rounded-full bg-[#dce5f2] overflow-hidden flex items-center justify-center">
-            <svg viewBox="0 0 32 32" className="w-full h-full">
+          <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#dce5f2]">
+            <svg viewBox="0 0 32 32" className="h-full w-full">
               <circle cx="16" cy="12" r="5" fill="#9bb0ce" />
-              <path
-                d="M6 29c1.8-5.5 5.4-8 10-8s8.2 2.5 10 8"
-                fill="#9bb0ce"
-              />
+              <path d="M6 29c1.8-5.5 5.4-8 10-8s8.2 2.5 10 8" fill="#9bb0ce" />
             </svg>
           </div>
         </div>
@@ -201,26 +235,24 @@ function TempDesignShowcaseInner() {
             SCREEN 1: OVERVIEW (Full-bleed satellite + Golf Field style white card)
            ========================================================= */}
         {screen === "dossier" && (
-          <div className="relative w-full h-full overflow-hidden">
+          <div className="relative h-full w-full overflow-hidden">
             <img
               src="/api/raster/roshn/split"
               alt="North Riyadh & ROSHN Sedra Sentinel-2 Canvas"
-              className="w-full h-full object-cover"
+              className="h-full w-full object-cover"
             />
 
             {/* Top-left dark pill zoom controls + subtle grid numbers */}
             <MapCanvasOverlay />
 
             {/* Floating White Card (Exact Golf Field proportion, spacing & footer arrows) */}
-            <div className="absolute top-12 right-14 w-[380px] bg-white rounded-[22px] shadow-[0_16px_48px_rgba(0,0,0,0.14)] p-7">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-[18px] font-semibold text-[#1c1f23] tracking-[-0.01em]">
-                  ROSHN Sedra Corridor
-                </h2>
+            <div className="absolute top-12 right-14 w-[380px] rounded-[22px] bg-white p-7 shadow-[0_16px_48px_rgba(0,0,0,0.14)]">
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-[#1c1f23]">ROSHN Sedra Corridor</h2>
                 <button
                   type="button"
                   aria-label="Close card"
-                  className="w-6 h-6 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d] hover:text-[#1c1f23]"
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-[#f4f5f7] text-[#7c828d] hover:text-[#1c1f23]"
                 >
                   <IconClose />
                 </button>
@@ -228,9 +260,7 @@ function TempDesignShowcaseInner() {
 
               {cardSlide === 0 ? (
                 <>
-                  <div className="text-[13px] font-medium text-[#3b4048] mb-5">
-                    Anomaly
-                  </div>
+                  <div className="mb-5 text-[13px] font-medium text-[#3b4048]">Anomaly</div>
 
                   <div className="space-y-4">
                     {[
@@ -271,24 +301,15 @@ function TempDesignShowcaseInner() {
                       },
                     ].map((row, idx) => (
                       <div key={idx}>
-                        <div className="flex items-center justify-between text-[12.5px] mb-2">
-                          <span className="font-semibold text-[#1c1f23] tabular-nums">
-                            {row.val}
-                          </span>
+                        <div className="mb-2 flex items-center justify-between text-[12.5px]">
+                          <span className="font-semibold text-[#1c1f23] tabular-nums">{row.val}</span>
                           <div className="flex items-center gap-3 tabular-nums">
-                            <span className="font-medium text-[#3b4048]">
-                              {row.dist}
-                            </span>
-                            <span className="text-[#9aa0aa] w-9 text-right">
-                              {row.pct}
-                            </span>
+                            <span className="font-medium text-[#3b4048]">{row.dist}</span>
+                            <span className="w-9 text-right text-[#9aa0aa]">{row.pct}</span>
                           </div>
                         </div>
-                        <div className="h-[5px] w-full bg-[#edeff2] rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${row.color}`}
-                            style={{ width: row.w }}
-                          />
+                        <div className="h-[5px] w-full overflow-hidden rounded-full bg-[#edeff2]">
+                          <div className={`h-full rounded-full ${row.color}`} style={{ width: row.w }} />
                         </div>
                       </div>
                     ))}
@@ -296,20 +317,12 @@ function TempDesignShowcaseInner() {
                 </>
               ) : (
                 <>
-                  <div className="text-[13px] font-medium text-[#3b4048] mb-4">
+                  <div className="mb-4 text-[13px] font-medium text-[#3b4048]">
                     10-Band Reflectance Profile (2018 vs 2024)
                   </div>
-                  <svg viewBox="0 0 320 175" className="w-full h-[185px]">
+                  <svg viewBox="0 0 320 175" className="h-[185px] w-full">
                     {[30, 75, 120, 155].map((y) => (
-                      <line
-                        key={y}
-                        x1="28"
-                        y1={y}
-                        x2="310"
-                        y2={y}
-                        stroke="#f0f2f5"
-                        strokeWidth="1"
-                      />
+                      <line key={y} x1="28" y1={y} x2="310" y2={y} stroke="#f0f2f5" strokeWidth="1" />
                     ))}
                     <text x="2" y="34" fill="#9aa0aa" fontSize="9">
                       0,45
@@ -346,19 +359,8 @@ function TempDesignShowcaseInner() {
                       ["B12", 304, 34],
                     ].map(([b, cx, cy]) => (
                       <g key={String(b)}>
-                        <circle
-                          cx={Number(cx)}
-                          cy={Number(cy)}
-                          r="3"
-                          fill="#22b567"
-                        />
-                        <text
-                          x={Number(cx)}
-                          y="170"
-                          textAnchor="middle"
-                          fill="#8c929c"
-                          fontSize="8.5"
-                        >
+                        <circle cx={Number(cx)} cy={Number(cy)} r="3" fill="#22b567" />
+                        <text x={Number(cx)} y="170" textAnchor="middle" fill="#8c929c" fontSize="8.5">
                           {b}
                         </text>
                       </g>
@@ -373,27 +375,19 @@ function TempDesignShowcaseInner() {
                   type="button"
                   onClick={() => setCardSlide(0)}
                   aria-label="Previous slide"
-                  className="w-7 h-7 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d] hover:text-[#1c1f23] transition-colors"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#f4f5f7] text-[#7c828d] transition-colors hover:text-[#1c1f23]"
                 >
                   <IconArrowLeft />
                 </button>
                 <div className="flex items-center gap-1.5">
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      cardSlide === 0 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"
-                    }`}
-                  />
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      cardSlide === 1 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"
-                    }`}
-                  />
+                  <span className={`h-1.5 w-1.5 rounded-full ${cardSlide === 0 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"}`} />
+                  <span className={`h-1.5 w-1.5 rounded-full ${cardSlide === 1 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"}`} />
                 </div>
                 <button
                   type="button"
                   onClick={() => setCardSlide(1)}
                   aria-label="Next slide"
-                  className="w-7 h-7 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d] hover:text-[#1c1f23] transition-colors"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#f4f5f7] text-[#7c828d] transition-colors hover:text-[#1c1f23]"
                 >
                   <IconArrowRight />
                 </button>
@@ -406,31 +400,27 @@ function TempDesignShowcaseInner() {
             SCREEN 2: NDVI & SPECTRAL (Full-bleed NIR Chlorophyll map + floating white card)
            ========================================================= */}
         {screen === "studio" && (
-          <div className="relative w-full h-full overflow-hidden">
+          <div className="relative h-full w-full overflow-hidden">
             <img
               src="/api/raster/roshn/nir"
               alt="Riyadh NIR Chlorophyll Composite"
-              className="w-full h-full object-cover"
+              className="h-full w-full object-cover"
             />
             <MapCanvasOverlay />
 
-            <div className="absolute top-12 right-14 w-[380px] bg-white rounded-[22px] shadow-[0_16px_48px_rgba(0,0,0,0.14)] p-7">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-[18px] font-semibold text-[#1c1f23] tracking-[-0.01em]">
-                  Wadi Hanifah Canopy
-                </h2>
+            <div className="absolute top-12 right-14 w-[380px] rounded-[22px] bg-white p-7 shadow-[0_16px_48px_rgba(0,0,0,0.14)]">
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-[#1c1f23]">Wadi Hanifah Canopy</h2>
                 <button
                   type="button"
                   aria-label="Close"
-                  className="w-6 h-6 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d]"
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-[#f4f5f7] text-[#7c828d]"
                 >
                   <IconClose />
                 </button>
               </div>
 
-              <div className="text-[13px] font-medium text-[#3b4048] mb-5">
-                NDVI &amp; Spectral Shift
-              </div>
+              <div className="mb-5 text-[13px] font-medium text-[#3b4048]">NDVI &amp; Spectral Shift</div>
 
               <div className="space-y-4">
                 {[
@@ -471,24 +461,15 @@ function TempDesignShowcaseInner() {
                   },
                 ].map((row, idx) => (
                   <div key={idx}>
-                    <div className="flex items-center justify-between text-[12.5px] mb-2">
-                      <span className="font-semibold text-[#1c1f23] tabular-nums">
-                        {row.val}
-                      </span>
+                    <div className="mb-2 flex items-center justify-between text-[12.5px]">
+                      <span className="font-semibold text-[#1c1f23] tabular-nums">{row.val}</span>
                       <div className="flex items-center gap-3 tabular-nums">
-                        <span className="font-medium text-[#3b4048]">
-                          {row.dist}
-                        </span>
-                        <span className="text-[#9aa0aa] w-9 text-right">
-                          {row.pct}
-                        </span>
+                        <span className="font-medium text-[#3b4048]">{row.dist}</span>
+                        <span className="w-9 text-right text-[#9aa0aa]">{row.pct}</span>
                       </div>
                     </div>
-                    <div className="h-[5px] w-full bg-[#edeff2] rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${row.color}`}
-                        style={{ width: row.w }}
-                      />
+                    <div className="h-[5px] w-full overflow-hidden rounded-full bg-[#edeff2]">
+                      <div className={`h-full rounded-full ${row.color}`} style={{ width: row.w }} />
                     </div>
                   </div>
                 ))}
@@ -498,18 +479,18 @@ function TempDesignShowcaseInner() {
                 <button
                   type="button"
                   aria-label="Prev"
-                  className="w-7 h-7 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d]"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#f4f5f7] text-[#7c828d]"
                 >
                   <IconArrowLeft />
                 </button>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#1c1f23]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#d5d8de]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#1c1f23]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#d5d8de]" />
                 </div>
                 <button
                   type="button"
                   aria-label="Next"
-                  className="w-7 h-7 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d]"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#f4f5f7] text-[#7c828d]"
                 >
                   <IconArrowRight />
                 </button>
@@ -522,9 +503,9 @@ function TempDesignShowcaseInner() {
             SCREEN 3: ANOMALY & XAI (4 City Effects + PR Curve + Attribution)
            ========================================================= */}
         {screen === "benchmarks" && (
-          <div className="w-full h-full p-6 grid grid-rows-[1.08fr_0.92fr] gap-5 overflow-hidden">
+          <div className="grid h-full w-full grid-rows-[1.08fr_0.92fr] gap-5 overflow-hidden p-6">
             {/* Top Row: 4 Clean White Cards with the 4 City Effects */}
-            <div className="grid grid-cols-4 gap-5 min-h-0">
+            <div className="grid min-h-0 grid-cols-4 gap-5">
               {[
                 {
                   title: "Siamese ResUNet-10ch",
@@ -557,27 +538,17 @@ function TempDesignShowcaseInner() {
               ].map((card) => (
                 <div
                   key={card.title}
-                  className="bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-4 flex flex-col min-h-0"
+                  className="flex min-h-0 flex-col rounded-[20px] bg-white p-4 shadow-[0_8px_28px_rgba(0,0,0,0.05)]"
                 >
-                  <div className="flex items-baseline justify-between mb-3">
-                    <h3 className="text-[14px] font-semibold text-[#1c1f23]">
-                      {card.title}
-                    </h3>
-                    <span className="text-[11.5px] text-[#8c929c]">
-                      {card.sub}
-                    </span>
+                  <div className="mb-3 flex items-baseline justify-between">
+                    <h3 className="text-[14px] font-semibold text-[#1c1f23]">{card.title}</h3>
+                    <span className="text-[11.5px] text-[#8c929c]">{card.sub}</span>
                   </div>
-                  <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
-                    <img
-                      src={card.img}
-                      alt={card.title}
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="relative min-h-0 flex-1 overflow-hidden rounded-[14px]">
+                    <img src={card.img} alt={card.title} className="h-full w-full object-cover" />
                   </div>
                   <div className="mt-3 flex items-center justify-between text-[12.5px] tabular-nums">
-                    <span className="font-semibold text-[#1c1f23]">
-                      {card.left}
-                    </span>
+                    <span className="font-semibold text-[#1c1f23]">{card.left}</span>
                     <span className="text-[#8c929c]">{card.right}</span>
                   </div>
                 </div>
@@ -585,40 +556,28 @@ function TempDesignShowcaseInner() {
             </div>
 
             {/* Bottom Row: PR Operating Curve + 10-Band Attribution Bars */}
-            <div className="grid grid-cols-12 gap-5 min-h-0">
-              <div className="col-span-6 bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-6 flex flex-col justify-between min-h-0">
+            <div className="grid min-h-0 grid-cols-12 gap-5">
+              <div className="col-span-6 flex min-h-0 flex-col justify-between rounded-[20px] bg-white p-6 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-[15px] font-semibold text-[#1c1f23]">
-                      Precision–Recall Curve
-                    </h3>
-                    <p className="text-[12px] text-[#8c929c] mt-0.5">
-                      LEVIR-CD + OSCD + Riyadh Sentinel-2 Benchmark
-                    </p>
+                    <h3 className="text-[15px] font-semibold text-[#1c1f23]">Precision–Recall Curve</h3>
+                    <p className="mt-0.5 text-[12px] text-[#8c929c]">LEVIR-CD + OSCD + Riyadh Sentinel-2 Benchmark</p>
                   </div>
                   <div className="flex items-center gap-4 text-[11.5px] font-medium text-[#5c626b]">
                     <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-[#22b567]" />
+                      <span className="h-2 w-2 rounded-full bg-[#22b567]" />
                       ResUNet (0,948)
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-[#f39223]" />
+                      <span className="h-2 w-2 rounded-full bg-[#f39223]" />
                       ΔNDBI (0,884)
                     </span>
                   </div>
                 </div>
 
-                <svg viewBox="0 0 540 165" className="w-full h-[145px]">
+                <svg viewBox="0 0 540 165" className="h-[145px] w-full">
                   {[24, 68, 112, 146].map((y) => (
-                    <line
-                      key={y}
-                      x1="36"
-                      y1={y}
-                      x2="520"
-                      y2={y}
-                      stroke="#f0f2f5"
-                      strokeWidth="1"
-                    />
+                    <line key={y} x1="36" y1={y} x2="520" y2={y} stroke="#f0f2f5" strokeWidth="1" />
                   ))}
                   <text x="4" y="28" fill="#9aa0aa" fontSize="10">
                     1,00
@@ -640,50 +599,26 @@ function TempDesignShowcaseInner() {
                     strokeWidth="2.2"
                     strokeDasharray="4 4"
                   />
-                  <path
-                    d="M 42 28 Q 230 32, 375 46 L 455 78 L 502 122"
-                    fill="none"
-                    stroke="#22b567"
-                    strokeWidth="3"
-                  />
-                  <circle
-                    cx="375"
-                    cy="46"
-                    r="5.5"
-                    fill="#ffffff"
-                    stroke="#22b567"
-                    strokeWidth="3"
-                  />
-                  <text
-                    x="362"
-                    y="34"
-                    textAnchor="end"
-                    fill="#1c1f23"
-                    fontSize="10.5"
-                    fontWeight="600"
-                  >
+                  <path d="M 42 28 Q 230 32, 375 46 L 455 78 L 502 122" fill="none" stroke="#22b567" strokeWidth="3" />
+                  <circle cx="375" cy="46" r="5.5" fill="#ffffff" stroke="#22b567" strokeWidth="3" />
+                  <text x="362" y="34" textAnchor="end" fill="#1c1f23" fontSize="10.5" fontWeight="600">
                     τ* = 0,45 (F1 = 0,914)
                   </text>
                 </svg>
               </div>
 
-              <div className="col-span-6 bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-6 flex flex-col justify-between min-h-0">
+              <div className="col-span-6 flex min-h-0 flex-col justify-between rounded-[20px] bg-white p-6 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-[15px] font-semibold text-[#1c1f23]">
-                      Spectral Attribution
-                    </h3>
-                    <p className="text-[12px] text-[#8c929c] mt-0.5">
-                      Integrated Gradients contribution across 10 Sentinel-2
-                      bands
+                    <h3 className="text-[15px] font-semibold text-[#1c1f23]">Spectral Attribution</h3>
+                    <p className="mt-0.5 text-[12px] text-[#8c929c]">
+                      Integrated Gradients contribution across 10 Sentinel-2 bands
                     </p>
                   </div>
-                  <span className="text-[12px] font-medium text-[#3b4048]">
-                    SHAP Verified
-                  </span>
+                  <span className="text-[12px] font-medium text-[#3b4048]">SHAP Verified</span>
                 </div>
 
-                <div className="space-y-3.5 my-auto">
+                <div className="my-auto space-y-3.5">
                   {[
                     {
                       val: "0,248",
@@ -715,24 +650,15 @@ function TempDesignShowcaseInner() {
                     },
                   ].map((b) => (
                     <div key={b.label}>
-                      <div className="flex items-center justify-between text-[12.5px] mb-1.5">
-                        <span className="font-semibold text-[#1c1f23] tabular-nums">
-                          {b.val}
-                        </span>
+                      <div className="mb-1.5 flex items-center justify-between text-[12.5px]">
+                        <span className="font-semibold text-[#1c1f23] tabular-nums">{b.val}</span>
                         <div className="flex items-center gap-3 tabular-nums">
-                          <span className="font-medium text-[#3b4048]">
-                            {b.label}
-                          </span>
-                          <span className="text-[#9aa0aa] w-9 text-right">
-                            {b.pct}
-                          </span>
+                          <span className="font-medium text-[#3b4048]">{b.label}</span>
+                          <span className="w-9 text-right text-[#9aa0aa]">{b.pct}</span>
                         </div>
                       </div>
-                      <div className="h-[5px] w-full bg-[#edeff2] rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${b.color}`}
-                          style={{ width: b.w }}
-                        />
+                      <div className="h-[5px] w-full overflow-hidden rounded-full bg-[#edeff2]">
+                        <div className={`h-full rounded-full ${b.color}`} style={{ width: b.w }} />
                       </div>
                     </div>
                   ))}
@@ -746,45 +672,37 @@ function TempDesignShowcaseInner() {
             SCREEN 4: TRAJECTORY (BFAST 2017–2030 Chart + Spatial Contagion + Ledger)
            ========================================================= */}
         {screen === "timeline" && (
-          <div className="w-full h-full p-6 grid grid-rows-[0.95fr_1.05fr] gap-5 overflow-hidden">
-            <div className="bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-6 flex flex-col justify-between min-h-0">
+          <div className="grid h-full w-full grid-rows-[0.95fr_1.05fr] gap-5 overflow-hidden p-6">
+            <div className="flex min-h-0 flex-col justify-between rounded-[20px] bg-white p-6 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-[16px] font-semibold text-[#1c1f23]">
                     BFAST Structural Breakpoint &amp; 2030 Forecast
                   </h2>
-                  <p className="text-[12px] text-[#8c929c] mt-0.5">
-                    OLS-MOSUM Breakpoint at 2021-Q3 (p &lt; 0,0001) · ROSHN
-                    Sedra Corridor
+                  <p className="mt-0.5 text-[12px] text-[#8c929c]">
+                    OLS-MOSUM Breakpoint at 2021-Q3 (p &lt; 0,0001) · ROSHN Sedra Corridor
                   </p>
                 </div>
                 <div className="flex items-center gap-5 text-[12px] font-medium text-[#5c626b]">
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#22b567]" />
+                    <span className="h-2 w-2 rounded-full bg-[#22b567]" />
                     Observed Built-Up (ha)
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#e94235]" />
+                    <span className="h-2 w-2 rounded-full bg-[#e94235]" />
                     2021-Q3 Breakpoint
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#f39223]" />
+                    <span className="h-2 w-2 rounded-full bg-[#f39223]" />
                     2024–2030 Forecast
                   </span>
                 </div>
               </div>
 
-              <svg viewBox="0 0 1100 185" className="w-full h-[165px]">
+              <svg viewBox="0 0 1100 185" className="h-[165px] w-full">
                 {[28, 72, 116, 152].map((y, idx) => (
                   <g key={y}>
-                    <line
-                      x1="68"
-                      y1={y}
-                      x2="1065"
-                      y2={y}
-                      stroke="#f0f2f5"
-                      strokeWidth="1"
-                    />
+                    <line x1="68" y1={y} x2="1065" y2={y} stroke="#f0f2f5" strokeWidth="1" />
                     <text x="8" y={y + 4} fill="#9aa0aa" fontSize="10.5">
                       {["8,000 ha", "5,500 ha", "3,000 ha", "500 ha"][idx]}
                     </text>
@@ -795,23 +713,8 @@ function TempDesignShowcaseInner() {
                   fill="#f39223"
                   fillOpacity="0.12"
                 />
-                <line
-                  x1="400"
-                  y1="16"
-                  x2="400"
-                  y2="156"
-                  stroke="#e94235"
-                  strokeWidth="1.8"
-                  strokeDasharray="4 4"
-                />
-                <text
-                  x="400"
-                  y="30"
-                  textAnchor="middle"
-                  fill="#e94235"
-                  fontSize="10.5"
-                  fontWeight="600"
-                >
+                <line x1="400" y1="16" x2="400" y2="156" stroke="#e94235" strokeWidth="1.8" strokeDasharray="4 4" />
+                <text x="400" y="30" textAnchor="middle" fill="#e94235" fontSize="10.5" fontWeight="600">
                   2021-Q3 Break (+310% Slope)
                 </text>
                 <polyline
@@ -841,19 +744,8 @@ function TempDesignShowcaseInner() {
                   ["2030F", 1045, 32],
                 ].map(([yr, cx, cy], idx) => (
                   <g key={String(yr)}>
-                    <circle
-                      cx={Number(cx)}
-                      cy={Number(cy)}
-                      r="4"
-                      fill={idx <= 7 ? "#22b567" : "#f39223"}
-                    />
-                    <text
-                      x={Number(cx)}
-                      y="176"
-                      textAnchor="middle"
-                      fill="#8c929c"
-                      fontSize="10.5"
-                    >
+                    <circle cx={Number(cx)} cy={Number(cy)} r="4" fill={idx <= 7 ? "#22b567" : "#f39223"} />
+                    <text x={Number(cx)} y="176" textAnchor="middle" fill="#8c929c" fontSize="10.5">
                       {yr}
                     </text>
                   </g>
@@ -861,41 +753,31 @@ function TempDesignShowcaseInner() {
               </svg>
             </div>
 
-            <div className="grid grid-cols-12 gap-5 min-h-0">
-              <div className="col-span-6 bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-5 flex flex-col min-h-0">
-                <div className="flex items-center justify-between mb-3">
+            <div className="grid min-h-0 grid-cols-12 gap-5">
+              <div className="col-span-6 flex min-h-0 flex-col rounded-[20px] bg-white p-5 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
+                <div className="mb-3 flex items-center justify-between">
                   <div>
-                    <h3 className="text-[15px] font-semibold text-[#1c1f23]">
-                      2024–2030 Spatial Contagion Forecast
-                    </h3>
-                    <p className="text-[12px] text-[#8c929c]">
-                      Morphological expansion rings across North Riyadh
-                    </p>
+                    <h3 className="text-[15px] font-semibold text-[#1c1f23]">2024–2030 Spatial Contagion Forecast</h3>
+                    <p className="text-[12px] text-[#8c929c]">Morphological expansion rings across North Riyadh</p>
                   </div>
-                  <span className="text-[12px] font-medium text-[#22b567]">
-                    104,2 % On-Target
-                  </span>
+                  <span className="text-[12px] font-medium text-[#22b567]">104,2 % On-Target</span>
                 </div>
-                <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
+                <div className="relative min-h-0 flex-1 overflow-hidden rounded-[14px]">
                   <img
                     src="/api/raster/roshn/contagion"
                     alt="Spatial Contagion Forecast"
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-cover"
                   />
                 </div>
               </div>
 
-              <div className="col-span-6 bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-6 flex flex-col justify-between min-h-0">
+              <div className="col-span-6 flex min-h-0 flex-col justify-between rounded-[20px] bg-white p-6 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
                 <div>
-                  <h3 className="text-[15px] font-semibold text-[#1c1f23]">
-                    Multi-Epoch Acquisition Ledger
-                  </h3>
-                  <p className="text-[12px] text-[#8c929c] mt-0.5">
-                    Cloud-free Sentinel-2 L2A milestone verification
-                  </p>
+                  <h3 className="text-[15px] font-semibold text-[#1c1f23]">Multi-Epoch Acquisition Ledger</h3>
+                  <p className="mt-0.5 text-[12px] text-[#8c929c]">Cloud-free Sentinel-2 L2A milestone verification</p>
                 </div>
 
-                <table className="w-full text-left border-collapse my-auto">
+                <table className="my-auto w-full border-collapse text-left">
                   <thead>
                     <tr className="border-b border-[#edeff2] text-[11.5px] font-medium text-[#8c929c]">
                       <th className="pb-2.5">Epoch</th>
@@ -907,14 +789,7 @@ function TempDesignShowcaseInner() {
                   </thead>
                   <tbody className="divide-y divide-[#f4f5f7] text-[12.5px] tabular-nums">
                     {[
-                      [
-                        "2018-Q2",
-                        "S2A_38RMV_20180614",
-                        "1,120 ha",
-                        "-0,04",
-                        "Baseline",
-                        "text-[#8c929c]",
-                      ],
+                      ["2018-Q2", "S2A_38RMV_20180614", "1,120 ha", "-0,04", "Baseline", "text-[#8c929c]"],
                       [
                         "2021-Q3",
                         "S2A_38RMV_20210918",
@@ -939,31 +814,13 @@ function TempDesignShowcaseInner() {
                         "Verified",
                         "text-[#22b567] font-semibold",
                       ],
-                      [
-                        "2026-Q4",
-                        "FORECAST_CA_2026",
-                        "6,140 ha",
-                        "+0,39",
-                        "Phase 2 Ring",
-                        "text-[#3b4048]",
-                      ],
-                      [
-                        "2030-Q1",
-                        "VISION_2030_TARGET",
-                        "7,890 ha",
-                        "+0,44",
-                        "Target",
-                        "text-[#22b567] font-semibold",
-                      ],
+                      ["2026-Q4", "FORECAST_CA_2026", "6,140 ha", "+0,39", "Phase 2 Ring", "text-[#3b4048]"],
+                      ["2030-Q1", "VISION_2030_TARGET", "7,890 ha", "+0,44", "Target", "text-[#22b567] font-semibold"],
                     ].map(([ep, scene, ha, ndbi, st, cls]) => (
                       <tr key={String(ep)}>
-                        <td className="py-2.5 font-semibold text-[#1c1f23]">
-                          {ep}
-                        </td>
+                        <td className="py-2.5 font-semibold text-[#1c1f23]">{ep}</td>
                         <td className="py-2.5 text-[#8c929c]">{scene}</td>
-                        <td className="py-2.5 font-medium text-[#1c1f23]">
-                          {ha}
-                        </td>
+                        <td className="py-2.5 font-medium text-[#1c1f23]">{ha}</td>
                         <td className="py-2.5 text-[#3b4048]">{ndbi}</td>
                         <td className={`py-2.5 text-right ${cls}`}>{st}</td>
                       </tr>
@@ -979,8 +836,8 @@ function TempDesignShowcaseInner() {
             SCREEN 5: PAIR LAB (3 Synchronized Rasters + Object Table)
            ========================================================= */}
         {screen === "lab" && (
-          <div className="w-full h-full p-6 grid grid-rows-[1.12fr_0.88fr] gap-5 overflow-hidden">
-            <div className="grid grid-cols-3 gap-5 min-h-0">
+          <div className="grid h-full w-full grid-rows-[1.12fr_0.88fr] gap-5 overflow-hidden p-6">
+            <div className="grid min-h-0 grid-cols-3 gap-5">
               {[
                 {
                   title: "1. Bi-Temporal Input (T₁ / T₂)",
@@ -1000,44 +857,31 @@ function TempDesignShowcaseInner() {
               ].map((panel) => (
                 <div
                   key={panel.title}
-                  className="bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-4 flex flex-col min-h-0"
+                  className="flex min-h-0 flex-col rounded-[20px] bg-white p-4 shadow-[0_8px_28px_rgba(0,0,0,0.05)]"
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-[14.5px] font-semibold text-[#1c1f23]">
-                      {panel.title}
-                    </h3>
-                    <span className="text-[12px] font-medium text-[#22b567] tabular-nums">
-                      {panel.sub}
-                    </span>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-[14.5px] font-semibold text-[#1c1f23]">{panel.title}</h3>
+                    <span className="text-[12px] font-medium text-[#22b567] tabular-nums">{panel.sub}</span>
                   </div>
-                  <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
-                    <img
-                      src={panel.img}
-                      alt={panel.title}
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="relative min-h-0 flex-1 overflow-hidden rounded-[14px]">
+                    <img src={panel.img} alt={panel.title} className="h-full w-full object-cover" />
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-6 flex flex-col justify-between min-h-0">
+            <div className="flex min-h-0 flex-col justify-between rounded-[20px] bg-white p-6 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-[15px] font-semibold text-[#1c1f23]">
-                    Connected-Component Segmented Footprints
-                  </h3>
-                  <p className="text-[12px] text-[#8c929c] mt-0.5">
-                    8-Connectivity Labeling + Douglas-Peucker Polygon
-                    Vectorization
+                  <h3 className="text-[15px] font-semibold text-[#1c1f23]">Connected-Component Segmented Footprints</h3>
+                  <p className="mt-0.5 text-[12px] text-[#8c929c]">
+                    8-Connectivity Labeling + Douglas-Peucker Polygon Vectorization
                   </p>
                 </div>
-                <span className="text-[12.5px] font-semibold text-[#22b567]">
-                  Precision 94,8 % · Recall 92,1 %
-                </span>
+                <span className="text-[12.5px] font-semibold text-[#22b567]">Precision 94,8 % · Recall 92,1 %</span>
               </div>
 
-              <table className="w-full text-left border-collapse my-auto">
+              <table className="my-auto w-full border-collapse text-left">
                 <thead>
                   <tr className="border-b border-[#edeff2] text-[11.5px] font-medium text-[#8c929c]">
                     <th className="pb-2">Object ID</th>
@@ -1098,19 +942,13 @@ function TempDesignShowcaseInner() {
                     ],
                   ].map(([id, name, utm, area, ndvi, ndbi, conf]) => (
                     <tr key={String(id)}>
-                      <td className="py-2 font-semibold text-[#1c1f23]">
-                        {id}
-                      </td>
-                      <td className="py-2 font-medium text-[#1c1f23]">
-                        {name}
-                      </td>
+                      <td className="py-2 font-semibold text-[#1c1f23]">{id}</td>
+                      <td className="py-2 font-medium text-[#1c1f23]">{name}</td>
                       <td className="py-2 text-[#8c929c]">{utm}</td>
                       <td className="py-2 text-[#3b4048]">{area}</td>
                       <td className="py-2 text-[#3b4048]">{ndvi}</td>
                       <td className="py-2 text-[#3b4048]">{ndbi}</td>
-                      <td className="py-2 text-right font-semibold text-[#22b567]">
-                        {conf}
-                      </td>
+                      <td className="py-2 text-right font-semibold text-[#22b567]">{conf}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1123,76 +961,55 @@ function TempDesignShowcaseInner() {
             SCREEN 6: CARBON & UHI (Dual Rasters + Golf-Field Style Carbon Card)
            ========================================================= */}
         {screen === "carbon" && (
-          <div className="w-full h-full p-6 grid grid-cols-12 gap-5 overflow-hidden">
-            <div className="col-span-7 bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-5 flex flex-col min-h-0">
-              <div className="flex items-center justify-between mb-3">
+          <div className="grid h-full w-full grid-cols-12 gap-5 overflow-hidden p-6">
+            <div className="col-span-7 flex min-h-0 flex-col rounded-[20px] bg-white p-5 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
+              <div className="mb-3 flex items-center justify-between">
                 <div>
                   <h2 className="text-[16px] font-semibold text-[#1c1f23]">
                     Spatial Carbon Flux &amp; Surface Thermal Shift (ΔLST)
                   </h2>
                   <p className="text-[12px] text-[#8c929c]">
-                    Wadi Hanifah &amp; Green Riyadh Canopy Sinks vs Corridor
-                    Grading
+                    Wadi Hanifah &amp; Green Riyadh Canopy Sinks vs Corridor Grading
                   </p>
                 </div>
-                <span className="text-[12px] font-semibold text-[#22b567]">
-                  IPCC Tier-1 Verified
-                </span>
+                <span className="text-[12px] font-semibold text-[#22b567]">IPCC Tier-1 Verified</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
-                <div className="flex flex-col min-h-0">
-                  <div className="flex items-center justify-between text-[12px] mb-2">
-                    <span className="font-medium text-[#3b4048]">
-                      Carbon Flux Density
-                    </span>
-                    <span className="font-semibold text-[#22b567]">
-                      -49,4 Mg C / ha
-                    </span>
+              <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
+                <div className="flex min-h-0 flex-col">
+                  <div className="mb-2 flex items-center justify-between text-[12px]">
+                    <span className="font-medium text-[#3b4048]">Carbon Flux Density</span>
+                    <span className="font-semibold text-[#22b567]">-49,4 Mg C / ha</span>
                   </div>
-                  <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
-                    <img
-                      src="/api/raster/roshn/carbon"
-                      alt="Carbon Flux Map"
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="relative min-h-0 flex-1 overflow-hidden rounded-[14px]">
+                    <img src="/api/raster/roshn/carbon" alt="Carbon Flux Map" className="h-full w-full object-cover" />
                   </div>
                 </div>
 
-                <div className="flex flex-col min-h-0">
-                  <div className="flex items-center justify-between text-[12px] mb-2">
-                    <span className="font-medium text-[#3b4048]">
-                      Thermal Shift (ΔLST)
-                    </span>
-                    <span className="font-semibold text-[#f39223]">
-                      -3,8 °C Canopy Cooling
-                    </span>
+                <div className="flex min-h-0 flex-col">
+                  <div className="mb-2 flex items-center justify-between text-[12px]">
+                    <span className="font-medium text-[#3b4048]">Thermal Shift (ΔLST)</span>
+                    <span className="font-semibold text-[#f39223]">-3,8 °C Canopy Cooling</span>
                   </div>
-                  <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
+                  <div className="relative min-h-0 flex-1 overflow-hidden rounded-[14px]">
                     <img
                       src="/api/raster/roshn/thermal"
                       alt="Thermal Shift Map"
-                      className="w-full h-full object-cover"
+                      className="h-full w-full object-cover"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="col-span-5 bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-7 flex flex-col justify-between min-h-0">
+            <div className="col-span-5 flex min-h-0 flex-col justify-between rounded-[20px] bg-white p-7 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
               <div>
-                <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-[18px] font-semibold text-[#1c1f23]">
-                    IPCC 4-Pool Carbon Ledger
-                  </h3>
-                  <span className="text-[12px] text-[#8c929c]">
-                    Verra VM0047
-                  </span>
+                <div className="mb-5 flex items-center justify-between">
+                  <h3 className="text-[18px] font-semibold text-[#1c1f23]">IPCC 4-Pool Carbon Ledger</h3>
+                  <span className="text-[12px] text-[#8c929c]">Verra VM0047</span>
                 </div>
 
-                <div className="text-[13px] font-medium text-[#3b4048] mb-5">
-                  Stoichiometric Pool Breakdown
-                </div>
+                <div className="mb-5 text-[13px] font-medium text-[#3b4048]">Stoichiometric Pool Breakdown</div>
 
                 <div className="space-y-4">
                   {[
@@ -1226,54 +1043,33 @@ function TempDesignShowcaseInner() {
                     },
                   ].map((p, idx) => (
                     <div key={idx}>
-                      <div className="flex items-center justify-between text-[12.5px] mb-2">
-                        <span className="font-semibold text-[#1c1f23] tabular-nums">
-                          {p.val}
-                        </span>
+                      <div className="mb-2 flex items-center justify-between text-[12.5px]">
+                        <span className="font-semibold text-[#1c1f23] tabular-nums">{p.val}</span>
                         <div className="flex items-center gap-3 tabular-nums">
-                          <span className="font-medium text-[#3b4048]">
-                            {p.dist}
-                          </span>
-                          <span className="text-[#9aa0aa] w-9 text-right">
-                            {p.pct}
-                          </span>
+                          <span className="font-medium text-[#3b4048]">{p.dist}</span>
+                          <span className="w-9 text-right text-[#9aa0aa]">{p.pct}</span>
                         </div>
                       </div>
-                      <div className="h-[5px] w-full bg-[#edeff2] rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${p.color}`}
-                          style={{ width: p.w }}
-                        />
+                      <div className="h-[5px] w-full overflow-hidden rounded-full bg-[#edeff2]">
+                        <div className={`h-full rounded-full ${p.color}`} style={{ width: p.w }} />
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="pt-5 border-t border-[#edeff2] grid grid-cols-3 gap-3 text-center">
+              <div className="grid grid-cols-3 gap-3 border-t border-[#edeff2] pt-5 text-center">
                 <div>
-                  <div className="text-[16px] font-semibold text-[#1c1f23] tabular-nums">
-                    -142,8k
-                  </div>
-                  <div className="text-[11px] text-[#8c929c] mt-0.5">
-                    Net tCO2e Sink
-                  </div>
+                  <div className="text-[16px] font-semibold text-[#1c1f23] tabular-nums">-142,8k</div>
+                  <div className="mt-0.5 text-[11px] text-[#8c929c]">Net tCO2e Sink</div>
                 </div>
                 <div>
-                  <div className="text-[16px] font-semibold text-[#22b567] tabular-nums">
-                    $4,99M
-                  </div>
-                  <div className="text-[11px] text-[#8c929c] mt-0.5">
-                    VCM Valuation
-                  </div>
+                  <div className="text-[16px] font-semibold text-[#22b567] tabular-nums">$4,99M</div>
+                  <div className="mt-0.5 text-[11px] text-[#8c929c]">VCM Valuation</div>
                 </div>
                 <div>
-                  <div className="text-[16px] font-semibold text-[#1c1f23] tabular-nums">
-                    31,043
-                  </div>
-                  <div className="text-[11px] text-[#8c929c] mt-0.5">
-                    Vehicles / Yr
-                  </div>
+                  <div className="text-[16px] font-semibold text-[#1c1f23] tabular-nums">31,043</div>
+                  <div className="mt-0.5 text-[11px] text-[#8c929c]">Vehicles / Yr</div>
                 </div>
               </div>
             </div>
@@ -1284,24 +1080,21 @@ function TempDesignShowcaseInner() {
             SCREEN 7: WATCHLIST & STAC ATLAS
            ========================================================= */}
         {screen === "watchlist" && (
-          <div className="w-full h-full p-6 grid grid-cols-12 gap-5 overflow-hidden">
-            <div className="col-span-7 bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-6 flex flex-col justify-between min-h-0">
+          <div className="grid h-full w-full grid-cols-12 gap-5 overflow-hidden p-6">
+            <div className="col-span-7 flex min-h-0 flex-col justify-between rounded-[20px] bg-white p-6 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-[16px] font-semibold text-[#1c1f23]">
                     Planetary Watchlist &amp; Automated STAC Rules
                   </h2>
-                  <p className="text-[12px] text-[#8c929c] mt-0.5">
-                    5-Day Sentinel-2 L2A revisit monitoring via Element84 Earth
-                    Search
+                  <p className="mt-0.5 text-[12px] text-[#8c929c]">
+                    5-Day Sentinel-2 L2A revisit monitoring via Element84 Earth Search
                   </p>
                 </div>
-                <span className="text-[12px] font-semibold text-[#22b567]">
-                  5 Active Corridors
-                </span>
+                <span className="text-[12px] font-semibold text-[#22b567]">5 Active Corridors</span>
               </div>
 
-              <div className="space-y-3 my-auto">
+              <div className="my-auto space-y-3">
                 {[
                   {
                     name: "NEOM · The Line Spine Sector 1",
@@ -1346,39 +1139,28 @@ function TempDesignShowcaseInner() {
                 ].map((item) => (
                   <div
                     key={item.name}
-                    className="p-3.5 rounded-[16px] bg-[#f8f9fb] flex items-center justify-between gap-4"
+                    className="flex items-center justify-between gap-4 rounded-[16px] bg-[#f8f9fb] p-3.5"
                   >
-                    <div className="flex items-center gap-3.5 min-w-[260px]">
+                    <div className="flex min-w-[260px] items-center gap-3.5">
                       <img
                         src={item.thumb}
                         alt={item.name}
-                        className="w-14 h-11 rounded-[10px] object-cover shrink-0"
+                        className="h-11 w-14 shrink-0 rounded-[10px] object-cover"
                       />
                       <div>
-                        <div className="text-[13.5px] font-semibold text-[#1c1f23]">
-                          {item.name}
-                        </div>
-                        <div className="text-[11.5px] text-[#8c929c] mt-0.5">
-                          {item.coords}
-                        </div>
+                        <div className="text-[13.5px] font-semibold text-[#1c1f23]">{item.name}</div>
+                        <div className="mt-0.5 text-[11.5px] text-[#8c929c]">{item.coords}</div>
                       </div>
                     </div>
 
-                    <div className="flex-1 max-w-[220px]">
-                      <div className="flex items-center justify-between text-[12px] mb-1.5 tabular-nums">
-                        <span className="font-semibold text-[#1c1f23]">
-                          {item.delta}
-                        </span>
-                        <span className="font-medium text-[#3b4048]">
-                          {item.area}
-                        </span>
+                    <div className="max-w-[220px] flex-1">
+                      <div className="mb-1.5 flex items-center justify-between text-[12px] tabular-nums">
+                        <span className="font-semibold text-[#1c1f23]">{item.delta}</span>
+                        <span className="font-medium text-[#3b4048]">{item.area}</span>
                         <span className="text-[#9aa0aa]">{item.pct}</span>
                       </div>
-                      <div className="h-[5px] w-full bg-[#e6e8ec] rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${item.color}`}
-                          style={{ width: item.w }}
-                        />
+                      <div className="h-[5px] w-full overflow-hidden rounded-full bg-[#e6e8ec]">
+                        <div className={`h-full rounded-full ${item.color}`} style={{ width: item.w }} />
                       </div>
                     </div>
                   </div>
@@ -1386,23 +1168,19 @@ function TempDesignShowcaseInner() {
               </div>
             </div>
 
-            <div className="col-span-5 bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-6 flex flex-col justify-between min-h-0">
+            <div className="col-span-5 flex min-h-0 flex-col justify-between rounded-[20px] bg-white p-6 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
               <div>
-                <div className="flex items-center justify-between mb-3">
+                <div className="mb-3 flex items-center justify-between">
                   <div>
-                    <h3 className="text-[15px] font-semibold text-[#1c1f23]">
-                      OGC STAC 1.0.0 Item Manifest
-                    </h3>
-                    <p className="text-[12px] text-[#8c929c] mt-0.5">
+                    <h3 className="text-[15px] font-semibold text-[#1c1f23]">OGC STAC 1.0.0 Item Manifest</h3>
+                    <p className="mt-0.5 text-[12px] text-[#8c929c]">
                       Standardized eo + proj + mlm metadata extensions
                     </p>
                   </div>
-                  <span className="text-[12px] font-medium text-[#8c929c]">
-                    GeoJSON
-                  </span>
+                  <span className="text-[12px] font-medium text-[#8c929c]">GeoJSON</span>
                 </div>
 
-                <pre className="p-4 rounded-[14px] bg-[#f8f9fb] text-[11.5px] font-mono text-[#3b4048] leading-relaxed overflow-hidden">
+                <pre className="overflow-hidden rounded-[14px] bg-[#f8f9fb] p-4 font-mono text-[11.5px] leading-relaxed text-[#3b4048]">
                   {`{
   "stac_version": "1.0.0",
   "id": "S2B_ROSHN_RIYADH_2018_2024",
@@ -1424,21 +1202,13 @@ function TempDesignShowcaseInner() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-3.5 rounded-[14px] bg-[#f8f9fb]">
-                  <div className="text-[12.5px] font-semibold text-[#1c1f23]">
-                    S2B_38RMV_20240614
-                  </div>
-                  <div className="text-[11.5px] text-[#22b567] font-medium mt-0.5">
-                    Cloud 0,12 % · 10 m Optical
-                  </div>
+                <div className="rounded-[14px] bg-[#f8f9fb] p-3.5">
+                  <div className="text-[12.5px] font-semibold text-[#1c1f23]">S2B_38RMV_20240614</div>
+                  <div className="mt-0.5 text-[11.5px] font-medium text-[#22b567]">Cloud 0,12 % · 10 m Optical</div>
                 </div>
-                <div className="p-3.5 rounded-[14px] bg-[#f8f9fb]">
-                  <div className="text-[12.5px] font-semibold text-[#1c1f23]">
-                    S2A_38RMV_20240525
-                  </div>
-                  <div className="text-[11.5px] text-[#22b567] font-medium mt-0.5">
-                    Cloud 0,04 % · 10 m Optical
-                  </div>
+                <div className="rounded-[14px] bg-[#f8f9fb] p-3.5">
+                  <div className="text-[12.5px] font-semibold text-[#1c1f23]">S2A_38RMV_20240525</div>
+                  <div className="mt-0.5 text-[11.5px] font-medium text-[#22b567]">Cloud 0,04 % · 10 m Optical</div>
                 </div>
               </div>
             </div>
@@ -1447,18 +1217,18 @@ function TempDesignShowcaseInner() {
       </main>
 
       {/* 3. EXACT BOTTOM TIMELINE BAR FROM REFERENCE */}
-      <footer className="h-[58px] shrink-0 bg-white px-5 flex items-center gap-4">
+      <footer className="flex h-[58px] shrink-0 items-center gap-4 bg-white px-5">
         {/* Year Pill Selector */}
         <button
           type="button"
-          className="h-[36px] px-4 rounded-xl border border-[#e4e7ec] bg-white flex items-center gap-2.5 text-[12.5px] font-semibold text-[#1c1f23] shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+          className="flex h-[36px] items-center gap-2.5 rounded-xl border border-[#e4e7ec] bg-white px-4 text-[12.5px] font-semibold text-[#1c1f23] shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
         >
           <span>2024</span>
           <IconChevronDown />
         </button>
 
         {/* Full-Width Segmented Month Track (#edeff2) */}
-        <div className="flex-1 bg-[#edeff2] p-[3px] rounded-xl flex items-center">
+        <div className="flex flex-1 items-center rounded-xl bg-[#edeff2] p-[3px]">
           {MONTHS.map((m) => {
             const active = m === activeMonth;
             return (
@@ -1466,10 +1236,10 @@ function TempDesignShowcaseInner() {
                 key={m}
                 type="button"
                 onClick={() => setActiveMonth(m)}
-                className={`flex-1 py-[6px] rounded-[9px] text-[12px] transition-all text-center ${
+                className={`flex-1 rounded-[9px] py-[6px] text-center text-[12px] transition-all ${
                   active
-                    ? "bg-white text-[#1c1f23] font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
-                    : "text-[#636973] font-medium hover:text-[#1c1f23]"
+                    ? "bg-white font-semibold text-[#1c1f23] shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                    : "font-medium text-[#636973] hover:text-[#1c1f23]"
                 }`}
               >
                 {m}
@@ -1486,25 +1256,25 @@ function MapCanvasOverlay() {
   return (
     <>
       {/* Top-Left Dark Translucent Pill Zoom Button Pair */}
-      <div className="absolute top-6 left-5 z-10 flex flex-col bg-[#1b1e23]/85 backdrop-blur-md rounded-2xl p-1 shadow-md">
+      <div className="absolute top-6 left-5 z-10 flex flex-col rounded-2xl bg-[#1b1e23]/85 p-1 shadow-md backdrop-blur-md">
         <button
           type="button"
           aria-label="Zoom in"
-          className="w-8 h-8 flex items-center justify-center text-white/90 hover:text-white transition-colors"
+          className="flex h-8 w-8 items-center justify-center text-white/90 transition-colors hover:text-white"
         >
           <IconZoomIn />
         </button>
         <button
           type="button"
           aria-label="Zoom out"
-          className="w-8 h-8 flex items-center justify-center text-white/90 hover:text-white transition-colors"
+          className="flex h-8 w-8 items-center justify-center text-white/90 transition-colors hover:text-white"
         >
           <IconZoomOut />
         </button>
       </div>
 
       {/* Subtle Coordinate Grid Indices matching reference */}
-      <div className="pointer-events-none absolute top-11 left-24 right-24 flex justify-between text-[10px] font-medium text-[#1c1f23]/45">
+      <div className="pointer-events-none absolute top-11 right-24 left-24 flex justify-between text-[10px] font-medium text-[#1c1f23]/45">
         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
           <span key={n}>{n}</span>
         ))}

@@ -5,17 +5,14 @@ import dynamic from "next/dynamic";
 import { StudioShell, MapCanvasOverlay, type StudioViewMode } from "@/components/studio-nav";
 import { useAoi, CORRIDOR_PROFILES, type CorridorId } from "@/lib/aoi-context";
 
-const MapCanvas = dynamic(
-  () => import("@/components/map/map-canvas").then((m) => m.MapCanvas),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="size-full flex items-center justify-center bg-[#0B0F17] text-white/50 text-xs tracking-wider uppercase font-mono">
-        Initializing Orbital Map Engine...
-      </div>
-    ),
-  },
-);
+const MapCanvas = dynamic(() => import("@/components/map/map-canvas").then((m) => m.MapCanvas), {
+  ssr: false,
+  loading: () => (
+    <div className="flex size-full items-center justify-center bg-[#0B0F17] font-mono text-xs tracking-wider text-white/50 uppercase">
+      Initializing Orbital Map Engine...
+    </div>
+  ),
+});
 
 const CITY_EFFECTS = [
   {
@@ -83,12 +80,7 @@ export function StitchCommandDeck() {
   const computedRows = activeCorridor.anomalyRows.map((row) => {
     const val = Math.min(0.95, Math.max(0.02, row.baseVal * temporalModifier));
     const areaHa = Math.max(12, Math.round(row.baseAreaHa * temporalModifier));
-    const colorClass =
-      row.tone === "emerald"
-        ? "bg-[#22b567]"
-        : row.tone === "amber"
-          ? "bg-[#f39223]"
-          : "bg-[#e94235]";
+    const colorClass = row.tone === "emerald" ? "bg-[#22b567]" : row.tone === "amber" ? "bg-[#f39223]" : "bg-[#e94235]";
     return {
       label: row.label,
       valStr: formatComma(val, 3),
@@ -120,7 +112,7 @@ export function StitchCommandDeck() {
 
   return (
     <StudioShell>
-      <div className="relative w-full h-full overflow-hidden">
+      <div className="relative h-full w-full overflow-hidden">
         {/* Real GPU-Accelerated MapLibre Satellite Map with Multi-Spectral Diagnostic Overlays */}
         <MapCanvas
           yearT1={2018}
@@ -155,21 +147,21 @@ export function StitchCommandDeck() {
           <button
             type="button"
             onClick={() => setCardCollapsed(false)}
-            className="absolute top-12 right-14 bg-white rounded-2xl shadow-[0_12px_36px_rgba(0,0,0,0.14)] px-4 py-2.5 text-[13px] font-semibold text-[#1c1f23] hover:bg-[#f8f9fb] transition-colors cursor-pointer"
+            className="absolute top-12 right-14 cursor-pointer rounded-2xl bg-white px-4 py-2.5 text-[13px] font-semibold text-[#1c1f23] shadow-[0_12px_36px_rgba(0,0,0,0.14)] transition-colors hover:bg-[#f8f9fb]"
           >
             {activeCorridor.name}
           </button>
         ) : (
           /* Floating White Card (Exact Golf Field proportion, spacing & footer arrows) */
-          <div className="absolute top-12 right-14 w-[380px] bg-white rounded-[22px] shadow-[0_16px_48px_rgba(0,0,0,0.14)] p-7">
-            <div className="flex items-center justify-between mb-5">
+          <div className="absolute top-12 right-14 w-[380px] rounded-[22px] bg-white p-7 shadow-[0_16px_48px_rgba(0,0,0,0.14)]">
+            <div className="mb-5 flex items-center justify-between">
               <button
                 type="button"
                 onClick={handleCycleCorridor}
                 title="Click to cycle observation corridor"
-                className="text-left group cursor-pointer"
+                className="group cursor-pointer text-left"
               >
-                <h2 className="text-[18px] font-semibold text-[#1c1f23] tracking-[-0.01em] group-hover:opacity-75 transition-opacity">
+                <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-[#1c1f23] transition-opacity group-hover:opacity-75">
                   {activeCorridor.name}
                 </h2>
               </button>
@@ -177,7 +169,7 @@ export function StitchCommandDeck() {
                 type="button"
                 onClick={() => setCardCollapsed(true)}
                 aria-label="Minimize card"
-                className="w-6 h-6 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d] hover:text-[#1c1f23] transition-colors cursor-pointer"
+                className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-[#f4f5f7] text-[#7c828d] transition-colors hover:text-[#1c1f23]"
               >
                 <svg
                   width="12"
@@ -197,12 +189,12 @@ export function StitchCommandDeck() {
 
             {cardSlide === 0 ? (
               <>
-                <div className="flex items-center justify-between text-[13px] font-medium text-[#3b4048] mb-5">
+                <div className="mb-5 flex items-center justify-between text-[13px] font-medium text-[#3b4048]">
                   <span>Anomaly</span>
                   <button
                     type="button"
                     onClick={handleCycleEffect}
-                    className="text-[11.5px] text-[#8c929c] hover:text-[#1c1f23] transition-colors cursor-pointer"
+                    className="cursor-pointer text-[11.5px] text-[#8c929c] transition-colors hover:text-[#1c1f23]"
                   >
                     {activeMonth} {activeYear}
                   </button>
@@ -211,20 +203,14 @@ export function StitchCommandDeck() {
                 <div className="space-y-4">
                   {computedRows.map((row, idx) => (
                     <div key={idx} title={row.label}>
-                      <div className="flex items-center justify-between text-[12.5px] mb-2">
-                        <span className="font-semibold text-[#1c1f23] tabular-nums">
-                          {row.valStr}
-                        </span>
+                      <div className="mb-2 flex items-center justify-between text-[12.5px]">
+                        <span className="font-semibold text-[#1c1f23] tabular-nums">{row.valStr}</span>
                         <div className="flex items-center gap-3 tabular-nums">
-                          <span className="font-medium text-[#3b4048]">
-                            {row.distStr}
-                          </span>
-                          <span className="text-[#9aa0aa] w-9 text-right">
-                            {row.pctStr}
-                          </span>
+                          <span className="font-medium text-[#3b4048]">{row.distStr}</span>
+                          <span className="w-9 text-right text-[#9aa0aa]">{row.pctStr}</span>
                         </div>
                       </div>
-                      <div className="h-[5px] w-full bg-[#edeff2] rounded-full overflow-hidden">
+                      <div className="h-[5px] w-full overflow-hidden rounded-full bg-[#edeff2]">
                         <div
                           className={`h-full rounded-full transition-all duration-300 ${row.colorClass}`}
                           style={{ width: row.widthStr }}
@@ -236,20 +222,12 @@ export function StitchCommandDeck() {
               </>
             ) : (
               <>
-                <div className="text-[13px] font-medium text-[#3b4048] mb-4">
+                <div className="mb-4 text-[13px] font-medium text-[#3b4048]">
                   10-Band Reflectance Profile (2018 vs {activeYear})
                 </div>
-                <svg viewBox="0 0 320 175" className="w-full h-[185px]">
+                <svg viewBox="0 0 320 175" className="h-[185px] w-full">
                   {[30, 75, 120, 155].map((y) => (
-                    <line
-                      key={y}
-                      x1="28"
-                      y1={y}
-                      x2="310"
-                      y2={y}
-                      stroke="#f0f2f5"
-                      strokeWidth="1"
-                    />
+                    <line key={y} x1="28" y1={y} x2="310" y2={y} stroke="#f0f2f5" strokeWidth="1" />
                   ))}
                   <text x="2" y="34" fill="#9aa0aa" fontSize="9">
                     0,45
@@ -267,22 +245,11 @@ export function StitchCommandDeck() {
                     strokeDasharray="3 3"
                     points={baselinePoints}
                   />
-                  <polyline
-                    fill="none"
-                    stroke="#22b567"
-                    strokeWidth="2.5"
-                    points={activePoints}
-                  />
+                  <polyline fill="none" stroke="#22b567" strokeWidth="2.5" points={activePoints} />
                   {activePointsList.map((pt) => (
                     <g key={pt.band}>
                       <circle cx={pt.x} cy={pt.y} r="3" fill="#22b567" />
-                      <text
-                        x={pt.x}
-                        y="170"
-                        textAnchor="middle"
-                        fill="#8c929c"
-                        fontSize="8.5"
-                      >
+                      <text x={pt.x} y="170" textAnchor="middle" fill="#8c929c" fontSize="8.5">
                         {pt.band}
                       </text>
                     </g>
@@ -297,7 +264,7 @@ export function StitchCommandDeck() {
                 type="button"
                 onClick={() => setCardSlide(0)}
                 aria-label="Previous slide"
-                className="w-7 h-7 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d] hover:text-[#1c1f23] transition-colors cursor-pointer"
+                className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-[#f4f5f7] text-[#7c828d] transition-colors hover:text-[#1c1f23]"
               >
                 <svg
                   width="13"
@@ -314,22 +281,14 @@ export function StitchCommandDeck() {
                 </svg>
               </button>
               <div className="flex items-center gap-1.5">
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    cardSlide === 0 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"
-                  }`}
-                />
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    cardSlide === 1 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"
-                  }`}
-                />
+                <span className={`h-1.5 w-1.5 rounded-full ${cardSlide === 0 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"}`} />
+                <span className={`h-1.5 w-1.5 rounded-full ${cardSlide === 1 ? "bg-[#1c1f23]" : "bg-[#d5d8de]"}`} />
               </div>
               <button
                 type="button"
                 onClick={() => setCardSlide(1)}
                 aria-label="Next slide"
-                className="w-7 h-7 rounded-full bg-[#f4f5f7] flex items-center justify-center text-[#7c828d] hover:text-[#1c1f23] transition-colors cursor-pointer"
+                className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-[#f4f5f7] text-[#7c828d] transition-colors hover:text-[#1c1f23]"
               >
                 <svg
                   width="13"

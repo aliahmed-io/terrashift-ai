@@ -14,10 +14,7 @@ export async function POST(req: NextRequest) {
     const rawJson = await req.json().catch(() => null);
     const parsed = searchSchema.safeParse(rawJson);
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid search parameters", details: parsed.error.issues },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid search parameters", details: parsed.error.issues }, { status: 400 });
     }
 
     const mlUrl = process.env["ML_SERVICE_URL"] ?? "http://127.0.0.1:8000";

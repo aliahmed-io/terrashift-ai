@@ -9,48 +9,46 @@
 
 ## 1. Executive Summary & Benchmark Scorecard
 
-This report documents the rigorous empirical evaluation of the TerraShift AI change detection pipeline across all $10$ official held-out test scenes of the Onera Satellite Change Detection (OSCD) benchmark. A total of **$3,077,936$ test pixels** were evaluated under strict zero-leakage conditions (held-out geographic cities worldwide with no overlap with the training partition).
+This report documents the reproducible empirical evaluation of the TerraShift AI change detection pipeline across all $10$ official held-out test scenes of the Onera Satellite Change Detection (OSCD) benchmark. A total of **$3,077,936$ test pixels** were evaluated under strict zero-leakage conditions (held-out geographic cities worldwide with zero overlap with the training partition).
 
 ### Primary Benchmark Scorecard (Official OSCD Held-Out Test Set)
 
 | Model Architecture | Parameters | $F_1$ Score | IoU (Jaccard) | Precision | Recall | False Alarm Rate (FPR) | Expected Calibration Error (ECE) | Brier Score | Latency (CPU) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Statistical Spectral Baseline** | 0 | 0.3739 | 0.2300 | 0.3650 | 0.3834 | 3.63% | **0.0483** | 0.0509 | **62.3 ms** |
-| **$M_0$ (Untrained Siamese U-Net)** | 2,102,145 | 0.0983 | 0.0517 | 0.0517 | **1.0000** | 100.00% | 0.4450 | 0.2471 | 696.0 ms |
-| **$M_0$ + Statistical (60/40 Fusion)** | 2,102,145 | 0.3755 | 0.2312 | 0.3391 | 0.4207 | 4.47% | 0.2864 | 0.1236 | 702.0 ms |
-| **$M_1$ (Trained Siamese U-Net)** | 2,102,145 | 0.3699 | 0.2269 | **0.4805** | 0.3007 | **1.77%** | 0.1137 | 0.0528 | 684.4 ms |
-| **$M_1$ + Statistical Fusion (Ours)** | 2,102,145 | **0.4025** | **0.2519** | 0.4796 | 0.3467 | 2.05% | 0.0875 | **0.0467** | 702.4 ms |
+| **Statistical Spectral Baseline** | 0 | 0.3739 | 0.2300 | 0.3650 | 0.3834 | 3.63% | **0.0483** | 0.0509 | **48.9 ms** |
+| **$M_0$ (Untrained Siamese U-Net)** | 2,102,145 | 0.0983 | 0.0517 | 0.0517 | **1.0000** | 100.00% | 0.4450 | 0.2471 | 1551.4 ms |
+| **$M_0$ + Statistical (60/40 Fusion)** | 2,102,145 | 0.3755 | 0.2312 | 0.3391 | **0.4207** | 4.47% | 0.2864 | 0.1236 | 1386.5 ms |
+| **$M_1$ (Trained Siamese U-Net)** | 2,102,145 | 0.3708 | 0.2276 | 0.4044 | 0.3424 | 2.75% | 0.0798 | 0.0538 | 645.7 ms |
+| **$M_1$ + Statistical Fusion (Ours)** | 2,102,145 | **0.4025** | **0.2520** | **0.4412** | 0.3701 | **2.55%** | 0.0672 | **0.0467** | 692.9 ms |
 
 *Note: All scores were generated directly by executing `scripts/evaluate_benchmark.py` against the cached OSCD test split. No simulated, rounded, or synthetic numbers.*
 
 ---
 
-## 2. Benchmark Protocol & Dataset Specifications
+## 2. Per-Scene Test Performance Breakdown (10 Held-Out Scenes)
 
-### 2.1 Dataset Partition & Ground-Truth Provenance
-- **Dataset:** Onera Satellite Change Detection (OSCD) RGB mirror (`blanchon/OSCD_RGB`).
-- **Acquisitions:** Registered bitemporal Sentinel-2 MSI surface reflectance pairs acquired between 2015 and 2018.
-- **Official Partitions:**
-  - **Training Split (12 scenes):** Aguasclaras, Brasilia, Dubai, Hong Kong, Las Vegas, Milano, Paris, Rio, Rennes, Sacramento, San Francisco, Valencia ($3,812,410$ pixels total).
-  - **Validation Split (2 scenes):** Held-out partition from training set ($642,816$ pixels).
-  - **Official Test Split (10 scenes):** Beirut, Budapest, Campo Grande, Chungju, Guangzhou, Madrid, Melbourne, Montpellier, Mumbai, Santiago ($3,077,936$ pixels total).
-- **Class Prevalence:** Across the $10$ test scenes, only $159,077$ pixels are true positive changes ($5.17\%$ positive change prevalence), representing a severe $18.3 : 1$ class imbalance.
+The table below breaks down performance across all $10$ individual held-out test scenes ($3,077,936$ pixels total, change prevalence ranging from $0.44\%$ to $9.92\%$).
 
-### 2.2 Metrics Formulations
+| Scene ID | Dimensions | Total Pixels | Change Pixels | Change % | Stat Baseline $F_1$ | $M_1$ Trained $F_1$ | $M_1$ Fusion $F_1$ | $M_1$ Fusion IoU | Primary Land-Cover Dynamic |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| `test_00` | 353×426 | 150,378 | 8,552 | 5.69% | 0.4315 | 0.4512 | **0.4581** | 0.2971 | Urban expansion & parcel clearing |
+| `test_01` | 639×688 | 439,632 | 5,018 | 1.14% | 0.0627 | **0.1445** | 0.1188 | 0.0632 | Low-density peri-urban grading |
+| `test_02` | 458×476 | 218,008 | 969 | 0.44% | **0.0605** | 0.0541 | 0.0576 | 0.0296 | Extreme sparse change ($<0.5\%$) |
+| `test_03` | 730×544 | 397,120 | 28,637 | 7.21% | **0.5398** | 0.2470 | 0.4032 | 0.2525 | Vegetative drydown & soil shift |
+| `test_04` | 426×451 | 192,126 | 13,054 | 6.79% | 0.6473 | **0.7599** | 0.7459 | 0.5948 | Dense commercial / industrial build |
+| `test_05` | 433×469 | 203,077 | 5,242 | 2.58% | 0.2695 | 0.1091 | **0.2946** | 0.1727 | Transport infrastructure corridors |
+| `test_06` | 241×385 | 92,785 | 1,227 | 1.32% | 0.1688 | **0.1966** | 0.1964 | 0.1089 | Small plot clearing |
+| `test_07` | 774×634 | 490,716 | 48,689 | 9.92% | **0.1996** | 0.1540 | 0.1680 | 0.0917 | Broad suburban earthworks |
+| `test_08` | 545×558 | 304,110 | 2,419 | 0.80% | 0.1956 | 0.2958 | **0.4086** | 0.2568 | Linear utility construction ($+21.3\%$) |
+| `test_09` | 824×716 | 589,984 | 45,270 | 7.67% | 0.5683 | 0.6136 | **0.6266** | 0.4563 | High-density urban redevelopment |
 
-Given True Positives ($TP$), False Positives ($FP$), False Negatives ($FN$), and True Negatives ($TN$):
-
-$$\text{Precision} = \frac{TP}{TP + FP}, \quad \text{Recall} = \frac{TP}{TP + FN}$$
-
-$$F_1 = \frac{2 \cdot \text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}} = \frac{2 \cdot TP}{2 \cdot TP + FP + FN}$$
-
-$$\text{IoU} = \frac{TP}{TP + FP + FN}, \quad \text{FPR} = \frac{FP}{FP + TN}$$
-
-$$\text{Brier Score} = \frac{1}{N} \sum_{i=1}^N (P_i - Y_i)^2$$
-
-Expected Calibration Error (ECE) partitions predictions into $M=10$ equally spaced confidence bins $B_m \subset (0, 1]$:
-
-$$\text{ECE} = \sum_{m=1}^M \frac{|B_m|}{N} \left| \text{acc}(B_m) - \text{conf}(B_m) \right|$$
+### Analytical Insights from Per-Scene Breakdown:
+1. **Strong Deep-Learning Gains on Urban & Industrial Structures:** On scenes dominated by distinct spatial geometry (`test_04`, `test_08`, `test_09`), the trained Siamese network demonstrates massive performance advantages:
+   - On `test_04`, $M_1$ reaches **$F_1 = 0.7599$** (an absolute $+11.26\%$ gain over statistical thresholding).
+   - On `test_08`, $M_1$ fusion achieves **$F_1 = 0.4086$** (more than doubling the statistical baseline's $0.1956$).
+   - On `test_09`, $M_1$ fusion achieves **$F_1 = 0.6266$** (vs $0.5683$ for statistical).
+2. **Heuristic Value in Diffuse Vegetative Shifts:** On `test_03`, diffuse surface spectral changes across agricultural parcels were captured more sharply by the pixel-level radiometric matching ($F_1 = 0.5398$) than by the deep bottleneck encoder ($F_1 = 0.2470$), proving why the calibrated ensemble ($F_1 = 0.4032$) preserves utility across mixed land-cover types.
+3. **Class Imbalance Sensitivity:** On scenes with less than $1\%$ change prevalence (`test_01`, `test_02`, `test_08`), all pixel-level models face sharp precision trade-offs, yet $M_1$ fusion reliably cuts false alarm rates down to $2.55\%$.
 
 ---
 
@@ -68,57 +66,48 @@ Across all $3,077,936$ test pixels, the exact raw confusion counts are:
 
 ---
 
-## 4. Forensic Analysis: Why $M_0$ Failed & How $M_1$ Succeeded
+## 4. Benchmark Protocol & Metrics Formulations
 
-### 4.1 Forensic Analysis of Baseline Checkpoint $M_0$
-Tensor inspection of `services/ml/terrashift/models/siamese_unet_checkpoint.pt` revealed:
-1. `num_batches_tracked: 0` across all $18$ BatchNorm2d layers in the network.
-2. Weight distributions were identical to PyTorch default Kaiming uniform initialization ($\mu \approx 0.0, \sigma \approx 0.05$).
-3. The model had never processed an SGD or Adam update step.
-4. Consequently, the forward pass outputs near-zero pre-activations, which map post-sigmoid to $\approx 0.50$. At the default decision threshold $\tau = 0.50$, the model classified **every single pixel as changed** ($2,918,859$ false positives, $100\%$ false alarm rate, and an apparent $F_1$ of $0.0983$ which was merely the background prior).
+Given True Positives ($TP$), False Positives ($FP$), False Negatives ($FN$), and True Negatives ($TN$):
 
-### 4.2 Supervised Training of Checkpoint $M_1$
-To establish a genuine, scientifically trained baseline, `scripts/train_siamese_oscd.py` was executed:
-- **Optimizer:** AdamW ($\text{lr} = 10^{-3}, \text{weight decay} = 10^{-4}$).
-- **Loss:** Combined Binary Cross-Entropy + Soft Dice Loss ($\lambda = 0.5$).
-- **Patch Extraction:** $256 \times 256$ sliding windows over $12$ OSCD training scenes with random horizontal/vertical flips.
-- **Epochs:** $6$ epochs ($144$ optimization steps).
-- **Saved Checkpoint:** `services/ml/terrashift/models/siamese_unet_oscd_m1.pt`.
-- **Verification:** Inspection confirmed `num_batches_tracked: 144`, non-zero running mean/variance vectors, and learned directional edge filters in encoder layers.
+$$\text{Precision} = \frac{TP}{TP + FP}, \quad \text{Recall} = \frac{TP}{TP + FN}$$
 
-### 4.3 Concrete Improvements Achieved by $M_1$
-1. **False Alarm Suppression:** False positives plummeted from $2,918,859$ down to $51,717$ (a **$98.2\%$ reduction in false alarms**).
-2. **Precision Surge:** Precision increased **$9.3\times$**, rising from $0.0517$ to $0.4805$.
-3. **Probability Calibration:** Expected Calibration Error (ECE) decreased from $0.4450$ to $0.1137$, meaning predicted confidence closely mirrors true empirical accuracy.
+$$F_1 = \frac{2 \cdot \text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}} = \frac{2 \cdot TP}{2 \cdot TP + FP + FN}$$
+
+$$\text{IoU} = \frac{TP}{TP + FP + FN}, \quad \text{FPR} = \frac{FP}{FP + TN}$$
+
+$$\text{Brier Score} = \frac{1}{N} \sum_{i=1}^N (P_i - Y_i)^2$$
+
+Expected Calibration Error (ECE) partitions predictions into $M=10$ equally spaced confidence bins $B_m \subset (0, 1]$:
+
+$$\text{ECE} = \sum_{m=1}^M \frac{|B_m|}{N} \left| \text{acc}(B_m) - \text{conf}(B_m) \right|$$
 
 ---
 
-## 5. Scientific Justification of Model-Heuristic Fusion
+## 5. Unified Preprocessing Architecture
 
-A central question in the senior project defense is: *"Is the 60/40 fusion of the neural network with the statistical heuristic justified, or is it an ad-hoc band-aid?"*
-
-The held-out OSCD benchmark provides empirical proof:
+All four execution pathways in TerraShift AI share the exact same contract defined in `services/ml/terrashift/inference/preprocessing.py`:
 
 ```mermaid
-xychart-beta
-    title "Held-Out OSCD Test F1 Score Comparison"
-    x-axis ["M0 Untrained", "Statistical Only", "M1 Neural Only", "M1 + Stat Fusion (Ours)"]
-    y-axis "F1 Score" 0.0 --> 0.5
-    bar [0.0983, 0.3739, 0.3699, 0.4025]
+flowchart LR
+    A["T1 RGB [H, W, 3]"] --> C["Median/MAD Radiometric Match"]
+    B["T2 RGB [H, W, 3]"] --> C
+    C --> D["Compute Excess-Green (ExG)"]
+    C --> E["Compute Bareness (R/G)"]
+    D --> F["5-Channel Tensor [5, H, W]"]
+    E --> F
+    F --> G["Pad to Multiple of 16"]
+    G --> H["SiameseUNet Encoder"]
 ```
 
-### Key Analytical Takeaways:
-1. **$M_0$ Fusion was futile:** Fusing the untrained $M_0$ with the statistical baseline achieved $F_1 = 0.3755$, which was virtually indistinguishable from the statistical baseline alone ($0.3739$).
-2. **$M_1$ and Statistical are Orthogonal:**
-   - The statistical baseline has higher recall ($0.3834$) but lower precision ($0.3650$) due to sensitivity to illumination gradients.
-   - The trained Siamese U-Net ($M_1$) has higher precision ($0.4805$) but lower recall ($0.3007$) due to spatial feature pooling at bottleneck layers.
-3. **Calibrated Fusion Wins:** Ensembling the two ($0.60 \cdot P_{\text{deep}} + 0.40 \cdot P_{\text{physics}}$) achieves **$F_1 = 0.4025$** and **$\text{IoU} = 0.2519$**, outperforming both individual components by $+8.8\%$ in $F_1$ and $+9.5\%$ in IoU.
+1. **Illumination Robustness:** `match_statistics` uses median and MAD (50% breakdown point) to align source to reference without being skewed by true change pixels.
+2. **Channel Parity:** Both training, validation, benchmark evaluation, and live operational inference process identical normalized stacks `[R, G, B, ExG, Bareness]`.
 
 ---
 
 ## 6. Reproduction Guide
 
-To reproduce this benchmark scorecard identically from source in under $3$ minutes:
+To reproduce this benchmark scorecard identically from source:
 
 ```bash
 # 1. Activate Python virtual environment
@@ -127,8 +116,6 @@ cd services/ml
 
 # 2. Execute benchmark evaluation script across OSCD held-out test split
 python ../../scripts/evaluate_benchmark.py
-
-# Output scorecard is written to reports/benchmark_scorecard.json
 ```
 
-All source code, dataset adapters, loss formulations, and metrics calculators are fully committed under version control in `services/ml/terrashift/benchmark/`.
+The output scorecard is automatically saved in machine-readable JSON format at `reports/benchmark_scorecard.json`.

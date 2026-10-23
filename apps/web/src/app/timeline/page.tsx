@@ -40,7 +40,7 @@ export default function TimelinePage() {
             series?: TimeseriesPoint[];
             forecast?: ForecastPoint[];
             forecast_mode?: string;
-          } | null
+          } | null,
         ) => {
           if (!cancelled && data) {
             if (data.series) setSeries(data.series);
@@ -49,7 +49,7 @@ export default function TimelinePage() {
               setScenarioLabel("Exploratory Scenario");
             }
           }
-        }
+        },
       )
       .catch(() => {
         // Fallback already in component
@@ -133,44 +133,38 @@ export default function TimelinePage() {
 
   return (
     <StudioShell>
-      <div className="w-full h-full p-6 grid grid-rows-[0.95fr_1.05fr] gap-5 overflow-hidden">
-        <div className="bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-6 flex flex-col justify-between min-h-0">
+      <div className="grid h-full w-full grid-rows-[0.95fr_1.05fr] gap-5 overflow-hidden p-6">
+        <div className="flex min-h-0 flex-col justify-between rounded-[20px] bg-white p-6 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-[16px] font-semibold text-[#1c1f23]">
                 BFAST Structural Breakpoint &amp; 2030 Forecast
               </h2>
-              <p className="text-[12px] text-[#8c929c] mt-0.5">
-                Annual Velocity Breakpoint at 2021 (MOSUM ratio 3.1) · {activeCorridor.name} ({activeMonth} {activeYear})
+              <p className="mt-0.5 text-[12px] text-[#8c929c]">
+                Annual Velocity Breakpoint at 2021 (MOSUM ratio 3.1) · {activeCorridor.name} ({activeMonth} {activeYear}
+                )
               </p>
             </div>
             <div className="flex items-center gap-5 text-[12px] font-medium text-[#5c626b]">
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#22b567]" />
+                <span className="h-2 w-2 rounded-full bg-[#22b567]" />
                 Observed Built-Up (ha)
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#e94235]" />
+                <span className="h-2 w-2 rounded-full bg-[#e94235]" />
                 2021-Q3 Breakpoint
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#f39223]" />
+                <span className="h-2 w-2 rounded-full bg-[#f39223]" />
                 2024–2030 Forecast
               </span>
             </div>
           </div>
 
-          <svg viewBox="0 0 1100 185" className="w-full h-[165px]">
+          <svg viewBox="0 0 1100 185" className="h-[165px] w-full">
             {[28, 72, 116, 152].map((y, idx) => (
               <g key={y}>
-                <line
-                  x1="68"
-                  y1={y}
-                  x2="1065"
-                  y2={y}
-                  stroke="#f0f2f5"
-                  strokeWidth="1"
-                />
+                <line x1="68" y1={y} x2="1065" y2={y} stroke="#f0f2f5" strokeWidth="1" />
                 <text x="8" y={y + 4} fill="#9aa0aa" fontSize="10.5">
                   {["8,000 ha", "5,500 ha", "3,000 ha", "500 ha"][idx]}
                 </text>
@@ -181,23 +175,8 @@ export default function TimelinePage() {
               fill="#f39223"
               fillOpacity="0.12"
             />
-            <line
-              x1="400"
-              y1="16"
-              x2="400"
-              y2="156"
-              stroke="#e94235"
-              strokeWidth="1.8"
-              strokeDasharray="4 4"
-            />
-            <text
-              x="400"
-              y="30"
-              textAnchor="middle"
-              fill="#e94235"
-              fontSize="10.5"
-              fontWeight="600"
-            >
+            <line x1="400" y1="16" x2="400" y2="156" stroke="#e94235" strokeWidth="1.8" strokeDasharray="4 4" />
+            <text x="400" y="30" textAnchor="middle" fill="#e94235" fontSize="10.5" fontWeight="600">
               2021-Q3 Break (+310% Slope)
             </text>
             <polyline
@@ -251,50 +230,40 @@ export default function TimelinePage() {
           </svg>
         </div>
 
-        <div className="grid grid-cols-12 gap-5 min-h-0">
-          <div className="col-span-6 bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-5 flex flex-col min-h-0">
-            <div className="flex items-center justify-between mb-3">
+        <div className="grid min-h-0 grid-cols-12 gap-5">
+          <div className="col-span-6 flex min-h-0 flex-col rounded-[20px] bg-white p-5 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
+            <div className="mb-3 flex items-center justify-between">
               <div>
-                <h3 className="text-[15px] font-semibold text-[#1c1f23]">
-                  2024–2030 Spatial Contagion Forecast
-                </h3>
-                <p className="text-[12px] text-[#8c929c]">
-                  Morphological expansion rings across North Riyadh
-                </p>
+                <h3 className="text-[15px] font-semibold text-[#1c1f23]">2024–2030 Spatial Contagion Forecast</h3>
+                <p className="text-[12px] text-[#8c929c]">Morphological expansion rings across North Riyadh</p>
               </div>
-              <span className="text-[12px] font-medium text-[#22b567]">
-                {scenarioLabel} · Linear Trend
-              </span>
+              <span className="text-[12px] font-medium text-[#22b567]">{scenarioLabel} · Linear Trend</span>
             </div>
-            <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">
+            <div className="relative min-h-0 flex-1 overflow-hidden rounded-[14px]">
               <img
                 src={getRasterUrl("contagion")}
                 alt="Spatial Contagion Forecast"
-                className="w-full h-full object-cover"
+                className="h-full w-full object-cover"
               />
             </div>
           </div>
 
-          <div className="col-span-6 bg-white rounded-[20px] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-6 flex flex-col justify-between min-h-0">
+          <div className="col-span-6 flex min-h-0 flex-col justify-between rounded-[20px] bg-white p-6 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-[15px] font-semibold text-[#1c1f23]">
-                  Multi-Epoch Acquisition Ledger
-                </h3>
-                <p className="text-[12px] text-[#8c929c] mt-0.5">
-                  Cloud-free Sentinel-2 L2A milestone verification
-                </p>
+                <h3 className="text-[15px] font-semibold text-[#1c1f23]">Multi-Epoch Acquisition Ledger</h3>
+                <p className="mt-0.5 text-[12px] text-[#8c929c]">Cloud-free Sentinel-2 L2A milestone verification</p>
               </div>
               <button
                 type="button"
                 onClick={handleExportCsv}
-                className="text-[12px] font-medium text-[#636973] hover:text-[#1c1f23] transition-colors cursor-pointer"
+                className="cursor-pointer text-[12px] font-medium text-[#636973] transition-colors hover:text-[#1c1f23]"
               >
                 Export CSV
               </button>
             </div>
 
-            <table className="w-full text-left border-collapse my-auto">
+            <table className="my-auto w-full border-collapse text-left">
               <thead>
                 <tr className="border-b border-[#edeff2] text-[11.5px] font-medium text-[#8c929c]">
                   <th className="pb-2.5">Epoch</th>
