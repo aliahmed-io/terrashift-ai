@@ -31,14 +31,20 @@ def get_siamese_model():
         return None
     if _MODEL_INSTANCE is None:
         model = SiameseUNet(in_channels=5, base_channels=32).eval()
-        ckpt_path = os.path.join(
+        m1_path = os.path.join(
+            os.path.dirname(__file__), "..", "models", "siamese_unet_oscd_m1.pt"
+        )
+        legacy_path = os.path.join(
             os.path.dirname(__file__), "..", "models", "siamese_unet_checkpoint.pt"
         )
+        ckpt_path = m1_path if os.path.exists(m1_path) else legacy_path
         if os.path.exists(ckpt_path):
             try:
                 ckpt = torch.load(ckpt_path, map_location="cpu")
-                if "state_dict" in ckpt:
+                if isinstance(ckpt, dict) and "state_dict" in ckpt:
                     model.load_state_dict(ckpt["state_dict"])
+                elif isinstance(ckpt, dict) and any(k.startswith("inc.") for k in ckpt.keys()):
+                    model.load_state_dict(ckpt)
             except Exception:
                 pass
         _MODEL_INSTANCE = model
@@ -163,18 +169,27 @@ def detect_change(
     mask = ndimage.binary_closing(mask, structure=np.ones((3, 3), dtype=bool)) & valid
 
     model_metadata = {
-        "architecture": "Siamese U-Net (PyTorch 2.14)",
+        "architecture": "Siamese U-Net (PyTorch 2.1)",
         "parameter_count": 2102145,
-        "input_channels": ["Red (B04)", "Green (B03)", "Blue (B02)", "NDVI", "NDBI"],
+        "input_channels": [
+            "Red (B04 proxy / EOX R)",
+            "Green (B03 proxy / EOX G)",
+            "Blue (B02 proxy / EOX B)",
+            "Excess-Green Index (NDVI proxy)",
+            "Red/Green Bareness Index (NDBI proxy)",
+        ],
         "loss_formulation": "Combined Binary Cross-Entropy + Soft Dice Loss",
         "benchmark_accuracy": {
-            "dataset": "LEVIR-CD & OSCD Sentinel-2",
-            "f1_score": 0.891,
-            "iou": 0.824,
-            "precision": 0.913,
-            "recall": 0.870,
+            "dataset": "OSCD Sentinel-2 Held-Out Test Split (10 cities, 3.08M pixels)",
+            "f1_score": 0.4025,
+            "iou": 0.2519,
+            "precision": 0.4796,
+            "recall": 0.3467,
+            "false_positive_rate": 0.0205,
+            "ece": 0.0875,
         },
         "threshold_tau": clamped_tau,
+        "checkpoint": "siamese_unet_oscd_m1.pt",
     }
 
     return (

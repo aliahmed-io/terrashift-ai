@@ -1,6 +1,6 @@
 import { type NextRequest } from "next/server";
 import { z } from "zod";
-import { calculatePolygonAreaKm2 } from "@/lib/tiles";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
         threshold,
         min_area_m2: minAreaM2,
       }),
-      signal: AbortSignal.timeout(3500),
+      signal: AbortSignal.timeout(30000),
     });
 
     if (mlRes.ok && mlRes.body) {
@@ -84,154 +84,26 @@ export async function POST(req: NextRequest) {
         },
       });
     }
-  } catch {
-    // Fall through to deterministic SSE stream fallback
+  } catch (err) {
+    const errorMsg =
+      err instanceof Error && err.name === "TimeoutError"
+        ? "Analysis request timed out while downloading satellite imagery."
+        : "Inference backend is currently unreachable. Please start the Python service on port 8000.";
+
+    return new Response(
+      `data: ${JSON.stringify({ error: { code: "SERVICE_UNAVAILABLE", message: errorMsg } })}\n\n`,
+      {
+        status: 503,
+        headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+      },
+    );
   }
 
-  const areaKm2 = Math.max(1.2, calculatePolygonAreaKm2(polygon));
-  const totalAreaM2 = Math.round(areaKm2 * 1_000_000);
-  const spanFactor = Math.max(0.25, (yearT2 - yearT1) / 6);
-  const threshFactor = Math.max(0.6, 1.0 + (0.5 - threshold) * 0.65);
-  const changePct = Number((12.9 * spanFactor * threshFactor).toFixed(2));
-  const changedAreaM2 = Math.round(totalAreaM2 * (changePct / 100));
-
-  const lons = polygon.map((p) => p[0]);
-  const lats = polygon.map((p) => p[1]);
-  const minLon = Math.min(...lons);
-  const maxLon = Math.max(...lons);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const dLon = maxLon - minLon;
-  const dLat = maxLat - minLat;
-
-  const features = [
+  return new Response(
+    `data: ${JSON.stringify({ error: { code: "BACKEND_ERROR", message: "Inference service returned a non-200 response." } })}\n\n`,
     {
-      type: "Feature" as const,
-      geometry: {
-        type: "Polygon" as const,
-        coordinates: [
-          [
-            [minLon + dLon * 0.18, minLat + dLat * 0.22],
-            [minLon + dLon * 0.46, minLat + dLat * 0.22],
-            [minLon + dLon * 0.46, minLat + dLat * 0.54],
-            [minLon + dLon * 0.18, minLat + dLat * 0.54],
-            [minLon + dLon * 0.18, minLat + dLat * 0.22],
-          ],
-        ],
-      },
-      properties: {
-        area_m2: Math.round(changedAreaM2 * 0.64),
-        confidence: 0.964,
-        change_type: "urban_expansion",
-        mean_ndvi_delta: -0.184,
-        mean_ndbi_delta: 0.442,
-      },
+      status: 502,
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
     },
-    {
-      type: "Feature" as const,
-      geometry: {
-        type: "Polygon" as const,
-        coordinates: [
-          [
-            [minLon + dLon * 0.54, minLat + dLat * 0.34],
-            [minLon + dLon * 0.78, minLat + dLat * 0.34],
-            [minLon + dLon * 0.78, minLat + dLat * 0.68],
-            [minLon + dLon * 0.54, minLat + dLat * 0.68],
-            [minLon + dLon * 0.54, minLat + dLat * 0.34],
-          ],
-        ],
-      },
-      properties: {
-        area_m2: Math.round(changedAreaM2 * 0.19),
-        confidence: 0.938,
-        change_type: "vegetation_gain",
-        mean_ndvi_delta: 0.312,
-        mean_ndbi_delta: -0.195,
-      },
-    },
-    {
-      type: "Feature" as const,
-      geometry: {
-        type: "Polygon" as const,
-        coordinates: [
-          [
-            [minLon + dLon * 0.25, minLat + dLat * 0.64],
-            [minLon + dLon * 0.48, minLat + dLat * 0.64],
-            [minLon + dLon * 0.48, minLat + dLat * 0.84],
-            [minLon + dLon * 0.25, minLat + dLat * 0.84],
-            [minLon + dLon * 0.25, minLat + dLat * 0.64],
-          ],
-        ],
-      },
-      properties: {
-        area_m2: Math.round(changedAreaM2 * 0.17),
-        confidence: 0.912,
-        change_type: "bare_soil_clearing",
-        mean_ndvi_delta: -0.095,
-        mean_ndbi_delta: 0.285,
-      },
-    },
-  ];
-
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    start(controller) {
-      const stages = [
-        { progress: 25, stage: `Querying Sentinel-2 L2A STAC Catalog (${yearT1} vs ${yearT2})...` },
-        { progress: 60, stage: "Running 10-Band Siamese ResUNet Spectral Inference..." },
-        { progress: 90, stage: "Vectorizing Connected-Component Footprints (EPSG:32638)..." },
-      ];
-      for (const s of stages) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(s)}\n\n`));
-      }
-      const finalPayload = {
-        progress: 100,
-        stage: "Complete",
-        result: {
-          change_percentage: changePct,
-          changed_area_m2: changedAreaM2,
-          total_area_m2: totalAreaM2,
-          polygon_count: features.length,
-          mean_confidence: 0.962,
-          dominant_change_type: "urban_expansion",
-          threshold_used: threshold,
-          mean_ndvi_delta: -0.142,
-          mean_ndbi_delta: 0.38,
-          uncertainty_margin_pct: 1.4,
-          processing_time_ms: 412,
-          epsg_code: 32638,
-          scene_t1: {
-            scene_id: `S2A_38RMV_${yearT1}0614_0_L2A`,
-            datetime: `${yearT1}-06-14T07:36:12Z`,
-            cloud_cover: 0.18,
-            platform: "Sentinel-2A",
-            epsg: 32638,
-            bands_used: ["B02", "B03", "B04", "B08", "B11", "B12"],
-          },
-          scene_t2: {
-            scene_id: `S2B_38RMV_${yearT2}0614_0_L2A`,
-            datetime: `${yearT2}-06-14T07:36:12Z`,
-            cloud_cover: 0.12,
-            platform: "Sentinel-2B",
-            epsg: 32638,
-            bands_used: ["B02", "B03", "B04", "B08", "B11", "B12"],
-          },
-          geojson: {
-            type: "FeatureCollection",
-            features,
-          },
-        },
-      };
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify(finalPayload)}\n\n`));
-      controller.close();
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-    },
-  });
+  );
 }

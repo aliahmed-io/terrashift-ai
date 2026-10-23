@@ -62,7 +62,8 @@ export async function POST(req: NextRequest) {
     gross_emissions_tco2e: grossEmissions,
     gross_sequestration_tco2e: grossSequestration,
     net_balance_tco2e: netBalance,
-    uncertainty_95_tco2e: Math.round(Math.abs(netBalance) * 0.115),
+    uncertainty_range_pct: 30,
+    uncertainty_tco2e: Math.round(Math.abs(netBalance) * 0.30),
     social_cost_usd_millions: socialCost,
     voluntary_credit_value_usd_millions: vcmValue,
     carbon_price_used_usd: priceUsd,
@@ -72,7 +73,12 @@ export async function POST(req: NextRequest) {
     surface_temp_delta_c: Number(((disturbedHa * 0.008 - greeningHa * 0.0044)).toFixed(2)),
     albedo_shift: -0.064,
     evapotranspiration_delta_mm_yr: 412.5,
-    uhi_risk_level: netBalance < 0 ? "Mitigated (-3.8°C Cooling)" : "Elevated (+2.9°C UHI)",
+    uhi_risk_level: netBalance < 0 ? "Mitigated (-3.8°C Empirical Proxy)" : "Elevated (+2.9°C Empirical Proxy)",
+    methodology: {
+      tier: "IPCC Tier-1 Biome Default Factors",
+      uncertainty: "±30% default variance for regional Tier-1 tables",
+      sensor_note: "Delta LST is an empirical biophysical proxy derived from NDBI and NDVI indices scaled by biome sensitivity; not direct satellite thermal radiometry.",
+    },
     pools: [
       {
         pool_name: "Aboveground Biomass (AGB)",

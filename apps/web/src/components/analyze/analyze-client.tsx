@@ -120,7 +120,11 @@ export function AnalyzeClient() {
                 const payload = JSON.parse(line.slice(6)) as {
                   stage?: string;
                   result?: { change_percentage?: number };
+                  error?: { code?: string; message?: string };
                 };
+                if (payload.error?.message) {
+                  setStatusMessage(`Notice: ${payload.error.message}`);
+                }
                 if (payload.stage) {
                   setStatusMessage(payload.stage);
                 }
@@ -133,7 +137,7 @@ export function AnalyzeClient() {
         }
       }
     } catch {
-      setStatusMessage("Verified against cached Sentinel-2 composite.");
+      setStatusMessage("Inference stream disconnected.");
     } finally {
       setIsRunning(false);
     }

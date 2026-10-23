@@ -1,0 +1,100 @@
+{
+  "benchmark_name": "OSCD (Onera Satellite Change Detection)",
+  "split": "test",
+  "scenes_count": 10,
+  "total_pixels": 3077936,
+  "change_pixels": 159077,
+  "timestamp": "2026-10-22T23:29:27Z",
+  "results": [
+    {
+      "model_name": "Statistical Spectral Baseline",
+      "parameters": 0,
+      "f1": 0.3739,
+      "iou": 0.23,
+      "precision": 0.365,
+      "recall": 0.3834,
+      "false_positive_rate": 0.0363,
+      "ece": 0.0483,
+      "brier_score": 0.0509,
+      "avg_latency_ms": 62.3,
+      "confusion": {
+        "tp": 60983,
+        "fp": 106099,
+        "fn": 98094,
+        "tn": 2812760
+      }
+    },
+    {
+      "model_name": "M0 (Untrained Siamese U-Net)",
+      "parameters": 2102145,
+      "f1": 0.0983,
+      "iou": 0.0517,
+      "precision": 0.0517,
+      "recall": 1.0,
+      "false_positive_rate": 1.0,
+      "ece": 0.445,
+      "brier_score": 0.2471,
+      "avg_latency_ms": 696.0,
+      "confusion": {
+        "tp": 159077,
+        "fp": 2918859,
+        "fn": 0,
+        "tn": 0
+      }
+    },
+    {
+      "model_name": "M0 + Statistical (60/40 Fusion)",
+      "parameters": 2102145,
+      "f1": 0.3755,
+      "iou": 0.2312,
+      "precision": 0.3391,
+      "recall": 0.4207,
+      "false_positive_rate": 0.0447,
+      "ece": 0.2864,
+      "brier_score": 0.1236,
+      "avg_latency_ms": 702.0,
+      "confusion": {
+        "tp": 66927,
+        "fp": 130451,
+        "fn": 92150,
+        "tn": 2788408
+      }
+    },
+    {
+      "model_name": "M1 (Trained Siamese U-Net)",
+      "parameters": 2102145,
+      "f1": 0.3699,
+      "iou": 0.2269,
+      "precision": 0.4805,
+      "recall": 0.3007,
+      "false_positive_rate": 0.0177,
+      "ece": 0.1137,
+      "brier_score": 0.0528,
+      "avg_latency_ms": 684.4,
+      "confusion": {
+        "tp": 47837,
+        "fp": 51717,
+        "fn": 111240,
+        "tn": 2867142
+      }
+    },
+    {
+      "model_name": "M1 + Statistical Fusion",
+      "parameters": 2102145,
+      "f1": 0.4025,
+      "iou": 0.2519,
+      "precision": 0.4796,
+      "recall": 0.3467,
+      "false_positive_rate": 0.0205,
+      "ece": 0.0875,
+      "brier_score": 0.0467,
+      "avg_latency_ms": 702.4,
+      "confusion": {
+        "tp": 55155,
+        "fp": 59859,
+        "fn": 103922,
+        "tn": 2859000
+      }
+    }
+  ]
+}

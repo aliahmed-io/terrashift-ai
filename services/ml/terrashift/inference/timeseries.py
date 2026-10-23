@@ -98,10 +98,10 @@ def run_timeseries_study(polygon: List[List[float]]) -> Dict[str, Any]:
         else:
             det, _ = detect_change(base_rgb, rgb, valid)
             changed_Ratio = float(np.sum(det.mask)) / valid_count
-            # Ensure monotonic cumulative progression across time-series
+            # Cumulative urban change footprint envelope
             prev_km2 = cum_km2_series[-1] if cum_km2_series else 0.0
             raw_km2 = changed_Ratio * aoi_km2
-            changed_km2 = round(max(raw_km2, prev_km2 * 1.08), 3)
+            changed_km2 = round(max(raw_km2, prev_km2), 3)
             changed_pct = round(min((changed_km2 / aoi_km2) * 100.0, 95.0), 2)
             latest_mask = det.mask
             latest_prob = det.probability
@@ -142,13 +142,13 @@ def run_timeseries_study(polygon: List[List[float]]) -> Dict[str, Any]:
         "breakpoint_year": breakpoint_year,
         "peak_velocity_km2_yr": round(max_vel, 3),
         "mosum_statistic": mosum_stat,
-        "confidence_level": 0.95,
-        "significance_p": 0.012 if mosum_stat > 1.25 else 0.041,
+        "structural_break_detected": bool(mosum_stat > 1.35),
         "dominant_driver": (
-            "Rapid Vegetation Clearing (ΔNDVI Drop)"
+            "Vegetation Clearing / Canopy Loss (ΔNDVI Drop)"
             if (ndvi_series[-1] - ndvi_series[0]) < -0.02
             else "Urban & Impervious Surface Expansion (ΔNDBI Surge)"
         ),
+        "detection_method": "Multi-temporal annual velocity MOSUM ratio proxy (Verbesselt et al.)",
     }
 
     # -------------------------------------------------------------------------
@@ -207,9 +207,10 @@ def run_timeseries_study(polygon: List[List[float]]) -> Dict[str, Any]:
         "forecasts": forecasts,
         "regression_slope_km2_yr": round(slope, 3),
         "forecast_grid": forecast_grid,
+        "projection_model": "Linear expansion rate + morphological dilation scenario (exploratory)",
         "reference": {
             "repo": "diku-dk/bfast",
             "url": "https://github.com/diku-dk/bfast",
-            "algorithm": "BFASTmonitor (Breaks For Additive Season and Trend) + Morphological Contagion",
+            "algorithm": "Annual velocity MOSUM + Morphological dilation scenario (exploratory)",
         },
     }
