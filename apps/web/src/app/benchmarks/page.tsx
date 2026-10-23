@@ -59,43 +59,43 @@ export default function BenchmarksPage() {
 
   const cards = [
     {
-      title: models?.[0]?.name ?? "Siamese ResUNet-10ch",
-      sub: "Attention Posterior",
+      title: models?.[0]?.name ?? "M1 Siamese U-Net + Fusion",
+      sub: "Calibrated Attention Posterior",
       img: models?.[0]?.heatmap_b64 ?? getRasterUrl("magma", tau),
-      left: `${formatComma((models?.[0]?.f1_score ?? 0.914) * (0.97 + temporalModifier * 0.03), 3)} F1`,
-      right: `${formatComma((models?.[0]?.iou_score ?? 0.842) * 100, 1)} %`,
+      left: `${formatComma(models?.[0]?.f1_score ?? 0.403, 3)} F1`,
+      right: `${formatComma((models?.[0]?.iou_score ?? 0.252) * 100, 1)} % IoU`,
     },
     {
-      title: models?.[1]?.name ?? "Bi-Temporal ΔNDBI",
-      sub: "SWIR Built-Up Index",
+      title: models?.[1]?.name ?? "Statistical Spectral Baseline",
+      sub: "Median / MAD Spectral Delta",
       img: models?.[1]?.heatmap_b64 ?? getRasterUrl("ndbi", tau),
-      left: `${formatComma((models?.[1]?.f1_score ?? 0.861) * (0.97 + temporalModifier * 0.03), 3)} F1`,
-      right: `${formatComma((models?.[1]?.iou_score ?? 0.756) * 100, 1)} %`,
+      left: `${formatComma(models?.[1]?.f1_score ?? 0.374, 3)} F1`,
+      right: `${formatComma((models?.[1]?.iou_score ?? 0.230) * 100, 1)} % IoU`,
     },
     {
-      title: models?.[2]?.name ?? "NIR Chlorophyll",
-      sub: "Vegetation Composite",
+      title: models?.[2]?.name ?? "M1 Supervised Siamese U-Net",
+      sub: "Dual-Branch Learned Weights",
       img: models?.[2]?.heatmap_b64 ?? getRasterUrl("nir", tau),
-      left: `${formatComma((models?.[2]?.f1_score ?? 0.838) * (0.97 + temporalModifier * 0.03), 3)} F1`,
-      right: `${formatComma((models?.[2]?.iou_score ?? 0.721) * 100, 1)} %`,
+      left: `${formatComma(models?.[2]?.f1_score ?? 0.370, 3)} F1`,
+      right: `${formatComma((models?.[2]?.iou_score ?? 0.227) * 100, 1)} % IoU`,
     },
     {
-      title: models?.[3]?.name ?? "Ground-Truth Audit",
-      sub: "Pixel Error Map",
+      title: models?.[3]?.name ?? "M0 Untrained Baseline",
+      sub: "Random Initialization Baseline",
       img: models?.[3]?.heatmap_b64 ?? getRasterUrl("confusion", tau),
-      left: `${formatComma((models?.[3]?.precision ?? 0.938) * (0.97 + temporalModifier * 0.03), 3)} Prec`,
-      right: `${formatComma((models?.[3]?.iou_score ?? 0.892) * 100, 1)} %`,
+      left: `${formatComma(models?.[3]?.f1_score ?? 0.098, 3)} F1`,
+      right: `${formatComma((models?.[3]?.iou_score ?? 0.052) * 100, 1)} % IoU`,
     },
   ];
 
   // Operating point marker along the PR curve driven by tau
   const prPoints: Record<string, { x: number; y: number; f1: number }> = {
-    "0.35": { x: 455, y: 78, f1: 0.902 },
-    "0.45": { x: 375, y: 46, f1: 0.914 },
-    "0.55": { x: 265, y: 36, f1: 0.908 },
-    "0.65": { x: 165, y: 31, f1: 0.891 },
+    "0.35": { x: 455, y: 78, f1: 0.385 },
+    "0.45": { x: 375, y: 46, f1: 0.403 },
+    "0.55": { x: 265, y: 36, f1: 0.372 },
+    "0.65": { x: 165, y: 31, f1: 0.310 },
   };
-  const pt = prPoints[tau.toFixed(2)] ?? { x: 375, y: 46, f1: 0.914 };
+  const pt = prPoints[tau.toFixed(2)] ?? { x: 375, y: 46, f1: 0.403 };
   const markerX = pt.x;
   const markerY = pt.y;
   const activeF1 = pt.f1;

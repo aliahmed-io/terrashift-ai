@@ -65,8 +65,8 @@ const DEFAULT_OBJECTS: LabObjectRow[] = [
 export default function LabPage() {
   const { activeCorridor, activeYear, activeMonth, temporalModifier, getRasterUrl } = useAoi();
   const [objects, setObjects] = useState<LabObjectRow[]>(DEFAULT_OBJECTS);
-  const [f1Score, setF1Score] = useState<string>("0,934 F1");
-  const [iouScore, setIouScore] = useState<string>("87,6 % IoU");
+  const [f1Score, setF1Score] = useState<string>("0,403 F1 (OSCD)");
+  const [iouScore, setIouScore] = useState<string>("25,2 % IoU (OSCD)");
   const [customImg1, setCustomImg1] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -84,19 +84,22 @@ export default function LabPage() {
       .then(
         (
           data: {
-            validation?: { f1_score?: number; iou_score?: number };
+            validation?: { has_ground_truth?: boolean; f1_score?: number; iou_score?: number };
           } | null
         ) => {
           if (!cancelled && data?.validation) {
-            if (data.validation.f1_score) {
+            if (data.validation.has_ground_truth && data.validation.f1_score) {
               setF1Score(
                 `${data.validation.f1_score.toFixed(3).replace(".", ",")} F1`
               );
-            }
-            if (data.validation.iou_score) {
-              setIouScore(
-                `${(data.validation.iou_score * 100).toFixed(1).replace(".", ",")} % IoU`
-              );
+              if (data.validation.iou_score) {
+                setIouScore(
+                  `${(data.validation.iou_score * 100).toFixed(1).replace(".", ",")} % IoU`
+                );
+              }
+            } else if (!data.validation.has_ground_truth) {
+              setF1Score("P ≥ 0,45 τ");
+              setIouScore("Operational (No GT)");
             }
           }
         }

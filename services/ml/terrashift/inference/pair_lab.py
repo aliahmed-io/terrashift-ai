@@ -90,14 +90,58 @@ def _render_confusion_map(
 
 def _build_benchmark_sample(
     sample_id: str, size: int = 256
-) -> Tuple[NDArray[np.uint8], NDArray[np.uint8], NDArray[np.bool_], Dict[str, str]]:
-    """Fetch real multi-temporal Sentinel-2 tiles with curated Ground-Truth change masks."""
+) -> Tuple[NDArray[np.uint8], NDArray[np.uint8], Optional[NDArray[np.bool_]], Dict[str, str]]:
+    """Fetch real multi-temporal Sentinel-2 tiles. Provides authentic ground-truth for OSCD benchmarks."""
     from terrashift.acquisition.tiles import fetch_tile
+
+    if sample_id.startswith("oscd"):
+        try:
+            from terrashift.benchmark.oscd import load_oscd_split
+
+            scenes = load_oscd_split("test")
+            scene_idx = 0
+            if "3" in sample_id and len(scenes) > 3:
+                scene_idx = 3
+            elif "2" in sample_id and len(scenes) > 2:
+                scene_idx = 2
+            elif "1" in sample_id and len(scenes) > 1:
+                scene_idx = 1
+            scene = scenes[scene_idx]
+            h, w = scene.height, scene.width
+            ch = min(h, size)
+            cw = min(w, size)
+            ys, xs = np.where(scene.gt_mask)
+            if len(ys) > 0:
+                cy, cx = int(np.mean(ys)), int(np.mean(xs))
+                y0 = max(0, min(cy - ch // 2, h - ch))
+                x0 = max(0, min(cx - cw // 2, w - cw))
+            else:
+                y0, x0 = 0, 0
+            rgb1 = scene.t1_rgb[y0 : y0 + ch, x0 : x0 + cw]
+            rgb2 = scene.t2_rgb[y0 : y0 + ch, x0 : x0 + cw]
+            gt = scene.gt_mask[y0 : y0 + ch, x0 : x0 + cw]
+            if ch != size or cw != size:
+                rgb1 = np.asarray(Image.fromarray(rgb1).resize((size, size)), dtype=np.uint8)
+                rgb2 = np.asarray(Image.fromarray(rgb2).resize((size, size)), dtype=np.uint8)
+                gt = np.asarray(
+                    Image.fromarray(gt.astype(np.uint8)).resize(
+                        (size, size), Image.Resampling.NEAREST
+                    ),
+                    dtype=bool,
+                )
+            meta = {
+                "title": f"OSCD Benchmark · Test Scene {scene.scene_id}",
+                "dataset": "OSCD (Onera Satellite Change Detection)",
+                "resolution": "10m Multispectral (256×256 Patch)",
+            }
+            return rgb1, rgb2, gt, meta
+        except Exception:
+            pass
 
     sample_specs = {
         "saudi_neom_4": {
             "title": "Vision 2030 · NEOM The Line Infrastructure Corridor",
-            "dataset": "Sentinel-2 L2A (10m) True Color",
+            "dataset": "Sentinel-2 L2A (10m) True Color (Operational)",
             "resolution": "10m Multispectral (256×256 Patch)",
             "y1": 2018,
             "y2": 2024,
@@ -105,19 +149,9 @@ def _build_benchmark_sample(
             "x": 2447,
             "y": 1714,
         },
-        "oscd_deforestation_3": {
-            "title": "OSCD Benchmark · Rondônia Tropical Forest Clearing",
-            "dataset": "OSCD (Onera Satellite Change Detection)",
-            "resolution": "10m Multispectral (256×256 Patch)",
-            "y1": 2018,
-            "y2": 2024,
-            "z": 12,
-            "x": 1332,
-            "y": 2165,
-        },
         "levir_industrial_2": {
-            "title": "LEVIR-CD #2 · Dubai Industrial & Urban Expansion",
-            "dataset": "LEVIR-CD Multi-Temporal Benchmark",
+            "title": "Dubai Industrial & Urban Expansion",
+            "dataset": "Sentinel-2 Multi-Temporal (Operational)",
             "resolution": "10m Multispectral (256×256 Patch)",
             "y1": 2017,
             "y2": 2024,
@@ -126,8 +160,8 @@ def _build_benchmark_sample(
             "y": 1768,
         },
         "levir_urban_1": {
-            "title": "LEVIR-CD #1 · Riyadh ROSHN Urban Subdivision",
-            "dataset": "LEVIR-CD Building Benchmark",
+            "title": "Riyadh ROSHN Sedra Urban Subdivision",
+            "dataset": "Sentinel-2 L2A (10m) (Operational)",
             "resolution": "10m Multispectral (256×256 Patch)",
             "y1": 2018,
             "y2": 2024,
@@ -145,20 +179,13 @@ def _build_benchmark_sample(
             rgb1 = np.asarray(Image.fromarray(rgb1).resize((size, size)), dtype=np.uint8)
             rgb2 = np.asarray(Image.fromarray(rgb2).resize((size, size)), dtype=np.uint8)
     except Exception:
-        # High-detail structured procedural fallback
         rng = np.random.default_rng(seed=101)
         rgb1 = (rng.normal(120, 30, (size, size, 3))).clip(0, 255).astype(np.uint8)
         rgb2 = rgb1.copy()
         rgb2[50:180, 50:180] = (rgb2[50:180, 50:180] * 0.4 + [180, 50, 40]).clip(0, 255).astype(np.uint8)
 
-    # Ground-truth reference mask curated from calibrated multi-spectral change consensus
-    det_ref, _ = detect_change(rgb1, rgb2, np.ones((size, size), dtype=bool), threshold=0.50)
-    gt = det_ref.mask.copy()
-    if not np.any(gt):
-        a_f = rgb1.astype(np.float32) / 255.0
-        b_f = rgb2.astype(np.float32) / 255.0
-        diff = np.sqrt(np.sum((b_f - a_f) ** 2, axis=-1))
-        gt = diff > np.percentile(diff, 90)
+    # Operational scene: no human-annotated ground-truth mask exists (avoids circular self-evaluation)
+    gt = None
 
     meta = {
         "title": spec["title"],
@@ -249,6 +276,11 @@ def run_pair_lab_analysis(
             "f1_score": round(float(f1), 3),
             "iou": round(float(iou), 3),
             "confusion_map_base64": _encode_base64_png(_render_confusion_map(det.mask, gt_mask)),
+        }
+    else:
+        ground_truth_eval = {
+            "has_ground_truth": False,
+            "note": "Operational scene: ground-truth change labels not available. For audited scores, evaluate against official OSCD benchmark test scenes.",
         }
 
     return {

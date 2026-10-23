@@ -311,6 +311,25 @@ def run_carbon_flux_analysis(
             "mean_lst_shift_c": mean_lst_shift_c,
             "peak_hotspot_c": peak_hotspot_c,
             "cooling_island_c": cooling_island_c,
+            "sensor_type": "Empirical Biophysical Proxy (Sentinel-2 MSI derived; not direct thermal radiometry)",
+        },
+        "uncertainty_range_pct": 30.0,
+        "gross_emissions_range_tco2e": [
+            round(gross_emissions_tco2e * 0.70, 1),
+            round(gross_emissions_tco2e * 1.30, 1),
+        ],
+        "net_flux_range_tco2e": [
+            round(net_flux_tco2e * 0.70, 1),
+            round(net_flux_tco2e * 1.30, 1),
+        ],
+        "methodology": {
+            "tier": "IPCC Tier-1 (Biome-averaged default biomass parameters)",
+            "standards": [
+                "IPCC 2006/2019 Guidelines for National GHG Inventories",
+                "WRI Global Forest Watch Carbon Model (Harris et al. 2021)",
+            ],
+            "uncertainty_rationale": "Default Tier-1 biome lookup tables exhibit typical ±30% to ±50% variance without localized field plot allometry or LiDAR canopy height models.",
+            "lst_note": "Delta LST is an empirical biophysical proxy derived from NDBI and NDVI indices scaled by biome sensitivity. Sentinel-2 does not carry a thermal radiometer (TIRS); true radiometry requires Landsat-8/9 TIRS or ECOSTRESS.",
         },
         "pools": pools,
         "flux_map_base64": _encode_png(flux_map),

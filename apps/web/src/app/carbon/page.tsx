@@ -16,7 +16,7 @@ function formatComma(num: number, decimals = 1): string {
 }
 
 export default function CarbonPage() {
-  const { activeCorridor, activeYear, activeMonth, temporalModifier, getRasterUrl } = useAoi();
+  const { activeCorridor, temporalModifier, getRasterUrl } = useAoi();
   const [biome, setBiome] = useState<string>("arid_afforestation");
   const [priceUsd, setPriceUsd] = useState<number>(35);
   const [netSinkTco2e, setNetSinkTco2e] = useState<number>(-142800);
@@ -119,19 +119,19 @@ export default function CarbonPage() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-[16px] font-semibold text-[#1c1f23]">
-                Spatial Carbon Flux &amp; Surface Thermal Shift (ΔLST)
+                Spatial Carbon Flux &amp; Thermal Shift (ΔLST Proxy)
               </h2>
               <p className="text-[12px] text-[#8c929c]">
-                Wadi Hanifah &amp; Green Riyadh Canopy Sinks vs Corridor Grading ({activeMonth} {activeYear})
+                Wadi Hanifah &amp; Green Riyadh Canopy Sinks vs Corridor Grading (IPCC Tier-1 ±30%)
               </p>
             </div>
             <button
               type="button"
               onClick={cycleBiome}
-              title="Click to cycle IPCC biome tier"
+              title="Click to cycle IPCC biome tier (Tier-1 default ±30% uncertainty)"
               className="text-[12px] font-semibold text-[#22b567] hover:opacity-80 transition-opacity cursor-pointer"
             >
-              IPCC Tier-1 Verified
+              IPCC Tier-1 (±30% Est.)
             </button>
           </div>
 

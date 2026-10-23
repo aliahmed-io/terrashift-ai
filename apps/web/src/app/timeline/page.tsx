@@ -20,7 +20,7 @@ export default function TimelinePage() {
   const { activeCorridor, activeYear, activeMonth, temporalModifier, getRasterUrl } = useAoi();
   const [series, setSeries] = useState<TimeseriesPoint[] | null>(null);
   const [forecast, setForecast] = useState<ForecastPoint[] | null>(null);
-  const [alignmentScore, setAlignmentScore] = useState<number>(104.2);
+  const [scenarioLabel, setScenarioLabel] = useState<string>("Exploratory Scenario");
 
   useEffect(() => {
     let cancelled = false;
@@ -39,14 +39,14 @@ export default function TimelinePage() {
           data: {
             series?: TimeseriesPoint[];
             forecast?: ForecastPoint[];
-            vision_2030_alignment_score?: number;
+            forecast_mode?: string;
           } | null
         ) => {
           if (!cancelled && data) {
             if (data.series) setSeries(data.series);
             if (data.forecast) setForecast(data.forecast);
-            if (data.vision_2030_alignment_score) {
-              setAlignmentScore(data.vision_2030_alignment_score);
+            if (data.forecast_mode) {
+              setScenarioLabel("Exploratory Scenario");
             }
           }
         }
@@ -141,7 +141,7 @@ export default function TimelinePage() {
                 BFAST Structural Breakpoint &amp; 2030 Forecast
               </h2>
               <p className="text-[12px] text-[#8c929c] mt-0.5">
-                OLS-MOSUM Breakpoint at 2021-Q3 (p &lt; 0,0001) · {activeCorridor.name} ({activeMonth} {activeYear})
+                Annual Velocity Breakpoint at 2021 (MOSUM ratio 3.1) · {activeCorridor.name} ({activeMonth} {activeYear})
               </p>
             </div>
             <div className="flex items-center gap-5 text-[12px] font-medium text-[#5c626b]">
@@ -263,7 +263,7 @@ export default function TimelinePage() {
                 </p>
               </div>
               <span className="text-[12px] font-medium text-[#22b567]">
-                {alignmentScore.toFixed(1).replace(".", ",")} % On-Target
+                {scenarioLabel} · Linear Trend
               </span>
             </div>
             <div className="relative flex-1 rounded-[14px] overflow-hidden min-h-0">

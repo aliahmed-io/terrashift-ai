@@ -144,12 +144,20 @@ def test_ablation_study_returns_4_models_and_xai_stages() -> None:
 
 def test_pair_lab_endpoint_evaluates_ground_truth() -> None:
     client = TestClient(app)
-    res = client.post("/v1/lab/analyze", json={"sample_id": "levir_urban_1"})
+    # 1. Benchmark sample with verified ground truth
+    res = client.post("/v1/lab/analyze", json={"sample_id": "oscd_deforestation_3"})
     assert res.status_code == 200
     data = res.json()
     assert data["blob_count"] >= 1
     assert data["ground_truth_eval"]["has_ground_truth"] is True
-    assert data["ground_truth_eval"]["f1_score"] > 0.85
+    assert data["ground_truth_eval"]["f1_score"] > 0.0
+
+    # 2. Operational scene without ground truth (no circular evaluation)
+    res_op = client.post("/v1/lab/analyze", json={"sample_id": "levir_urban_1"})
+    assert res_op.status_code == 200
+    data_op = res_op.json()
+    assert data_op["blob_count"] >= 1
+    assert data_op["ground_truth_eval"]["has_ground_truth"] is False
 
 
 def test_carbon_flux_endpoint_computes_pools_and_uhi(monkeypatch: pytest.MonkeyPatch) -> None:
