@@ -24,6 +24,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.pdfgen import canvas
 from reportlab.platypus import (
     HRFlowable,
+    Image,
     KeepTogether,
     PageBreak,
     Paragraph,
@@ -35,6 +36,8 @@ from reportlab.platypus import (
 
 ROOT = Path(__file__).resolve().parent.parent
 LATEX_DIR = ROOT / "reports" / "senior_project" / "latex"
+FIG_DIR = ROOT / "reports" / "senior_project" / "figures"
+DIAG_DIR = ROOT / "reports" / "visual_diagnostics"
 OUTPUT_PDF = ROOT / "reports" / "senior_project" / "TerraShift_Senior_Project_Report.pdf"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -52,6 +55,7 @@ from report_data import (
     DEPLOYMENT_ENV_ROWS,
     DEPLOYMENT_PREREQS_ROWS,
     JEDDAH_CASE_STUDY_ROWS,
+    LOCALIZATION_SENSITIVITY_ROWS,
     RIYADH_CASE_STUDY_ROWS,
     SSE_STATE_TRANSITIONS_ROWS,
     VERIFICATION_CHECKLIST_ROWS,
@@ -582,6 +586,35 @@ def create_styled_table(rows: list[list[str]], styles, col_widths: list[float] |
     return t
 
 
+def create_figure_plate(img_path: Path, caption: str, styles, max_width: float = 485.0, max_height: float = 230.0) -> list:
+    """Embed a high-resolution PNG figure with aspect-preserving scaling and formal academic caption."""
+    if not img_path.exists():
+        return []
+    from PIL import Image as PILImage
+    with PILImage.open(img_path) as im:
+        w, h = im.size
+    scale = min(max_width / max(w, 1), max_height / max(h, 1))
+    disp_w = w * scale
+    disp_h = h * scale
+    rl_img = Image(str(img_path), width=disp_w, height=disp_h)
+    rl_img.hAlign = "CENTER"
+    cap_p = Paragraph(clean_latex_math(caption), styles["TableCaption"])
+    box = Table([[rl_img], [cap_p]], colWidths=[487])
+    box.setStyle(
+        TableStyle(
+            [
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FAFBFD")),
+                ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#CBD5E1")),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    return [Spacer(1, 6), KeepTogether([box]), Spacer(1, 8)]
+
+
 def render_defense_qa_section(qa_pairs: list[tuple[str, str]], styles) -> list:
     """Render the 10 senior project defense questions and answers as styled cards."""
     elements = []
@@ -625,11 +658,11 @@ def render_defense_qa_section(qa_pairs: list[tuple[str, str]], styles) -> list:
 CHAPTER_OVERVIEWS = {
     1: (
         "Chapter 1 Executive Overview: Problem Statement, Research Question, and Vision 2030 Foundations",
-        "This opening chapter establishes the operational and scientific context of TerraShift AI within the ambitious framework of Saudi Vision 2030 and the Saudi Green Initiative. We examine the extreme remote sensing challenges imposed by hyper-arid desert terrain—including extreme solar zenith shifts, low dynamic contrast between regolith and concrete, and sabkha moisture fluctuations. We formalize the central research question: Can a trained deep-learning change detector, when fused with physical spectral guards or foundation embeddings, reliably distinguish real urban and agricultural changes from desert background noise using modest CPU hardware? Finally, we articulate five rigorous research objectives and define the Senior Project Defense Readiness Gate Matrix.",
+        "This opening chapter establishes the operational and scientific context of TerraShift AI within the ambitious framework of Saudi Vision 2030 and the Saudi Green Initiative. We examine the extreme remote sensing challenges imposed by hyper-arid desert terrain—including extreme solar zenith shifts, low dynamic contrast between regolith and concrete, and sabkha moisture fluctuations. We formalize the central research question: Can a physics-guided hybrid architecture combining bitemporal Siamese deep learning, Google AlphaEarth V1 foundation embeddings, and Sentinel-2 L2A physical spectral guards reliably distinguish real urban and agricultural changes from desert background noise using modest CPU hardware? Finally, we articulate five rigorous research objectives and define the Senior Project Defense Readiness Gate Matrix.",
     ),
     2: (
         "Chapter 2 Executive Overview: Classical Paradigms, Siamese Networks, and Foundation Models",
-        "This chapter surveys over four decades of remote sensing change detection literature, tracing the algorithmic lineage from classical univariate image differencing and Change Vector Analysis (CVA) to modern deep learning and foundation models. We contrast early-fusion versus late-fusion Siamese convolutional architectures (FC-Siam-diff, FC-Siam-conc) and examine the mathematical implications of weight sharing. We evaluate emerging planetary foundation models—specifically Google AlphaEarth 64-D annual embeddings and Dynamic World land-cover probabilities—as well as recent Chinese foundation architectures (SIGMAE, GenCD, CSD-Net, SEED, BTC). The chapter concludes with a 10-system literature comparison matrix and formalizes the three research gaps addressed by this thesis.",
+        "This chapter surveys over four decades of remote sensing change detection literature, tracing the algorithmic lineage from classical univariate image differencing and Change Vector Analysis (CVA) to modern deep learning and foundation models. We contrast early-fusion versus late-fusion Siamese convolutional architectures (FC-Siam-diff, FC-Siam-conc) and examine the mathematical implications of weight sharing. We evaluate emerging planetary foundation models—specifically Google AlphaEarth V1 64-D annual embeddings and Dynamic World V1 land-cover probabilities—as well as recent Chinese foundation architectures (SIGMAE, GenCD, CSD-Net, SEED, BTC). The chapter concludes with a 10-system literature comparison matrix and formalizes the three research gaps addressed by this thesis.",
     ),
     3: (
         "Chapter 3 Executive Overview: Stakeholder Requirements, Technical Specifications, and Readiness Gates",
@@ -637,27 +670,27 @@ CHAPTER_OVERVIEWS = {
     ),
     4: (
         "Chapter 4 Executive Overview: Sentinel-2 Multi-Spectral Data, Atmospheric Correction, and Ground Truth",
-        "This chapter details the data engineering pipelines feeding TerraShift AI. We analyze the 13 multispectral bands of the Copernicus Sentinel-2 MSI instrument, contrasting Level-1C Top-Of-Atmosphere (TOA) radiance against Level-2A Bottom-Of-Atmosphere (BOA) surface reflectance processed via Sen2Cor. We detail our Scene Classification Layer (SCL) quality filtering algorithm for snow, cloud, and cirrus removal. We describe the Earth Engine extraction pipeline for Google AlphaEarth 64-D latent embeddings and Dynamic World probability cubes. Finally, we formalize the Saudi Reference Benchmark Corridors: 91.19 km² across Riyadh, Jeddah, Al-Jouf, and held-out Al-Kharj, containing 19 independently annotated parcel-level events and 4 undisturbed negative control zones.",
+        "This chapter details the data engineering pipelines feeding TerraShift AI. We analyze the 13 multispectral bands of the Copernicus Sentinel-2 MSI instrument, contrasting Level-1C Top-Of-Atmosphere (TOA) radiance against Level-2A Bottom-Of-Atmosphere (BOA) surface reflectance processed via Sen2Cor. We detail our Scene Classification Layer (SCL) quality filtering algorithm for snow, cloud, and cirrus removal. We describe the authenticated Google Earth Engine extraction pipeline ('project=terrashift', allow_synthetic=False) for Google AlphaEarth V1 64-D latent embeddings and Dynamic World V1 probability cubes. Finally, we formalize the Saudi Reference Benchmark Corridors: 91.19 km² across Riyadh, Jeddah, Al-Jouf, and held-out Al-Kharj, containing 19 coarse parcel-level events and 4 undisturbed negative control zones.",
     ),
     5: (
         "Chapter 5 Executive Overview: Full-Stack Architecture, Streaming Inference, and CPU Optimization",
-        "This chapter outlines the complete full-stack architectural implementation of TerraShift AI. We present the microservices topology decoupling the Next.js 16 (App Router) presentation layer from the Python FastAPI machine learning engine. We formalize the Server-Sent Events (SSE) streaming pipeline delivering real-time progress telemetry across acquisition, inference, physical filtering, and polygonization stages. We detail our windowed STAC Cloud-Optimized GeoTIFF (COG) HTTP range reader that fetches sub-meter regional bounding boxes without transferring entire multi-gigabyte satellite granules. Finally, we provide hardware profiling proving pure compute execution of 0.495s and a peak RAM footprint of 301 MB on commodity CPU hardware.",
+        "This chapter outlines the complete full-stack architectural implementation of TerraShift AI. We present the microservices topology decoupling the Next.js 16 (App Router) presentation layer from the Python FastAPI machine learning engine. We formalize the Server-Sent Events (SSE) streaming pipeline delivering real-time progress telemetry across acquisition, inference, physical filtering, and polygonization stages. We detail our windowed STAC Cloud-Optimized GeoTIFF (COG) HTTP range reader that fetches sub-meter regional bounding boxes without transferring entire multi-gigabyte satellite granules. Finally, we provide hardware profiling proving pure compute execution of 1.485s and a peak RAM footprint of 301 MB on commodity CPU hardware.",
     ),
     6: (
         "Chapter 6 Executive Overview: Neural Network Architecture, AlphaEarth Models, and Spectral Guards",
-        "This chapter presents the mathematical formulation and neural network architecture of TerraShift AI. We derive the Siamese U-Net encoder-decoder network, detailing weight-shared convolutions and multi-scale skip feature difference concatenation. We formulate the compound loss function combining weighted Binary Cross-Entropy with Soft Dice Loss to conquer severe spatial class imbalance. We specify four AlphaEarth foundation model paradigms (Models A, B, C, D) and prove the geometric equivalence between cosine dissimilarity and squared Euclidean distance on the unit hypersphere. Finally, we formulate the directional physical spectral guard equations (ΔNDBI ≥ +0.04, |ΔNDVI| ≥ 0.10) that eliminate false alarms caused by regolith albedo drift.",
+        "This chapter presents the mathematical formulation and neural network architecture of TerraShift AI. We derive the Siamese U-Net encoder-decoder network, detailing weight-shared convolutions and multi-scale skip feature difference concatenation. We formulate the compound loss function combining weighted Binary Cross-Entropy with Soft Dice Loss to conquer severe spatial class imbalance. We specify the AlphaEarth V1 and Dynamic World V1 foundation model paradigms and prove the geometric equivalence between cosine dissimilarity and squared Euclidean distance on the unit hypersphere. Finally, we formulate the directional physical spectral guard equations (ΔNDBI ≥ +0.04, |ΔNDVI| ≥ 0.10) and exact WGS84 geodesic clipping that eliminate false alarms caused by regolith albedo drift.",
     ),
     7: (
-        "Chapter 7 Executive Overview: Greedy Matching Protocol, Validation Metrics, and Experimental Integrity",
-        "This chapter details our rigorous empirical evaluation methodology designed to prevent scientific self-deception and artificial metric inflation. We analyze the 'Polygon Fragmentation Dilemma' where naive buffer-based metrics reward detectors that shatter single construction sites into dozens of spurious alert fragments. To solve this, we formulate a strict greedy 1-to-1 bipartite event-matching algorithm that guarantees each reference event can match at most one alert polygon. We mathematically define Strict Event Precision, Validity Precision, Event Recall, and Event F1 score, alongside Spatial False Alert Density (alerts/100 km²). Finally, we formalize our negative control zone auditing protocol and held-out generalization testing across Al-Kharj.",
+        "Chapter 7 Executive Overview: Localization-Aware 1-to-1 Matching, Pooled vs. Macro Metrics, and Sensitivity Auditing",
+        "This chapter details our rigorous empirical evaluation methodology designed to prevent both polygon fragmentation inflation and sprawling-polygon gaming. We formulate a Localization-Aware Greedy 1-to-1 Bipartite Event-Matching Protocol requiring both physical parcel coverage (RoC ≥ 0.08 or Area ≥ 3,500 m²) and localization purity (PoC ≥ 0.15 and IoU ≥ 0.05, or PoC ≥ 0.30). We define both Pooled (micro) and Corridor Macro-Averaged Precision, Recall, and F1 side-by-side, along with a 4-regime Localization Threshold Sensitivity Sweep (Relaxed, Standard, Moderate, Strict) and Negative Control Zone auditing.",
     ),
     8: (
-        "Chapter 8 Executive Overview: Empirical Results, Multi-Model Leaderboard, and Ablation Findings",
-        "This chapter delivers the central empirical findings of this thesis. We present reproduction results on the academic OSCD benchmark, followed by the comprehensive Saudi Deployment Multi-Model Benchmark Leaderboard evaluating all 7 candidate paradigms across 91.19 km² and 19 reference events. We analyze why TerraShift AI v5.1 (Tuned Siamese + Physical Spectral Guards) achieved Rank #1 with 61.5% Event F1, 45.5% Strict Precision, and 95.0% Recall. We analyze the 'AlphaEarth Precision Phenomenon' where Models A, C, and D achieved 100% Strict Precision but were bounded at 21.2% Recall. We present systematic ablation studies proving physical guards eliminate 69.6% of false alarms, and profile sub-second CPU latency.",
+        "Chapter 8 Executive Overview: Empirical Results, Multi-Model Leaderboard, and Visual Satellite Plates",
+        "This chapter delivers the central empirical findings of this thesis. We present reproduction results on the academic OSCD benchmark, followed by the authenticated v6.1 Saudi Deployment Multi-Model Benchmark Leaderboard evaluating all 7 candidate paradigms across 91.19 km² and 19 reference events. We show why TerraShift v6.0 Hybrid (Siamese + AlphaEarth + L2A) achieves Rank #1 with 79.2% Pooled Event F1 (82.5% Macro F1), 65.5% Pooled Precision (70.1% Macro Precision), 100.0% Recall, and 0 Negative Zone hits, while TerraShift v5.1 achieves Rank #2 (53.5% Pooled F1 / 64.1% Macro F1) with 5-day L2A autonomy. Conversely, we prove that standalone Google AlphaEarth V1 achieves only 27.0% Pooled F1 (with 90 false alarms and 23 Negative Control Zone hits) and standalone Dynamic World V1 achieves only 19.7% Pooled F1.",
     ),
     9: (
         "Chapter 9 Executive Overview: Scientific Conclusions, Vision 2030 Impact, and Future Roadmap",
-        "The concluding chapter synthesizes the core scientific findings of this senior design project and directly answers our central research question with empirical proof. We demonstrate that deep learning combined with directional physical spectral guards decisively outperforms conventional image comparison on arid terrain, while deep learning alone fails due to seasonal regolith albedo drift. We outline key defense talking points for the university examination committee, map the socio-economic impact of TerraShift AI to the municipal and environmental goals of Saudi Vision 2030, and identify future research vectors including multi-temporal SAR fusion and localized hyperspectral foundation models.",
+        "The concluding chapter synthesizes the core scientific findings of this senior design project and directly answers our central research question with empirical proof. We demonstrate that neither deep learning alone nor standalone global foundation models (AlphaEarth / Dynamic World) are sufficient on hyper-arid desert terrain, whereas fusing Siamese spatial segmentation, AlphaEarth 64-D embeddings, and L2A physical spectral guards reduces false alarms by 91.2% while achieving 100% recall. We outline key defense talking points, map the socio-economic impact of TerraShift AI to Saudi Vision 2030, and identify future research vectors including surveyed cadastral GIS integration and Sentinel-1 SAR fusion.",
     ),
 }
 
@@ -667,9 +700,9 @@ CHAPTER_SUMMARIES = {
         [
             "Saudi Arabia's vast landmass (2.15M km²) and rapid Vision 2030 construction require automated satellite monitoring; traditional ground inspection is logistically and economically unviable.",
             "Hyper-arid environments present severe remote sensing hurdles: low contrast between concrete and regolith, 45° seasonal solar zenith shifts, and sabkha moisture fluctuations.",
-            "The central research question investigates whether deep learning fused with physical spectral guards or foundation models outperforms conventional differencing on modest CPU hardware.",
-            "Five formal research objectives establish reproducible baselines, AlphaEarth integration, a 91.19 km² Saudi ground-truth benchmark, greedy 1-to-1 evaluation, and production full-stack deployment.",
-            "The project strictly adheres to university defense readiness criteria: zero unverified scientific claims, reproducible metrics, and complete open-source transparency.",
+            "The central research question investigates whether a physics-guided hybrid foundation architecture outperforms standalone global foundation models and conventional differencing on CPU hardware.",
+            "Five formal research objectives establish reproducible baselines, authenticated AlphaEarth V1 integration, a 91.19 km² Saudi benchmark, localization-aware 1-to-1 evaluation, and full-stack deployment.",
+            "The project strictly adheres to university defense readiness criteria: zero synthetic benchmark data (allow_synthetic=False), separate Pooled and Macro metrics, and complete open-source transparency.",
         ],
     ),
     2: (
@@ -677,19 +710,19 @@ CHAPTER_SUMMARIES = {
         [
             "Classical change detection (differencing, CVA, PCC) suffers from either extreme solar sensitivity or the multiplicative error law, making it unreliable for operational desert monitoring.",
             "Siamese convolutional networks (FC-Siam-diff) enforce temporal symmetry through weight-sharing, allowing the network to learn structural spatial patterns rather than raw pixel differences.",
-            "Global satellite foundation models (AlphaEarth, Dynamic World) provide powerful static representations but suffer from natural multi-year baseline drift on bare desert surfaces.",
+            "Global satellite foundation models (AlphaEarth V1, Dynamic World V1) provide powerful representations in temperate zones but suffer from desert albedo drift and bare-rock confusion when used standalone.",
             "Recent Chinese remote sensing models (SIGMAE, GenCD, CSD-Net) explore generative and token contrast approaches, but require multi-GPU cloud infrastructure exceeding commodity budgets.",
-            "The literature comparison matrix reveals three critical gaps: the hyper-arid evaluation void, the foundation model operational dilemma, and the edge deployability bottleneck.",
+            "The literature comparison matrix reveals three critical gaps: the hyper-arid evaluation void, the standalone foundation model desert false-alarm problem, and the edge deployability bottleneck.",
         ],
     ),
     3: (
         "Chapter 3 Key Defense Takeaways",
         [
             "Stakeholder analysis spans municipal spatial compliance, environmental monitoring (NCEC, MEWA), and master-planned residential developers (ROSHN).",
-            "Eight functional requirements govern end-to-end operational execution, from multispectral acquisition to GeoJSON alert generation and cartographic visualization.",
+            "Eight functional requirements govern end-to-end operational execution, from multispectral and GEE acquisition to GeoJSON alert generation and cartographic visualization.",
             "Six non-functional requirements enforce production-grade reliability: sub-2.0s pure CPU latency, RAM bounds under 500 MB, WCAG AA accessibility, and zero client-side credentials.",
-            "The Senior Project Defense Readiness Gate Matrix defines 10 pass/fail criteria that must be verified before academic defense approval.",
-            "The research methodology follows a disciplined progression: baseline establishment, foundation model exploration, multi-model benchmarking, and ablation verification.",
+            "The Senior Project Defense Readiness Gate Matrix defines 15 pass/fail criteria that must be verified before academic defense approval.",
+            "The research methodology follows a disciplined progression: baseline establishment, authenticated GEE foundation model integration, multi-model benchmarking, and sensitivity verification.",
         ],
     ),
     4: (
@@ -697,8 +730,8 @@ CHAPTER_SUMMARIES = {
         [
             "Copernicus Sentinel-2 delivers 13 multispectral bands with 5-day revisit; Level-2A BOA surface reflectance is essential to eliminate atmospheric aerosol scattering.",
             "The Scene Classification Layer (SCL) quality filter removes cloud, shadow, and cirrus pixels with zero manual intervention.",
-            "Google AlphaEarth provides 64-dimensional latent embeddings at 10m resolution, accessible via Earth Engine without local foundation model training.",
-            "The Saudi Reference Benchmark establishes 91.19 km² across Riyadh, Jeddah, Al-Jouf, and Al-Kharj, containing 19 parcel-level events and 4 negative control zones.",
+            "Google AlphaEarth V1 provides 64-dimensional unit-sphere embeddings at 10m resolution via Google Earth Engine ('GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL') with allow_synthetic=False strictly enforced.",
+            "The Saudi Reference Benchmark spans 91.19 km² across Riyadh, Jeddah, Al-Jouf, and Al-Kharj, containing 19 coarse parcel-level events and 4 undisturbed negative control zones.",
             "Al-Kharj serves as a completely held-out generalization corridor with frozen hyperparameters to rigorously test model transferability.",
         ],
     ),
@@ -709,47 +742,47 @@ CHAPTER_SUMMARIES = {
             "Server-Sent Events (SSE) provide real-time streaming telemetry across acquisition, inference, filtering, and polygonization stages.",
             "On-demand windowed STAC COG HTTP range reads fetch only the required spatial bounding box, cutting data transfer by over 98%.",
             "MapLibre GL cartography delivers hardware-accelerated vector rendering of change polygons and spectral index layers.",
-            "Empirical CPU profiling demonstrates pure compute latency of 0.495s and a peak RAM footprint of 301 MB, proving commercial viability at zero cloud infrastructure cost.",
+            "Empirical CPU profiling demonstrates pure compute latency of 1.485s and a peak RAM footprint of 301 MB, proving commercial viability at zero cloud GPU cost.",
         ],
     ),
     6: (
         "Chapter 6 Key Defense Takeaways",
         [
             "The Siamese U-Net architecture extracts multi-scale features through shared convolutional encoders and processes bitemporal skip differences in the decoder.",
-            "Compound loss combining weighted BCE (pos_weight=4.0) with Soft Dice loss successfully mitigates the 95:5 class imbalance inherent in satellite change detection.",
+            "Compound loss combining weighted BCE with Soft Dice loss successfully mitigates the 95:5 class imbalance inherent in satellite change detection.",
             "On the unit hypersphere, cosine dissimilarity is mathematically equivalent to half the squared Euclidean distance: d_cosine = 0.5 * ||z1 - z2||².",
-            "Directional physical spectral guards (ΔNDBI ≥ +0.04, |ΔNDVI| ≥ 0.10) inject domain physics into neural predictions, screening out non-structural regolith albedo shifts.",
-            "Connected component analysis and geodesic polygonization transform raw pixel probability masks into clean, GIS-compliant GeoJSON vector features.",
+            "Directional physical spectral guards (ΔNDBI ≥ +0.04, |ΔNDVI| ≥ 0.10) and polygon-level AlphaEarth + Siamese consensus screen out non-structural regolith albedo shifts.",
+            "Every vectorized polygon is geometrically clipped to the exact WGS84 AOI bounding box before ellipsoidal geodesic area integration, guaranteeing changed area never exceeds 100%.",
         ],
     ),
     7: (
         "Chapter 7 Key Defense Takeaways",
         [
-            "Naive buffer-based metrics inflate detection scores by counting multiple fragmented alert polygons against a single ground-truth event.",
-            "Our strict greedy 1-to-1 bipartite matching algorithm sorts candidate pairs by descending IoU and enforces an irreversible 1-to-1 assignment.",
-            "Strict Event Precision, Validity Precision, Event Recall, and Event F1 provide an honest, uninflated evaluation of operational utility.",
-            "Spatial False Alert Density (alerts/100 km²) measures the operational burden placed on human analysts, distinguishing viable systems from false alarm generators.",
-            "Negative control zones (4 undisturbed desert corridors) audit model stability: any change alert in a negative zone constitutes a catastrophic false positive.",
+            "Naive intersection metrics inflate scores via fragmented polygons or sprawling giant polygons that accidentally touch reference parcels.",
+            "Our Localization-Aware Greedy 1-to-1 Bipartite Matching Protocol requires both physical coverage (RoC ≥ 0.08 or Area ≥ 3,500 m²) and localization purity (PoC ≥ 0.15, IoU ≥ 0.05).",
+            "Both Pooled (micro) and Corridor Macro-Averaged Precision, Recall, and F1 are reported side-by-side to prevent macro-averaging from masking corridor-level false alarm counts.",
+            "A 4-regime Localization Threshold Sensitivity Sweep (Relaxed, Standard, Moderate, Strict) proves rankings are robust across evaluation tolerances.",
+            "Negative control zones (4 undisturbed desert corridors) audit model stability: TerraShift v6.0 and v5.1 achieve 0 hits, whereas standalone AlphaEarth V1 triggers 23 hits.",
         ],
     ),
     8: (
         "Chapter 8 Key Defense Takeaways",
         [
-            "On the Saudi Deployment Benchmark, TerraShift AI v5.1 (Tuned Siamese + Physical Guards) achieves Rank #1: 61.5% Event F1, 45.5% Strict Precision, and 95.0% Recall.",
-            "Physical spectral guards eliminate 69.6% of false alarms (reducing density from 126.1 to 38.4 alerts/100 km²) and eliminate 100% of negative control hits.",
-            "Standalone AlphaEarth models (Models A, C, D) achieve 100% Strict Precision (zero false alarms across 91.19 km²), but recall is bounded at 21.2% at τ=0.12.",
-            "The pure multispectral physical baseline achieves 95.0% recall but suffers from high false alarm density (109.7 alerts/100 km²), proving deep learning is necessary for spatial context.",
-            "Sub-second CPU latency (0.495s) confirms that high-precision geospatial AI does not require expensive GPU cloud infrastructure.",
+            "Rank #1 TerraShift v6.0 Hybrid (Siamese + AlphaEarth + L2A) achieves 79.2% Pooled Event F1 (82.5% Macro F1), 65.5% Pooled Precision (70.1% Macro Precision), 100.0% Recall (19/19), and 0 Negative Zone hits.",
+            "Rank #2 TerraShift v5.1 (Tuned Siamese + L2A Guards) achieves 53.5% Pooled Event F1 (64.1% Macro F1) and 100.0% Recall with zero GEE dependency and 5-day revisit cadence.",
+            "Rank #3 Standalone Google AlphaEarth V1 Cosine (Model A) achieves only 27.0% Pooled F1 (31.4% Macro F1) with 90 false alarms and 23 Negative Control Zone hits due to desert albedo drift.",
+            "Rank #6 Standalone Google Dynamic World V1 LULC achieves only 19.7% Pooled F1 (31.6% Recall) because it misclassifies bright concrete grading as bare desert rock.",
+            "Sub-1.5s CPU compute latency (1.485s) confirms that frontier multi-modal geospatial AI can run locally without GPU clusters.",
         ],
     ),
     9: (
         "Chapter 9 Key Defense Takeaways",
         [
-            "Central Research Question answered: Deep learning fused with directional physical spectral guards decisively outperforms conventional image comparison on hyper-arid terrain.",
-            "Deep learning alone is insufficient in desert environments: without physical spectral guards, seasonal solar geometry causes crippling false alarm rates.",
-            "AlphaEarth foundation embeddings represent a powerful complementary tool for high-confidence annual auditing, while Siamese networks excel at operational high-revisit monitoring.",
-            "TerraShift AI directly supports Saudi Vision 2030 by automating urban spatial compliance, verifying SGI afforestation, and curbing illegal desert land encroachment.",
-            "Future development vectors include multi-temporal Sentinel-1 SAR coherence fusion, localized desert foundation models, and edge UAV integration.",
+            "Central Research Question answered: Fusing Siamese deep learning, AlphaEarth V1 embeddings, and L2A physical spectral guards decisively outperforms both standalone foundation models and conventional methods.",
+            "Neither deep learning alone (23.8% Pooled F1) nor standalone AlphaEarth V1 (27.0% Pooled F1) is sufficient in hyper-arid desert terrain without physical SWIR/NIR spectral guards.",
+            "TerraShift AI provides a dual-mode operational architecture: TerraShift v5.1 for 5-day tactical Sentinel-2 L2A alerts, and TerraShift v6.0 Hybrid for annual foundation-model compliance audits.",
+            "TerraShift AI directly supports Saudi Vision 2030 by automating urban spatial compliance (ROSHN/MOMRAH), verifying SGI afforestation, and curbing illegal desert encroachment.",
+            "Future work will expand the 19 coarse reference bounding boxes to surveyed municipal cadastral GIS polygons and integrate Sentinel-1 SAR coherence.",
         ],
     ),
 }
@@ -1610,34 +1643,101 @@ def build_senior_project_pdf():
 
         if chap_num == 8:
             story.append(Spacer(1, 10))
-            story.append(
-                Paragraph(
-                    "8.3.1 Riyadh Sedra Master-Plan Case Study (Detailed Parcel Breakdown)", styles["ReportSecTitle"]
+            story.extend(
+                create_figure_plate(
+                    DIAG_DIR / "test_01_forensic_diagnostic.png",
+                    "Figure 8.1: OSCD Academic Held-Out Forensic Diagnostic Plate (Scene 01: Bi-Temporal RGB, Ground Truth, and Calibrated Siamese Posterior).",
+                    styles,
+                    max_height=185.0,
                 )
             )
-            story.append(create_styled_table(RIYADH_CASE_STUDY_ROWS, styles, col_widths=[95, 75, 45, 65, 65, 40, 40, 62]))
+            story.extend(
+                create_figure_plate(
+                    DIAG_DIR / "test_02_forensic_diagnostic.png",
+                    "Figure 8.2: OSCD Academic Held-Out Forensic Diagnostic Plate (Scene 02: Spatial Error Decomposition across True Positives and False Positives).",
+                    styles,
+                    max_height=185.0,
+                )
+            )
+            story.extend(
+                create_figure_plate(
+                    FIG_DIR / "fig5_leaderboard_pooled_vs_macro.png",
+                    "Figure 8.3: Saudi Deployment Multi-Model Leaderboard (v6.1) — Pooled vs. Macro Event F1, Total False Alarms, and Negative Control Zone Hits across 91.19 km².",
+                    styles,
+                    max_height=190.0,
+                )
+            )
+            story.append(
+                Paragraph(
+                    "8.3.1 Riyadh Sedra Master-Plan Case Study (Detailed Parcel Breakdown & Satellite Plate)", styles["ReportSecTitle"]
+                )
+            )
+            story.append(create_styled_table(RIYADH_CASE_STUDY_ROWS, styles, col_widths=[90, 70, 42, 62, 62, 36, 36, 89]))
+            story.extend(
+                create_figure_plate(
+                    FIG_DIR / "fig1_riyadh_multimodal_plate.png",
+                    "Figure 8.4: Riyadh ROSHN Sedra (17.88 km²) — Authentic Sentinel-2 L2A RGB (2021 vs 2024), Physical ΔNDBI, Google AlphaEarth V1 64-D Cosine Distance, and TerraShift v6.0 Hybrid Detection.",
+                    styles,
+                    max_height=165.0,
+                )
+            )
+            story.append(
+                Paragraph(
+                    "8.3.2 Jeddah Obhur Coastal Sabkha Case Study (Detailed Parcel Breakdown & Satellite Plate)", styles["ReportSecTitle"]
+                )
+            )
+            story.append(create_styled_table(JEDDAH_CASE_STUDY_ROWS, styles, col_widths=[90, 70, 42, 62, 62, 36, 36, 89]))
+            story.extend(
+                create_figure_plate(
+                    FIG_DIR / "fig2_jeddah_multimodal_plate.png",
+                    "Figure 8.5: Jeddah North Obhur (18.31 km²) — Coastal Infill vs. Sabkha Negative Control Zone (Red Dashed Box: 9 False Alarms in Standalone AlphaEarth vs. 0 in TerraShift v6.0 Hybrid).",
+                    styles,
+                    max_height=165.0,
+                )
+            )
+            story.append(
+                Paragraph(
+                    "8.3.3 Al-Jouf Sirhan Circular Pivot Agricultural Case Study & Satellite Plate", styles["ReportSecTitle"]
+                )
+            )
+            story.append(create_styled_table(ALJOUF_CASE_STUDY_ROWS, styles, col_widths=[90, 70, 42, 62, 62, 36, 36, 89]))
+            story.extend(
+                create_figure_plate(
+                    FIG_DIR / "fig3_aljouf_multimodal_plate.png",
+                    "Figure 8.6: Al-Jouf Wadi As-Sirhan (26.82 km²) — 50-Hectare Center-Pivot Irrigation Dynamics (Physical ΔNDVI, AlphaEarth V1 64-D Cosine Distance, and TerraShift v6.0 Hybrid Consensus).",
+                    styles,
+                    max_height=165.0,
+                )
+            )
+            story.append(
+                Paragraph(
+                    "8.3.4 Al-Kharj Held-Out Corridor Generalization Case Study & Satellite Plate", styles["ReportSecTitle"]
+                )
+            )
+            story.append(create_styled_table(ALKHARJ_CASE_STUDY_ROWS, styles, col_widths=[90, 70, 42, 62, 62, 36, 36, 89]))
+            story.extend(
+                create_figure_plate(
+                    FIG_DIR / "fig4_alkharj_heldout_plate.png",
+                    "Figure 8.7: Held-Out Al-Kharj Industrial & Agricultural Corridor (28.18 km²) — Frozen-Hyperparameter Generalization (100% Recall, 62.5% Strict Precision, 0 Negative Zone Hits).",
+                    styles,
+                    max_height=165.0,
+                )
+            )
+            story.append(
+                Paragraph(
+                    "8.4.1 Localization Threshold Sensitivity Sweep (4-Regime Robustness Audit)", styles["ReportSecTitle"]
+                )
+            )
+            story.append(create_styled_table(LOCALIZATION_SENSITIVITY_ROWS, styles, col_widths=[127, 90, 90, 90, 90]))
+            story.extend(
+                create_figure_plate(
+                    FIG_DIR / "fig6_localization_sensitivity_curve.png",
+                    "Figure 8.8: Localization Purity Threshold Sensitivity Sweep (Relaxed, Standard, Moderate, Strict PoC/IoU Regimes) and Progressive False-Alarm Suppression.",
+                    styles,
+                    max_height=185.0,
+                )
+            )
             story.append(Spacer(1, 10))
-            story.append(
-                Paragraph(
-                    "8.3.2 Jeddah Obhur Coastal Sabkha Case Study (Detailed Parcel Breakdown)", styles["ReportSecTitle"]
-                )
-            )
-            story.append(create_styled_table(JEDDAH_CASE_STUDY_ROWS, styles, col_widths=[95, 75, 45, 65, 65, 40, 40, 62]))
-            story.append(Spacer(1, 10))
-            story.append(
-                Paragraph(
-                    "8.3.3 Al-Jouf Sirhan Circular Pivot Agricultural Case Study", styles["ReportSecTitle"]
-                )
-            )
-            story.append(create_styled_table(ALJOUF_CASE_STUDY_ROWS, styles, col_widths=[95, 75, 45, 65, 65, 40, 40, 62]))
-            story.append(Spacer(1, 10))
-            story.append(
-                Paragraph(
-                    "8.3.4 Al-Kharj Held-Out Corridor Generalization Case Study", styles["ReportSecTitle"]
-                )
-            )
-            story.append(create_styled_table(ALKHARJ_CASE_STUDY_ROWS, styles, col_widths=[95, 75, 45, 65, 65, 40, 40, 62]))
-            story.append(Spacer(1, 14))
             story.extend(render_defense_qa_section(DEFENSE_QA_PAIRS, styles))
             story.append(Spacer(1, 10))
 
@@ -1746,7 +1846,7 @@ Notice that when ground truth y_k = 1 and prediction p_k -> 0 (a false negative)
             story.append(Spacer(1, 10))
             story.append(
                 Paragraph(
-                    "B.3 Corridor Confusion Matrices (True Positives, False Positives, False Negatives)",
+                    "B.3 Corridor Confusion Matrices (TerraShift v6.0 Hybrid vs. v5.1 vs. Standalone AlphaEarth)",
                     styles["ReportSecTitle"],
                 )
             )

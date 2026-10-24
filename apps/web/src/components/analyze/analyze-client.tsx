@@ -46,12 +46,13 @@ const WADI_SPECTRAL_ROWS = [
 ] as const;
 
 export const DETECTOR_MODELS = [
-  { id: "siamese_tuned", label: "Siamese U-Net + L2A Spectral Guard" },
-  { id: "alphaearth_hybrid", label: "AlphaEarth Foundation Hybrid (Model D)" },
-  { id: "alphaearth_cosine", label: "AlphaEarth 64-D Cosine Distance (Model A)" },
-  { id: "alphaearth_dw", label: "AlphaEarth + Dynamic World (Model B)" },
-  { id: "alphaearth_supervised", label: "AlphaEarth Supervised Classifier (Model C)" },
-  { id: "multispectral_physical", label: "Pure Physical Multispectral Baseline" },
+  { id: "alphaearth_hybrid", label: "TerraShift v6.0 Hybrid (Siamese + AlphaEarth + L2A)" },
+  { id: "siamese_tuned", label: "TerraShift v5.1 (Siamese U-Net + L2A Spectral Guard)" },
+  { id: "alphaearth_cosine", label: "Google AlphaEarth V1 64-D Cosine (Model A)" },
+  { id: "multispectral_physical", label: "Pure Sentinel-2 L2A Physical Baseline (ΔNDBI/ΔNDVI)" },
+  { id: "dynamic_world_lulc", label: "Google Dynamic World V1 LULC Transition" },
+  { id: "alphaearth_dw", label: "AlphaEarth + Dynamic World Transition (Model B)" },
+  { id: "siamese_untuned", label: "Untuned Siamese U-Net Baseline (RGB)" },
 ] as const;
 
 function formatComma(num: number, decimals = 3): string {
@@ -74,7 +75,7 @@ export function AnalyzeClient() {
   const zoomActionsRef = useRef<{ zoomIn: () => void; zoomOut: () => void } | null>(null);
   const [cardSlide, setCardSlide] = useState<0 | 1>(0);
   const [threshold, setThreshold] = useState<number>(0.48);
-  const [selectedModel, setSelectedModel] = useState<string>("siamese_tuned");
+  const [selectedModel, setSelectedModel] = useState<string>("alphaearth_hybrid");
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [liveChangePct, setLiveChangePct] = useState<number | null>(null);

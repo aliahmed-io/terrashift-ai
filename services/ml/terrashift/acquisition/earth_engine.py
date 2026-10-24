@@ -7,15 +7,17 @@ Integrates:
 2. Google Dynamic World V1 ('GOOGLE/DYNAMICWORLD/V1')
    - 9-class near-real-time global land use land cover (LULC) probabilities.
 
-Security & Authentication:
-- Reads Google Cloud project ID from EARTH_ENGINE_PROJECT_ID environment variable.
-- Handles credentials strictly on backend; never leaks tokens or keys to client or Git.
-- Provides robust, transparent offline fallback mode when GEE authentication is unconfigured,
-  allowing local CPU execution and reproducible benchmarking on cached arrays.
+Methodological & Scientific Integrity Guarantees:
+- Reads Google Cloud project ID from EARTH_ENGINE_PROJECT_ID (defaulting to 'terrashift').
+- Synthetic embeddings and synthetic Dynamic World probabilities are STRICTLY PROHIBITED in
+  benchmarks and production (`allow_synthetic=False` by default).
+- Raises a clear RuntimeError if genuine Earth Engine data cannot be fetched when `allow_synthetic=False`.
+- Caches verified live GEE downloads in `.cache/gee_verified/` with strict provenance verification.
 """
 
 from __future__ import annotations
 
+import io
 import logging
 import os
 from dataclasses import dataclass
@@ -24,6 +26,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
+from scipy.ndimage import zoom
 
 logger = logging.getLogger(__name__)
 
@@ -43,50 +46,61 @@ DYNAMIC_WORLD_CLASSES: List[str] = [
     "snow_and_ice",
 ]
 
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent
+
 
 @dataclass
 class AlphaEarthScene:
-    """Analysis-ready AlphaEarth 64-D embedding scene."""
+    """Analysis-ready AlphaEarth 64-D embedding + Dynamic World LULC scene."""
     year: int
     bbox: List[float]                   # [min_lon, min_lat, max_lon, max_lat]
     shape: Tuple[int, int]              # (height, width)
     embeddings: NDArray[np.float32]     # (H, W, 64) unit-normalized vectors
     valid_mask: NDArray[np.bool_]       # (H, W) valid data mask
-    source: str                         # "google_earth_engine" | "cached_array" | "offline_fallback"
+    source: str                         # "google_earth_engine" | "google_earth_engine_cached" | "unit_test_synthetic_only"
     dw_probabilities: Optional[NDArray[np.float32]] = None  # (H, W, 9) DW class probs
     dw_label: Optional[NDArray[np.uint8]] = None            # (H, W) dominant DW class index
     provenance: Optional[Dict[str, Any]] = None
 
 
+def _resize_3d(arr: NDArray[np.float32], target_shape: Tuple[int, int]) -> NDArray[np.float32]:
+    """Resize (H0, W0, C) float32 array to (H, W, C) via bilinear interpolation."""
+    h0, w0, _ = arr.shape
+    th, tw = target_shape
+    if (h0, w0) == (th, tw):
+        return arr
+    zh = float(th) / float(h0)
+    zw = float(tw) / float(w0)
+    return zoom(arr, (zh, zw, 1.0), order=1).astype(np.float32)
+
+
 class EarthEngineManager:
-    """Manages Earth Engine lifecycle, queries, and fallback routing."""
+    """Manages Earth Engine lifecycle and verified GEE queries."""
 
     def __init__(self, project_id: Optional[str] = None):
-        self.project_id = project_id or os.getenv("EARTH_ENGINE_PROJECT_ID")
+        self.project_id = project_id or os.getenv("EARTH_ENGINE_PROJECT_ID", "terrashift")
         self._is_initialized = False
         self._init_attempted = False
         self._init_error: Optional[str] = None
 
     def initialize(self) -> bool:
-        """Attempt to initialize Earth Engine client safely."""
+        """Initialize Earth Engine client with registered project."""
         if self._is_initialized:
             return True
         if self._init_attempted:
             return self._is_initialized
 
         self._init_attempted = True
-        # Check if project ID or credentials exist before attempting network discovery
+        if self.project_id == "test-unauthenticated-project":
+            self._init_error = "Explicit unit-test unauthenticated project ID."
+            self._is_initialized = False
+            return False
+
         cred_file = Path.home() / ".config" / "earthengine" / "credentials"
         has_sa = "GOOGLE_APPLICATION_CREDENTIALS" in os.environ
 
-        if not self.project_id and not cred_file.exists() and not has_sa:
-            self._init_error = "No Earth Engine project ID or credentials file found on disk."
-            self._is_initialized = False
-            logger.info("Google Earth Engine credentials unconfigured. Operating in deterministic offline fallback mode.")
-            return False
-
-        if self.project_id == "test-unauthenticated-project":
-            self._init_error = "Test unauthenticated project ID."
+        if not cred_file.exists() and not has_sa:
+            self._init_error = "No Earth Engine credentials file found at ~/.config/earthengine/credentials."
             self._is_initialized = False
             return False
 
@@ -95,7 +109,7 @@ class EarthEngineManager:
             if self.project_id:
                 ee.Initialize(project=self.project_id)
                 self._is_initialized = True
-                logger.info("Google Earth Engine initialized successfully with project '%s'", self.project_id)
+                logger.info("Google Earth Engine initialized with project '%s'", self.project_id)
             else:
                 ee.Initialize()
                 self._is_initialized = True
@@ -103,7 +117,7 @@ class EarthEngineManager:
         except Exception as exc:
             self._init_error = str(exc)
             self._is_initialized = False
-            logger.info("Google Earth Engine initialization skipped/unavailable (%s). Operating in offline fallback mode.", exc)
+            logger.warning("Google Earth Engine initialization failed: %s", exc)
 
         return self._is_initialized
 
@@ -116,29 +130,83 @@ class EarthEngineManager:
         bbox: List[float],
         year: int,
         target_shape: Tuple[int, int] = (256, 256),
+        allow_synthetic: bool = False,
     ) -> AlphaEarthScene:
-        """Fetch 64-D AlphaEarth annual embeddings for a bounding box and calendar year.
+        """Fetch genuine 64-D AlphaEarth annual embeddings and Dynamic World LULC probabilities.
 
-        If GEE is live, queries ee.ImageCollection('GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL').
-        If GEE is unconfigured/offline, generates deterministic cached representations
-        aligned with the geographic bounding box.
+        Args:
+            bbox: [west, south, east, north] in EPSG:4326.
+            year: Calendar year (e.g., 2021, 2024).
+            target_shape: Desired (height, width) pixel dimensions aligned to the study grid.
+            allow_synthetic: MUST be False in all official benchmarks and production runs.
+                             May only be set to True inside isolated unit tests.
         """
-        if self.initialize():
-            try:
-                return self._fetch_gee_alphaearth(bbox, year, target_shape)
-            except Exception as exc:
-                logger.warning("Live Earth Engine query failed (%s); reverting to local cached provider", exc)
+        # 1. Check verified GEE disk cache first
+        cache_dir = ROOT_DIR / "services" / "ml" / ".cache" / "gee_verified"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        bbox_slug = f"{bbox[0]:.4f}_{bbox[1]:.4f}_{bbox[2]:.4f}_{bbox[3]:.4f}_{year}"
+        cache_path = cache_dir / f"gee_ae_dw_{bbox_slug}.npz"
 
-        return self._fetch_offline_alphaearth(bbox, year, target_shape)
+        if not allow_synthetic and self.project_id != "test-unauthenticated-project" and cache_path.exists():
+            try:
+                data = np.load(cache_path, allow_pickle=False)
+                src = str(data["source_tag"])
+                if src == "google_earth_engine":
+                    raw_emb = data["embeddings"].astype(np.float32)
+                    raw_dw = data["dw_probabilities"].astype(np.float32)
+                    emb = _resize_3d(raw_emb, target_shape)
+                    norms = np.linalg.norm(emb, axis=-1, keepdims=True)
+                    norms[norms == 0] = 1.0
+                    emb = emb / norms
+                    dw_probs = _resize_3d(raw_dw, target_shape)
+                    dw_label = np.argmax(dw_probs, axis=-1).astype(np.uint8)
+                    valid_mask = np.isfinite(emb).all(axis=-1) & (norms[:, :, 0] > 1e-4)
+                    return AlphaEarthScene(
+                        year=year,
+                        bbox=bbox,
+                        shape=target_shape,
+                        embeddings=emb,
+                        valid_mask=valid_mask,
+                        source="google_earth_engine_cached",
+                        dw_probabilities=dw_probs,
+                        dw_label=dw_label,
+                        provenance={
+                            "dataset": "GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL + GOOGLE/DYNAMICWORLD/V1",
+                            "producer": "Google / Google DeepMind",
+                            "bands": 64,
+                            "resolution_m": 10,
+                            "project_id": self.project_id,
+                            "cache_file": str(cache_path.name),
+                        },
+                    )
+            except Exception as exc:
+                logger.warning("Corrupt GEE cache at %s (%s); re-fetching from live GEE", cache_path, exc)
+
+        # 2. Query live Google Earth Engine
+        if self.initialize():
+            scene = self._fetch_gee_alphaearth(bbox, year, target_shape, cache_path=cache_path)
+            return scene
+
+        # 3. Handle unauthenticated state strictly
+        if not allow_synthetic:
+            raise RuntimeError(
+                f"Genuine Google Earth Engine data is required (`allow_synthetic=False`), "
+                f"but Earth Engine initialization failed: {self._init_error}. "
+                f"Run `earthengine authenticate` and `earthengine set_project {self.project_id}`."
+            )
+
+        return self._generate_unit_test_synthetic_scene(bbox, year, target_shape)
 
     def _fetch_gee_alphaearth(
         self,
         bbox: List[float],
         year: int,
         target_shape: Tuple[int, int],
+        cache_path: Optional[Path] = None,
     ) -> AlphaEarthScene:
-        """Query live Earth Engine servers for AlphaEarth embeddings."""
+        """Query live Earth Engine servers for AlphaEarth 64-D embeddings and Dynamic World LULC."""
         import ee
+        import requests
 
         aoi = ee.Geometry.Rectangle(bbox)
         start_date = f"{year}-01-01"
@@ -152,40 +220,80 @@ class EarthEngineManager:
         )
         count = col.size().getInfo()
         if count == 0:
-            raise ValueError(f"No AlphaEarth annual embeddings available for year {year} in bbox {bbox}")
+            raise ValueError(f"No AlphaEarth annual embeddings found in GEE for year {year} in bbox {bbox}")
 
-        image = col.mosaic().clip(aoi)
+        ae_image = col.mosaic().toFloat().clip(aoi)
 
-        # Retrieve Dynamic World composite if available
-        dw_col = (
+        # Query Dynamic World summer window (May-Aug) to match Sentinel-2 summer phenology, fallback to full year
+        dw_summer = (
             ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
-            .filterDate(start_date, end_date)
+            .filterDate(f"{year}-05-01", f"{year}-09-01")
             .filterBounds(aoi)
             .select(DYNAMIC_WORLD_CLASSES)
         )
-        dw_image = dw_col.mean().clip(aoi)
+        dw_count = dw_summer.size().getInfo()
+        if dw_count > 0:
+            dw_image = dw_summer.mean().toFloat().clip(aoi)
+        else:
+            dw_image = (
+                ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
+                .filterDate(start_date, end_date)
+                .filterBounds(aoi)
+                .select(DYNAMIC_WORLD_CLASSES)
+                .mean()
+                .toFloat()
+                .clip(aoi)
+            )
 
-        # Download bounded thumbnail or region array
-        # Note: Bounded to modest target_shape to respect CPU and memory constraints
-        region = aoi.getInfo()["coordinates"]
-        url = image.getDownloadURL({
-            "region": region,
-            "dimensions": f"{target_shape[1]}x{target_shape[0]}",
+        combined = ee.Image.cat([ae_image, dw_image])
+
+        # Download at 256x256 in EPSG:4326 (~15m-20m grid over 0.04-0.05 deg corridor, well within 50MB GEE limit)
+        dl_dim = "256x256"
+        url = combined.getDownloadURL({
+            "region": aoi,
+            "dimensions": dl_dim,
             "format": "NPY",
+            "crs": "EPSG:4326",
         })
 
-        import requests
-        resp = requests.get(url, timeout=30)
+        resp = requests.get(url, timeout=90)
         resp.raise_for_status()
-        raw_arr = np.load(resp.raw or resp.content)
-        # raw_arr shape: (H, W, 64) or structured
-        embeddings = raw_arr.astype(np.float32)
+        raw_arr = np.load(io.BytesIO(resp.content))
 
-        # Normalize to unit length
+        if not raw_arr.dtype.names:
+            raise RuntimeError(f"Expected structured NPY array from GEE, got dtype {raw_arr.dtype}")
+
+        # Note: GEE NPY arrays are ordered North-to-South (row 0 = North), matching STACGrid!
+        raw_emb = np.stack([raw_arr[b].astype(np.float32) for b in ALPHAEARTH_BANDS], axis=-1)
+        raw_dw = np.stack([raw_arr[b].astype(np.float32) for b in DYNAMIC_WORLD_CLASSES], axis=-1)
+
+        # Replace any NaN/inf before caching and resizing
+        raw_emb = np.nan_to_num(raw_emb, nan=0.0, posinf=0.0, neginf=0.0)
+        raw_dw = np.nan_to_num(raw_dw, nan=0.0, posinf=0.0, neginf=0.0)
+
+        # Save verified raw download to cache
+        if cache_path is not None:
+            np.savez_compressed(
+                cache_path,
+                embeddings=raw_emb,
+                dw_probabilities=raw_dw,
+                source_tag=np.array("google_earth_engine"),
+            )
+
+        # Resize to match exact target_shape of the corridor STACGrid
+        embeddings = _resize_3d(raw_emb, target_shape)
+        dw_probs = _resize_3d(raw_dw, target_shape)
+
+        # Re-normalize 64-D embeddings to unit hypersphere
         norms = np.linalg.norm(embeddings, axis=-1, keepdims=True)
+        valid_mask = (norms[:, :, 0] > 1e-4) & np.isfinite(embeddings).all(axis=-1)
         norms[norms == 0] = 1.0
         embeddings = embeddings / norms
-        valid_mask = np.isfinite(embeddings).all(axis=-1)
+
+        dw_sum = np.sum(dw_probs, axis=-1, keepdims=True)
+        dw_sum[dw_sum == 0] = 1.0
+        dw_probs = np.clip(dw_probs / dw_sum, 0.0, 1.0).astype(np.float32)
+        dw_label = np.argmax(dw_probs, axis=-1).astype(np.uint8)
 
         return AlphaEarthScene(
             year=year,
@@ -194,86 +302,41 @@ class EarthEngineManager:
             embeddings=embeddings,
             valid_mask=valid_mask,
             source="google_earth_engine",
+            dw_probabilities=dw_probs,
+            dw_label=dw_label,
             provenance={
-                "dataset": "GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL",
+                "dataset": "GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL + GOOGLE/DYNAMICWORLD/V1",
                 "producer": "Google / Google DeepMind",
                 "bands": len(ALPHAEARTH_BANDS),
+                "dw_classes": len(DYNAMIC_WORLD_CLASSES),
                 "resolution_m": 10,
-                "project_id": self.project_id or "default",
+                "project_id": self.project_id,
+                "ae_tiles_merged": count,
+                "dw_scenes_composited": dw_count,
             },
         )
 
-    def _fetch_offline_alphaearth(
+    def _generate_unit_test_synthetic_scene(
         self,
         bbox: List[float],
         year: int,
         target_shape: Tuple[int, int],
     ) -> AlphaEarthScene:
-        """Generate high-fidelity deterministic AlphaEarth embeddings for local CPU execution.
-
-        Uses local disk caching in .cache/alphaearth/ and deterministic geospatial projections
-        so that scientific ablation, cosine distance computation, and Saudi corridor evaluations
-        can be reproduced offline without mandatory Google Cloud credentials.
-        """
-        cache_dir = Path(ROOT_DIR) / ".cache" / "alphaearth"
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        bbox_slug = f"{bbox[0]:.2f}_{bbox[1]:.2f}_{bbox[2]:.2f}_{bbox[3]:.2f}_{year}_{target_shape[0]}x{target_shape[1]}"
-        cache_path = cache_dir / f"ae_{bbox_slug}.npz"
-
-        if cache_path.exists():
-            try:
-                data = np.load(cache_path)
-                return AlphaEarthScene(
-                    year=year,
-                    bbox=bbox,
-                    shape=target_shape,
-                    embeddings=data["embeddings"],
-                    valid_mask=data["valid_mask"],
-                    source="cached_array",
-                    dw_probabilities=data.get("dw_probabilities"),
-                    dw_label=data.get("dw_label"),
-                    provenance={
-                        "dataset": "GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL",
-                        "status": "cached_offline_reproducibility",
-                        "producer": "Google / Google DeepMind",
-                        "resolution_m": 10,
-                    },
-                )
-            except Exception:
-                pass
-
-        # Synthesize deterministic, unit-normalized 64-D vectors with spatial smoothness
+        """Isolated synthetic generator strictly for offline pytest unit tests (`allow_synthetic=True`)."""
         H, W = target_shape
         seed = int(abs(bbox[0] * 1000 + bbox[1] * 100 + year)) % (2**31 - 1)
         rng = np.random.RandomState(seed)
 
-        # Base spectral feature representation
         raw_emb = rng.randn(H, W, 64).astype(np.float32)
-
-        # Apply Gaussian-like spatial autocorrelation (spatial smoothness characteristic of 10m embeddings)
-        from scipy.ndimage import uniform_filter
-        for d in range(64):
-            raw_emb[:, :, d] = uniform_filter(raw_emb[:, :, d], size=3)
-
-        # Unit-normalize vectors: ||v|| = 1.0 (fundamental mathematical property of AlphaEarth)
         norms = np.linalg.norm(raw_emb, axis=-1, keepdims=True)
         norms[norms == 0] = 1.0
         embeddings = raw_emb / norms
         valid_mask = np.ones((H, W), dtype=bool)
 
-        # Synthesize correlated Dynamic World probabilities
-        # Classes: [water, trees, grass, flooded_veg, crops, shrub, built, bare, snow]
-        dw_probs = rng.dirichlet(np.array([0.05, 0.05, 0.1, 0.02, 0.15, 0.1, 0.2, 0.32, 0.01]), size=(H, W)).astype(np.float32)
+        dw_probs = rng.dirichlet(
+            np.array([0.05, 0.05, 0.1, 0.02, 0.15, 0.1, 0.2, 0.32, 0.01]), size=(H, W)
+        ).astype(np.float32)
         dw_label = np.argmax(dw_probs, axis=-1).astype(np.uint8)
-
-        # Save to local cache
-        np.savez_compressed(
-            cache_path,
-            embeddings=embeddings,
-            valid_mask=valid_mask,
-            dw_probabilities=dw_probs,
-            dw_label=dw_label,
-        )
 
         return AlphaEarthScene(
             year=year,
@@ -281,16 +344,11 @@ class EarthEngineManager:
             shape=target_shape,
             embeddings=embeddings,
             valid_mask=valid_mask,
-            source="offline_fallback",
+            source="unit_test_synthetic_only",
             dw_probabilities=dw_probs,
             dw_label=dw_label,
             provenance={
-                "dataset": "GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL",
-                "status": "deterministic_offline_provider",
-                "producer": "Google / Google DeepMind (Synthesized Unit-Normalized Representation)",
-                "note": "Earth Engine credentials unconfigured; running in deterministic offline mode for local evaluation.",
+                "dataset": "UNIT_TEST_SYNTHETIC_FIXTURE",
+                "status": "unit_test_only_prohibited_in_benchmarks",
             },
         )
-
-
-ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent

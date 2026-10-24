@@ -93,6 +93,10 @@ interface LeaderboardEntry {
   model_id: string;
   model_name: string;
   category: string;
+  pooled_strict_precision?: number;
+  pooled_event_f1?: number;
+  macro_strict_precision?: number;
+  macro_event_f1?: number;
   strict_precision: number;
   validity_precision: number;
   recall: number;
@@ -232,15 +236,15 @@ export default function BenchmarksPage() {
       title: saudiTuned[0]?.name ?? "Riyadh ROSHN Sedra",
       sub: "Arid Limestone Plateau (17,9 km²)",
       img: getRasterUrl("magma", tau),
-      left: `${formatComma(((saudiTuned[0]?.strict_event_precision ?? saudiTuned[0]?.event_precision) ?? 0.556) * 100, 1)} % Strict Prec`,
-      right: `${formatComma(saudiTuned[0]?.false_alerts_per_100km2 ?? 22.3, 1)} FA/100km²`,
+      left: `${formatComma(((saudiTuned[0]?.strict_event_precision ?? saudiTuned[0]?.event_precision) ?? 0.500) * 100, 1)} % v5.1 · 71,4% v6.0`,
+      right: `${formatComma(saudiTuned[0]?.false_alerts_per_100km2 ?? 27.9, 1)} FA/100km²`,
       stat: `Recall: ${formatComma((saudiTuned[0]?.event_recall ?? 1.0) * 100, 0)}% (${saudiTuned[0]?.reference_events_detected ?? 5}/5 events) · 0 Neg Hits`,
     },
     {
       title: saudiTuned[1]?.name ?? "Jeddah North Obhur",
       sub: "Coastal Marine Plain (18,3 km²)",
       img: getRasterUrl("ndbi", tau),
-      left: `${formatComma(((saudiTuned[1]?.strict_event_precision ?? saudiTuned[1]?.event_precision) ?? 0.800) * 100, 1)} % Strict Prec`,
+      left: `${formatComma(((saudiTuned[1]?.strict_event_precision ?? saudiTuned[1]?.event_precision) ?? 0.800) * 100, 1)} % v5.1 · 100% v6.0`,
       right: `${formatComma(saudiTuned[1]?.false_alerts_per_100km2 ?? 5.5, 1)} FA/100km²`,
       stat: `Recall: ${formatComma((saudiTuned[1]?.event_recall ?? 1.0) * 100, 0)}% (${saudiTuned[1]?.reference_events_detected ?? 4}/4 events) · 0 Neg Hits`,
     },
@@ -248,17 +252,17 @@ export default function BenchmarksPage() {
       title: saudiTuned[2]?.name ?? "Al-Jouf Sirhan Basin",
       sub: "Center-Pivot Irrigation (26,8 km²)",
       img: getRasterUrl("nir", tau),
-      left: `${formatComma(((saudiTuned[2]?.strict_event_precision ?? saudiTuned[2]?.event_precision) ?? 0.227) * 100, 1)} % Strict Prec`,
-      right: `${formatComma(saudiTuned[2]?.false_alerts_per_100km2 ?? 63.4, 1)} FA/100km²`,
+      left: `${formatComma(((saudiTuned[2]?.strict_event_precision ?? saudiTuned[2]?.event_precision) ?? 0.278) * 100, 1)} % v5.1 · 62,5% v6.0`,
+      right: `${formatComma(saudiTuned[2]?.false_alerts_per_100km2 ?? 48.5, 1)} FA/100km²`,
       stat: `Recall: ${formatComma((saudiTuned[2]?.event_recall ?? 1.0) * 100, 0)}% (${saudiTuned[2]?.reference_events_detected ?? 5}/5 events) · 0 Neg Hits`,
     },
     {
       title: saudiTuned[3]?.name ?? "Al-Kharj Logistics Corridor",
       sub: "Held-Out Test Corridor (28,2 km²)",
       img: getRasterUrl("confusion", tau),
-      left: `${formatComma(((saudiTuned[3]?.strict_event_precision ?? saudiTuned[3]?.event_precision) ?? 0.235) * 100, 1)} % Strict Prec`,
-      right: `${formatComma(saudiTuned[3]?.false_alerts_per_100km2 ?? 46.2, 1)} FA/100km²`,
-      stat: `Recall: ${formatComma((saudiTuned[3]?.event_recall ?? 0.80) * 100, 0)}% (${saudiTuned[3]?.reference_events_detected ?? 4}/5 events) · 0 Neg Hits`,
+      left: `${formatComma(((saudiTuned[3]?.strict_event_precision ?? saudiTuned[3]?.event_precision) ?? 0.312) * 100, 1)} % v5.1 · 62,5% v6.0`,
+      right: `${formatComma(saudiTuned[3]?.false_alerts_per_100km2 ?? 39.1, 1)} FA/100km²`,
+      stat: `Recall: ${formatComma((saudiTuned[3]?.event_recall ?? 1.0) * 100, 0)}% (${saudiTuned[3]?.reference_events_detected ?? 5}/5 events) · 0 Neg Hits`,
     },
   ];
 
@@ -326,7 +330,7 @@ export default function BenchmarksPage() {
                   activeTab === "saudi" ? "bg-white font-semibold text-[#1c1f23] shadow-sm" : "hover:text-[#1c1f23]"
                 }`}
               >
-                Saudi Deployment Benchmark (v5.0)
+                Saudi Deployment Benchmark (v6.1)
               </button>
               <button
                 type="button"
@@ -344,7 +348,7 @@ export default function BenchmarksPage() {
           </div>
           <span className="text-[12px] font-medium text-[#8c929c]">
             {activeTab === "saudi"
-              ? "Sentinel-2 L2A BOA Reflectance · AWS Open Data · 63 km²"
+              ? "Sentinel-2 L2A STAC + Google AlphaEarth V1 / Dynamic World V1 · 91,19 km²"
               : "Held-out 10-Scene Evaluation · 3,077,936 evaluated pixels"}
           </span>
         </div>
@@ -414,13 +418,13 @@ export default function BenchmarksPage() {
                     </button>
                   </div>
                   <span className="rounded-full bg-[#22b567]/10 px-2.5 py-0.5 text-[11.5px] font-semibold text-[#22b567]">
-                    #1 Siamese+Guards: 61,5% F1
+                    #1 TerraShift v6.0: 79,2% Pooled · 82,5% Macro F1
                   </span>
                 </div>
                 <p className="mt-1 text-[12px] text-[#8c929c]">
                   {saudiSubTab === "leaderboard"
-                    ? "Strict 1-to-1 event matching across 4 Saudi corridors (91,19 km²): AlphaEarth foundation models vs deep learning vs conventional physics"
-                    : "Strict greedy 1-to-1 matching: raw RGB Siamese baseline vs tuned detector with L2A physical spectral filtering"}
+                    ? "Localization-aware 1-to-1 parcel matching (PoC ≥ 0.15, IoU ≥ 0.05) across 4 Saudi corridors (91,19 km²): Pooled & Macro metrics"
+                    : "Controlled ablation: raw RGB Siamese baseline vs TerraShift v5.1 (L2A Spectral Guards) vs TerraShift v6.0 (Hybrid AlphaEarth)"}
                 </p>
               </div>
 
@@ -429,48 +433,53 @@ export default function BenchmarksPage() {
                   <table className="w-full text-left text-[11px]">
                     <thead className="bg-[#f7f8fa] text-[10px] uppercase tracking-wider text-[#8c929c]">
                       <tr>
-                        <th className="px-2.5 py-1.5">#</th>
-                        <th className="px-2.5 py-1.5">Model Architecture</th>
-                        <th className="px-2.5 py-1.5 text-right">F1 Score</th>
-                        <th className="px-2.5 py-1.5 text-right">Strict Prec</th>
-                        <th className="px-2.5 py-1.5 text-right">Recall</th>
-                        <th className="px-2.5 py-1.5 text-right">FA/100km²</th>
-                        <th className="px-2.5 py-1.5 text-right">CPU</th>
+                        <th className="px-2 py-1.5">#</th>
+                        <th className="px-2 py-1.5">Model Architecture</th>
+                        <th className="px-2 py-1.5 text-right">Pooled F1</th>
+                        <th className="px-2 py-1.5 text-right">Macro F1</th>
+                        <th className="px-2 py-1.5 text-right">Pooled / Macro Prec</th>
+                        <th className="px-2 py-1.5 text-right">Recall</th>
+                        <th className="px-2 py-1.5 text-right">FA / Neg</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#edf0f3] font-medium text-[#1c1f23] tabular-nums">
                       {(saudiData?.multi_model_leaderboard ?? [
-                        { model_id: "siamese_tuned_filtered", model_name: "Tuned Siamese + Directional Guards", category: "Hybrid", event_f1: 0.615, strict_precision: 0.455, recall: 0.950, fa_density_100km2: 38.4, pure_cpu_latency_s: 0.495 },
-                        { model_id: "alphaearth_cosine", model_name: "AlphaEarth 64-D Cosine (Model A)", category: "Foundation", event_f1: 0.350, strict_precision: 1.000, recall: 0.212, fa_density_100km2: 0.0, pure_cpu_latency_s: 5.911 },
-                        { model_id: "alphaearth_supervised", model_name: "AlphaEarth Supervised (Model C)", category: "Supervised", event_f1: 0.350, strict_precision: 1.000, recall: 0.212, fa_density_100km2: 0.0, pure_cpu_latency_s: 0.979 },
-                        { model_id: "alphaearth_hybrid", model_name: "AlphaEarth + Spectral Guard (Model D)", category: "Hybrid", event_f1: 0.350, strict_precision: 1.000, recall: 0.212, fa_density_100km2: 0.0, pure_cpu_latency_s: 0.620 },
-                        { model_id: "multispectral_physical", model_name: "Pure Multispectral Physical Baseline", category: "Physics", event_f1: 0.265, strict_precision: 0.154, recall: 0.950, fa_density_100km2: 109.7, pure_cpu_latency_s: 0.583 },
-                        { model_id: "siamese_untuned", model_name: "Untuned Siamese U-Net Baseline", category: "Deep Learning", event_f1: 0.243, strict_precision: 0.140, recall: 0.900, fa_density_100km2: 126.1, pure_cpu_latency_s: 0.549 },
-                        { model_id: "alphaearth_dynamic_world", model_name: "AlphaEarth + Dynamic World (Model B)", category: "LULC", event_f1: 0.058, strict_precision: 0.030, recall: 0.950, fa_density_100km2: 638.2, pure_cpu_latency_s: 6.034 },
-                      ]).map((m, idx) => (
-                        <tr key={m.model_id} className={idx === 0 ? "bg-[#22b567]/5" : ""}>
-                          <td className="px-2.5 py-1 text-[#8c929c] font-bold">#{idx + 1}</td>
-                          <td className="px-2.5 py-1 font-semibold text-[#1c1f23]">
-                            {m.model_name}
-                            <span className="ml-1.5 text-[9.5px] font-normal text-[#8c929c]">({m.category})</span>
-                          </td>
-                          <td className={`px-2.5 py-1 text-right font-bold ${idx === 0 ? "text-[#22b567]" : "text-[#1c1f23]"}`}>
-                            {formatComma(m.event_f1 * 100, 1)} %
-                          </td>
-                          <td className="px-2.5 py-1 text-right font-medium text-[#1c1f23]">
-                            {formatComma(m.strict_precision * 100, 1)} %
-                          </td>
-                          <td className="px-2.5 py-1 text-right font-medium text-[#1c1f23]">
-                            {formatComma(m.recall * 100, 1)} %
-                          </td>
-                          <td className="px-2.5 py-1 text-right text-[#5c626b]">
-                            {formatComma(m.fa_density_100km2, 1)}
-                          </td>
-                          <td className="px-2.5 py-1 text-right text-[#8c929c]">
-                            {formatComma(m.pure_cpu_latency_s, 3)}s
-                          </td>
-                        </tr>
-                      ))}
+                        { model_id: "alphaearth_hybrid", model_name: "TerraShift v6.0 Hybrid (Siamese + AlphaEarth + L2A)", category: "Hybrid Foundation", pooled_event_f1: 0.792, macro_event_f1: 0.825, event_f1: 0.792, pooled_strict_precision: 0.655, macro_strict_precision: 0.701, strict_precision: 0.655, recall: 1.000, false_alarms: 10, negative_zone_hits: 0, fa_density_100km2: 11.0, pure_cpu_latency_s: 1.485 },
+                        { model_id: "siamese_tuned_filtered", model_name: "TerraShift v5.1 (Tuned Siamese + L2A Guards)", category: "Hybrid Physics-AI", pooled_event_f1: 0.535, macro_event_f1: 0.641, event_f1: 0.535, pooled_strict_precision: 0.365, macro_strict_precision: 0.472, strict_precision: 0.365, recall: 1.000, false_alarms: 33, negative_zone_hits: 0, fa_density_100km2: 36.2, pure_cpu_latency_s: 1.450 },
+                        { model_id: "alphaearth_cosine", model_name: "Google AlphaEarth V1 64-D Cosine (Model A)", category: "Foundation Model", pooled_event_f1: 0.270, macro_event_f1: 0.314, event_f1: 0.270, pooled_strict_precision: 0.159, macro_strict_precision: 0.191, strict_precision: 0.159, recall: 0.895, false_alarms: 90, negative_zone_hits: 23, fa_density_100km2: 98.7, pure_cpu_latency_s: 0.498 },
+                        { model_id: "multispectral_physical", model_name: "Pure Sentinel-2 L2A Physical Baseline", category: "Conventional RS", pooled_event_f1: 0.265, macro_event_f1: 0.267, event_f1: 0.265, pooled_strict_precision: 0.154, macro_strict_precision: 0.155, strict_precision: 0.154, recall: 0.947, false_alarms: 99, negative_zone_hits: 0, fa_density_100km2: 108.6, pure_cpu_latency_s: 0.556 },
+                        { model_id: "siamese_untuned", model_name: "Untuned Siamese U-Net Baseline (RGB)", category: "Deep Learning", pooled_event_f1: 0.238, macro_event_f1: 0.253, event_f1: 0.238, pooled_strict_precision: 0.136, macro_strict_precision: 0.146, strict_precision: 0.136, recall: 0.947, false_alarms: 114, negative_zone_hits: 5, fa_density_100km2: 125.0, pure_cpu_latency_s: 0.518 },
+                        { model_id: "dynamic_world_lulc", model_name: "Google Dynamic World V1 LULC Transition", category: "LULC Classifier", pooled_event_f1: 0.197, macro_event_f1: 0.279, event_f1: 0.197, pooled_strict_precision: 0.143, macro_strict_precision: 0.335, strict_precision: 0.143, recall: 0.316, false_alarms: 36, negative_zone_hits: 6, fa_density_100km2: 39.5, pure_cpu_latency_s: 0.497 },
+                        { model_id: "alphaearth_dynamic_world", model_name: "AlphaEarth + Dynamic World Transition (Model B)", category: "Foundation + LULC", pooled_event_f1: 0.163, macro_event_f1: 0.259, event_f1: 0.163, pooled_strict_precision: 0.133, macro_strict_precision: 0.336, strict_precision: 0.133, recall: 0.211, false_alarms: 26, negative_zone_hits: 4, fa_density_100km2: 28.5, pure_cpu_latency_s: 0.464 },
+                      ]).map((m, idx) => {
+                        const pF1 = m.pooled_event_f1 ?? m.event_f1;
+                        const mF1 = m.macro_event_f1 ?? m.event_f1;
+                        const pPrec = m.pooled_strict_precision ?? m.strict_precision;
+                        const mPrec = m.macro_strict_precision ?? m.strict_precision;
+                        return (
+                          <tr key={m.model_id} className={idx === 0 ? "bg-[#22b567]/5" : ""}>
+                            <td className="px-2 py-1 text-[#8c929c] font-bold">#{idx + 1}</td>
+                            <td className="px-2 py-1 font-semibold text-[#1c1f23] truncate max-w-[230px]">
+                              {m.model_name}
+                            </td>
+                            <td className={`px-2 py-1 text-right font-bold ${idx === 0 ? "text-[#22b567]" : "text-[#1c1f23]"}`}>
+                              {formatComma(pF1 * 100, 1)} %
+                            </td>
+                            <td className={`px-2 py-1 text-right font-semibold ${idx === 0 ? "text-[#22b567]" : "text-[#5c626b]"}`}>
+                              {formatComma(mF1 * 100, 1)} %
+                            </td>
+                            <td className="px-2 py-1 text-right font-medium text-[#1c1f23]">
+                              {formatComma(pPrec * 100, 1)}% / {formatComma(mPrec * 100, 1)}%
+                            </td>
+                            <td className="px-2 py-1 text-right font-medium text-[#1c1f23]">
+                              {formatComma(m.recall * 100, 1)} %
+                            </td>
+                            <td className="px-2 py-1 text-right text-[#5c626b]">
+                              {m.false_alarms} / {m.negative_zone_hits} neg
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -480,59 +489,59 @@ export default function BenchmarksPage() {
                     <thead className="bg-[#f7f8fa] text-[10.5px] uppercase tracking-wider text-[#8c929c]">
                       <tr>
                         <th className="px-3 py-1.5">Metric</th>
-                        <th className="px-3 py-1.5">Untuned Baseline</th>
-                        <th className="px-3 py-1.5">Tuned + Spectrally Filtered</th>
-                        <th className="px-3 py-1.5 text-right">Delta</th>
+                        <th className="px-3 py-1.5">Untuned RGB (M0)</th>
+                        <th className="px-3 py-1.5">TerraShift v5.1 (L2A)</th>
+                        <th className="px-3 py-1.5 text-right">TerraShift v6.0 Hybrid</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#edf0f3] font-medium text-[#1c1f23] tabular-nums">
                       <tr>
-                        <td className="px-3 py-1.5">Mean Strict 1-to-1 Precision</td>
-                        <td className="px-3 py-1.5 text-[#5c626b]">14,0 %</td>
-                        <td className="px-3 py-1.5 font-semibold text-[#22b567]">45,5 % (Jeddah: 80,0%, Riyadh: 55,6%)</td>
-                        <td className="px-3 py-1.5 text-right text-[#22b567]">+31,4 pp</td>
+                        <td className="px-3 py-1.5">Pooled / Macro Event F1</td>
+                        <td className="px-3 py-1.5 text-[#5c626b]">23,8 % / 25,3 %</td>
+                        <td className="px-3 py-1.5 font-semibold text-[#1c1f23]">53,5 % / 64,1 %</td>
+                        <td className="px-3 py-1.5 text-right font-bold text-[#22b567]">79,2 % / 82,5 %</td>
                       </tr>
                       <tr>
-                        <td className="px-3 py-1.5">Event Validity Precision</td>
-                        <td className="px-3 py-1.5 text-[#5c626b]">15,4 %</td>
-                        <td className="px-3 py-1.5 font-semibold text-[#22b567]">50,1 % (excluding duplicate fragments)</td>
-                        <td className="px-3 py-1.5 text-right text-[#22b567]">+34,6 pp</td>
+                        <td className="px-3 py-1.5">Pooled / Macro Strict Precision</td>
+                        <td className="px-3 py-1.5 text-[#5c626b]">13,6 % / 14,6 %</td>
+                        <td className="px-3 py-1.5 font-semibold text-[#1c1f23]">36,5 % / 47,2 %</td>
+                        <td className="px-3 py-1.5 text-right font-bold text-[#22b567]">65,5 % / 70,1 %</td>
                       </tr>
                       <tr>
-                        <td className="px-3 py-1.5">Mean Event Recall</td>
-                        <td className="px-3 py-1.5 text-[#5c626b]">90,0 %</td>
-                        <td className="px-3 py-1.5 font-semibold text-[#22b567]">95,0 % (100% Core, 80% Held-Out)</td>
-                        <td className="px-3 py-1.5 text-right text-[#22b567]">+5,0 pp</td>
+                        <td className="px-3 py-1.5">Event Recall (19 Reference Parcels)</td>
+                        <td className="px-3 py-1.5 text-[#5c626b]">94,7 % (18/19)</td>
+                        <td className="px-3 py-1.5 font-semibold text-[#22b567]">100,0 % (19/19)</td>
+                        <td className="px-3 py-1.5 text-right font-bold text-[#22b567]">100,0 % (19/19)</td>
                       </tr>
                       <tr>
-                        <td className="px-3 py-1.5">Total False Alerts (All AOI)</td>
-                        <td className="px-3 py-1.5 text-[#e94235]">115 alerts</td>
-                        <td className="px-3 py-1.5 font-semibold text-[#22b567]">35 alerts (4 dup, 31 bg)</td>
-                        <td className="px-3 py-1.5 text-right text-[#22b567]">-69,6 %</td>
+                        <td className="px-3 py-1.5">Total False Alerts (91,19 km²)</td>
+                        <td className="px-3 py-1.5 text-[#e94235]">114 alerts</td>
+                        <td className="px-3 py-1.5 font-semibold text-[#1c1f23]">33 alerts (-71,1%)</td>
+                        <td className="px-3 py-1.5 text-right font-bold text-[#22b567]">10 alerts (-91,2%)</td>
                       </tr>
                       <tr>
                         <td className="px-3 py-1.5">Pooled False Alerts / 100 km²</td>
-                        <td className="px-3 py-1.5 text-[#5c626b]">126,1</td>
-                        <td className="px-3 py-1.5 font-semibold text-[#22b567]">38,4 / 100km²</td>
-                        <td className="px-3 py-1.5 text-right text-[#22b567]">-87,7</td>
+                        <td className="px-3 py-1.5 text-[#5c626b]">125,0 / 100km²</td>
+                        <td className="px-3 py-1.5 font-semibold text-[#1c1f23]">36,2 / 100km²</td>
+                        <td className="px-3 py-1.5 text-right font-bold text-[#22b567]">11,0 / 100km²</td>
                       </tr>
                       <tr>
                         <td className="px-3 py-1.5">Macro False Alerts / 100 km²</td>
-                        <td className="px-3 py-1.5 text-[#5c626b]">129,4</td>
-                        <td className="px-3 py-1.5 font-semibold text-[#22b567]">34,4 / 100km²</td>
-                        <td className="px-3 py-1.5 text-right text-[#22b567]">-95,0</td>
+                        <td className="px-3 py-1.5 text-[#5c626b]">128,3 / 100km²</td>
+                        <td className="px-3 py-1.5 font-semibold text-[#1c1f23]">30,2 / 100km²</td>
+                        <td className="px-3 py-1.5 text-right font-bold text-[#22b567]">8,2 / 100km²</td>
                       </tr>
                       <tr>
                         <td className="px-3 py-1.5">Negative Control Zone Hits</td>
-                        <td className="px-3 py-1.5 text-[#e94235]">3 alerts</td>
-                        <td className="px-3 py-1.5 font-semibold text-[#22b567]">0 alerts (0 in all 4 zones)</td>
-                        <td className="px-3 py-1.5 text-right text-[#22b567]">100% suppressed</td>
+                        <td className="px-3 py-1.5 text-[#e94235]">5 alerts</td>
+                        <td className="px-3 py-1.5 font-semibold text-[#22b567]">0 alerts (0 in 4 zones)</td>
+                        <td className="px-3 py-1.5 text-right font-bold text-[#22b567]">0 alerts (AlphaEarth: 23)</td>
                       </tr>
                       <tr>
-                        <td className="px-3 py-1.5">Pure CPU Compute Latency</td>
-                        <td className="px-3 py-1.5 text-[#5c626b]">1,509 s</td>
-                        <td className="px-3 py-1.5 font-semibold text-[#1c1f23]">1,418 s (Inference: 1,17s)</td>
-                        <td className="px-3 py-1.5 text-right text-[#5c626b]">-0,091 s</td>
+                        <td className="px-3 py-1.5">Held-Out Al-Kharj Precision / Recall</td>
+                        <td className="px-3 py-1.5 text-[#5c626b]">9,5 % / 80,0 %</td>
+                        <td className="px-3 py-1.5 font-semibold text-[#1c1f23]">31,2 % / 100,0 %</td>
+                        <td className="px-3 py-1.5 text-right font-bold text-[#22b567]">62,5 % / 100,0 %</td>
                       </tr>
                     </tbody>
                   </table>
@@ -540,50 +549,50 @@ export default function BenchmarksPage() {
               )}
 
               <div className="flex items-center justify-between text-[11px] text-[#8c929c]">
-                <span>Saudi Deployment Benchmark (v6.0) · Greedy 1-to-1 event assignment</span>
-                <span className="font-semibold text-[#1c1f23]">100% SCL Valid Land Coverage</span>
+                <span>Saudi Deployment Benchmark (v6.1) · Verified GEE (`project=terrashift`) + STAC L2A</span>
+                <span className="font-semibold text-[#1c1f23]">Zero Synthetic Benchmark Data</span>
               </div>
             </div>
 
             {/* Sensor & Pipeline Provenance Card */}
             <div className="col-span-5 flex min-h-0 flex-col justify-between rounded-[20px] bg-white p-5 shadow-[0_8px_28px_rgba(0,0,0,0.05)]">
               <div>
-                <h3 className="text-[15px] font-semibold text-[#1c1f23]">Authentic Multispectral Pipeline</h3>
+                <h3 className="text-[15px] font-semibold text-[#1c1f23]">Authentic Multi-Modal Pipeline</h3>
                 <p className="mt-0.5 text-[12px] text-[#8c929c]">
-                  Physical Sentinel-2 L2A BOA reflectance streaming via AWS Earth Search
+                  Sentinel-2 L2A BOA reflectance + Google AlphaEarth V1 64-D embeddings
                 </p>
               </div>
 
               <div className="space-y-2 text-[11.5px]">
                 <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2">
-                  <span className="text-[#5c626b]">AWS Open Data STAC</span>
-                  <span className="font-semibold text-[#1c1f23]">Windowed COG HTTP Range Reads</span>
+                  <span className="text-[#5c626b]">Google Earth Engine V1</span>
+                  <span className="font-semibold text-[#22b567]">64-D AlphaEarth + 9-Class Dynamic World</span>
                 </div>
                 <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2">
-                  <span className="text-[#5c626b]">Multi-Resolution Alignment</span>
-                  <span className="font-semibold text-[#1c1f23]">B11 (20m) & SCL aligned to 10m grid</span>
+                  <span className="text-[#5c626b]">AWS Open Data STAC</span>
+                  <span className="font-semibold text-[#1c1f23]">Windowed L2A COG HTTP Range Reads</span>
                 </div>
                 <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2">
                   <span className="text-[#5c626b]">Physical Spectral Guard</span>
                   <span className="font-semibold text-[#22b567]">Directional ΔNDBI (Built) + ΔNDVI (Agri)</span>
                 </div>
                 <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2">
-                  <span className="text-[#5c626b]">Held-Out Generalization</span>
-                  <span className="font-semibold text-[#1c1f23]">Al-Kharj (28,2 km²) Frozen Hyperparameters</span>
+                  <span className="text-[#5c626b]">Localization Purity Gate</span>
+                  <span className="font-semibold text-[#1c1f23]">PoC ≥ 0,15 &amp; IoU ≥ 0,05 (Exact WGS84 Clip)</span>
                 </div>
                 <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2">
-                  <span className="text-[#5c626b]">SCL Surface Validity Mask</span>
-                  <span className="font-semibold text-[#1c1f23]">Quality Classes (3, 8, 9, 10 masked)*</span>
+                  <span className="text-[#5c626b]">Operational Dual-Mode</span>
+                  <span className="font-semibold text-[#1c1f23]">5-Day L2A Tactical (v5.1) + Annual GEE (v6.0)</span>
                 </div>
               </div>
 
               <div className="flex flex-col gap-1 rounded-lg border border-[#e2e8f0] bg-[#fafbfc] px-3 py-2 text-[11px] text-[#5c626b]">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">Local CPU Execution</span>
-                  <span className="font-semibold text-[#1c1f23]">301 MB RAM · $0 Cloud Cost</span>
+                  <span className="font-semibold text-[#1c1f23]">1,485s Compute · $0 Cloud GPU Cost</span>
                 </div>
                 <p className="text-[10px] text-[#8c929c] leading-tight">
-                  *SCL masks guarantee clear-land surface validity under standard criteria; thin sub-pixel cirrus or dust haze can pass.
+                  *Standalone AlphaEarth triggers 23 false alarms in invariant desert negative control zones; TerraShift physics-guided fusion reduces them to 0.
                 </p>
               </div>
             </div>

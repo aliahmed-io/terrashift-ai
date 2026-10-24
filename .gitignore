@@ -32,6 +32,10 @@ ENV/
 
 # Cache & Local Files
 .cache/
+!services/ml/.cache/
+services/ml/.cache/*
+!services/ml/.cache/gee_verified/
+!services/ml/.cache/gee_verified/*.npz
 .turbo/
 .vercel
 *.tsbuildinfo

@@ -1,28 +1,31 @@
 # TerraShift AI — Saudi Reference Benchmark Evaluation Protocol
 
-**Protocol Version**: 5.1 (Preliminary Pilot Protocol)  
+**Protocol Version**: 6.1 (Verified GEE + STAC Localization-Aware 1-to-1 Protocol)  
 **Effective Date**: October 2026  
 **Target Environment**: Kingdom of Saudi Arabia (Arid Limestone, Coastal Plain Sabkha, Northern Agricultural Basin, Central Oasis Logistics)  
-**Hardware Profile**: Local Commodity Multi-Core CPU (Zero Mandatory Cloud GPU / Zero Mandatory Paid API Keys)  
-**Primary Sensor**: Sentinel-2 Multi-Spectral Instrument (Level-2A Bottom-Of-Atmosphere BOA Reflectance via AWS Open Data)  
+**Hardware Profile**: Local Commodity Multi-Core CPU (Zero Mandatory Cloud GPU)  
+**Primary Sensors**:
+- **Optical & SWIR Physics**: Copernicus Sentinel-2 Level-2A (10m/20m BOA Reflectance via AWS Open Data STAC)
+- **Foundation Embeddings**: Google AlphaEarth Foundations V1 (`GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL`, 64-D Unit-Sphere Embeddings via Google Earth Engine `project='terrashift'`)
+- **Land-Cover Probabilities**: Google Dynamic World V1 (`GOOGLE/DYNAMICWORLD/V1`, 9-Class Near-Real-Time Probabilities via Google Earth Engine `project='terrashift'`)
 
 ---
 
-## 1. Executive Summary & Objective
+## 1. Executive Summary & Scientific Integrity Mandate
 
-TerraShift AI investigates the operational feasibility of automated satellite change detection across Saudi Arabia's arid landscape. Standard computer vision models trained on temperate European or North American urban datasets (e.g. OSCD, LEVIR-CD) suffer from severe false-positive alarm rates when deployed over Saudi Arabia. These false alarms stem from:
-1. **Limestone & Gravel Reflectance Fluctuations**: Seasonal and solar zenith angle disparities alter the optical brightness of natural desert surfaces without physical ground modification.
-2. **Spectral Similarity between Concrete and Calcrete**: Arid limestone soils exhibit spectral signatures closely mirroring foundation trenches and crushed gravel roadways.
-3. **Sabkha Moisture & Salt Dynamics**: Sub-surface coastal water table changes in regions like Jeddah alter the refractive properties and albedo of salt crusts.
-4. **Extreme Contrast in Agricultural Basins**: Center-pivot irrigation circular fields in Al-Jouf transition between hyper-arid dunes and dense chlorophyll canopies.
+TerraShift AI investigates the operational feasibility of automated satellite change detection across Saudi Arabia's hyper-arid landscape. Standard computer vision models trained on temperate European or North American urban datasets (e.g., OSCD, LEVIR-CD), as well as standalone global foundation models (Google AlphaEarth V1 and Dynamic World V1), suffer from severe false-positive alarm rates or low transition recall when deployed over Saudi Arabia without arid-calibrated spatial and physical filtering.
 
-This protocol defines an independent, reproducible evaluation methodology designed to measure event-level detection accuracy, false alarm frequencies, and operational latency on authentic Sentinel-2 Level-2A imagery without inflated claims or unearned precision metrics.
+This protocol defines a strict, auditable evaluation methodology governed by four non-negotiable rules:
+1. **Zero Synthetic Benchmark Data**: `allow_synthetic=False` is strictly enforced in all benchmark executions (`services/ml/terrashift/acquisition/earth_engine.py`). Any missing Google Earth Engine or Sentinel-2 STAC tensor raises an immediate `RuntimeError`.
+2. **Localization-Aware 1-to-1 Matching (Anti-Giant-Polygon Rule)**: Unconstrained global models often emit sprawling background polygons covering 30–100% of an AOI that trivially touch multiple reference parcels. Under Protocol v6.1, a candidate polygon must satisfy both physical intersection coverage AND localization purity (`PoC` and `IoU`) to claim at most one reference event.
+3. **Exact WGS84 Ellipsoidal Area Clipping**: Every vectorized polygon is geometrically clipped in `EPSG:4326` against `shapely.geometry.box(*aoi_bbox)` before WGS84 geodesic area integration (`pyproj.Geod(ellps="WGS84")`), mathematically bounding total changed area to $\le 100.0\%$ of the corridor.
+4. **Separate Pooled (Micro) and Corridor Macro-Averaged Reporting**: Both Pooled (sum of TP/FP/FN across all 4 corridors) and Macro-Averaged (mean of per-corridor scores) Precision, Recall, and $F_1$ are reported side-by-side so neither is conflated with the other.
 
 ---
 
 ## 2. Evaluation Corridors & Environmental Stratification
 
-Four reference corridors were selected to represent distinct geomorphological and economic development typologies in Saudi Arabia, including a dedicated held-out corridor evaluated with frozen hyperparameters:
+Four reference corridors ($91.19\text{ km}^2$ total) were selected to represent distinct geomorphological and economic development typologies in Saudi Arabia, including a dedicated held-out corridor (`alkharj_industrial_pilot`) evaluated with frozen hyperparameters:
 
 | Corridor ID | Name & Province | Bounding Box (WGS84) | Area ($\text{km}^2$) | Epoch Pair | Target Environment & Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -34,11 +37,11 @@ Four reference corridors were selected to represent distinct geomorphological an
 
 ---
 
-## 3. Independent Reference Annotations
+## 3. Reference Annotations & Provenance Disclosure
 
-To prevent precision inflation from coarse bounding envelopes, reference annotations are delineated as discrete, parcel-level features ($N=19$ across all corridors):
+> **Provenance & Scope Disclosure**: The 19 positive change events and 4 negative undisturbed control zones listed below are **parcel-level bounding-box envelopes** curated from multi-date Sentinel-2 visual/spectral inspection (RGB, SWIR B11/B12, NDVI, NDBI) and known Saudi development landmarks (ROSHN Sedra, North Obhur, Wadi As-Sirhan, Al-Kharj Industrial City). They represent pilot-scale parcel envelopes rather than dense cadastral pixel polygons surveyed by municipal field inspectors.
 
-### 3.1 Positive Ground Truth Change Events ($N=19$)
+### 3.1 Positive Reference Change Events ($N=19$)
 - **Riyadh ROSHN Sedra ($N=5$)**:
   1. `sedra_mass_grading_sector1` (`[46.721, 24.873, 46.727, 24.881]`): Sector 1 mass residential earthworks.
   2. `sedra_spine_road_paving` (`[46.718, 24.868, 46.725, 24.873]`): Spine roadway and utility trench corridor.
@@ -72,33 +75,37 @@ To audit false positive alarms over natural terrain, four persistent, undisturbe
 
 ---
 
-## 4. Evaluation Metrics & Strict 1-to-1 Matching Formulation
+## 4. Localization-Aware 1-to-1 Matching & Sensitivity Sweep
 
-### 4.1 Strict Greedy 1-to-1 Matching
-To eliminate many-to-one precision inflation:
-1. Predictions $\mathcal{P} = \{p_1, \dots, p_M\}$ are sorted in descending order of neural confidence score.
-2. Ground truth reference events $\mathcal{R} = \{r_1, \dots, r_N\}$ maintain an unclaimed registry.
-3. For each prediction $p_{(i)}$:
-   - A match occurs if $\text{Area}(p_{(i)} \cap r_j) \ge 4{,}000\text{ m}^2$ OR $\frac{\text{Area}(p_{(i)} \cap r_j)}{\text{Area}(r_j)} \ge 0.08$.
-   - If $r_j$ is unclaimed, $r_j$ is claimed and $p_{(i)}$ is marked as **True Positive (TP)**.
-   - If all matching reference events are already claimed, $p_{(i)}$ is marked as **Duplicate Detection ($\text{FP}_{\text{dup}}$)**.
-   - If no reference event matches, $p_{(i)}$ is marked as **Background False Alarm ($\text{FP}_{\text{bg}}$)**.
+### 4.1 Geometric Overlap Measures
+For each predicted polygon $P_i$ and ground-truth reference parcel box $G_j$, we compute on the WGS84 ellipsoid:
+- **Intersection Area**: $A_{\cap}(P_i, G_j) = \text{Area}_{\text{WGS84}}(P_i \cap G_j)$
+- **Recall on Change ($\text{RoC}$, Parcel Coverage)**:
+  $$\text{RoC}(P_i, G_j) = \frac{\text{Area}_{\text{WGS84}}(P_i \cap G_j)}{\text{Area}_{\text{WGS84}}(G_j)}$$
+- **Precision on Change ($\text{PoC}$, Prediction Purity)**:
+  $$\text{PoC}(P_i, G_j) = \frac{\text{Area}_{\text{WGS84}}(P_i \cap G_j)}{\text{Area}_{\text{WGS84}}(P_i)}$$
+- **Intersection-over-Union ($\text{IoU}$)**:
+  $$\text{IoU}(P_i, G_j) = \frac{\text{Area}_{\text{WGS84}}(P_i \cap G_j)}{\text{Area}_{\text{WGS84}}(P_i \cup G_j)}$$
 
-### 4.2 Primary Operational Metrics
-1. **Strict 1-to-1 Event Precision**:
-   $$\text{Precision}_{\text{strict}} = \frac{\text{TP}}{\text{Total Predictions}} = \frac{\text{TP}}{\text{TP} + \text{FP}_{\text{dup}} + \text{FP}_{\text{bg}}}$$
-2. **Event Validity Precision**:
-   $$\text{Precision}_{\text{validity}} = \frac{\text{TP}}{\text{TP} + \text{FP}_{\text{bg}}}$$
-3. **Duplicate Alert Rate**:
-   $$\text{Rate}_{\text{dup}} = \frac{\text{FP}_{\text{dup}}}{\text{Total Predictions}}$$
-4. **Event Recall**:
-   $$\text{Recall} = \frac{\text{Claimed Reference Events}}{\text{Total Reference Events}}$$
-5. **Pooled Area False Alert Density**:
-   $$\text{FA}_{100, \text{pooled}} = \frac{\sum (\text{FP}_{\text{dup}} + \text{FP}_{\text{bg}})}{\sum \text{AOI Area (km}^2\text{)}} \times 100$$
-6. **Macro-Averaged False Alert Density**:
-   $$\text{FA}_{100, \text{macro}} = \frac{1}{K} \sum_{k=1}^K \text{FA}_{100, k}$$
-7. **SCL Clear-Land Surface Validity**:
-   $$SCL_{\text{valid}} = \min(SCL_{\text{valid}}^{T1}, SCL_{\text{valid}}^{T2}) \times 100\%$$
-   *(Disclosure: SCL masks guarantee clear-land surface validity under standard operational criteria; thin sub-pixel cirrus or dust haze can pass).*
-8. **Pure CPU Compute Latency**:
-   Measured CPU forward pass time ($1.166\text{s}$) plus geographic vectorization time ($0.253\text{s}$) independent of network STAC I/O.
+### 4.2 Standard Protocol v6.1 Eligibility & Greedy 1-to-1 Assignment
+Instead of an arbitrary area cap on predictions, a candidate pair $(P_i, G_j)$ is eligible to match under the **Standard (`PoC>=0.15, IoU>=0.05`)** regime if and only if:
+1. **Parcel Coverage**: $A_{\cap}(P_i, G_j) \ge 3{,}500\text{ m}^2$ OR $\text{RoC}(P_i, G_j) \ge 0.08$, **AND**
+2. **Localization Purity**: $(\text{PoC}(P_i, G_j) \ge 0.15 \text{ AND } \text{IoU}(P_i, G_j) \ge 0.05)$ OR $\text{PoC}(P_i, G_j) \ge 0.30$ (allowing compact surgical sub-parcel detections whose area resides $\ge 30\%$ inside the reference parcel).
+
+Predictions are sorted in descending order of confidence score. Each prediction $P_i$ selects the highest-$\text{IoU}$ unclaimed eligible reference event $G_j$:
+- If an unclaimed eligible $G_j$ exists, $G_j$ is claimed and $P_i$ is recorded as a **True Positive ($\text{TP}$)**.
+- If $P_i$ satisfies the eligibility criteria only against already-claimed reference events, $P_i$ is penalized as a **Duplicate False Positive ($\text{FP}_{\text{dup}}$)**.
+- If $P_i$ fails localization purity or misses all reference parcels (including sprawling giant polygons with $\text{PoC} < 0.15$), $P_i$ is penalized as a **Background False Alarm ($\text{FP}_{\text{bg}}$)**.
+
+### 4.3 Multi-Threshold Localization Sensitivity Sweep
+To ensure full transparency across evaluation stringencies, every run evaluates all 7 models across four localization regimes simultaneously (`reports/saudi_pilot_evaluation.json`):
+1. **`relaxed` (`PoC>=0.05, IoU>=0.02`)**: Permissive overlap threshold.
+2. **`standard` (`PoC>=0.15, IoU>=0.05`)**: Official headline benchmark regime.
+3. **`moderate` (`PoC>=0.20, IoU>=0.08`)**: Stricter boundary alignment.
+4. **`strict` (`PoC>=0.25, IoU>=0.10`)**: High parcel localization purity.
+
+### 4.4 Pooled (Micro) vs. Corridor Macro-Averaged Metrics
+- **Pooled (Micro) Metrics**: Computed from the global sums across all $K=4$ corridors ($\sum \text{TP}, \sum \text{FP}, \sum \text{FN}$):
+  $$\text{Precision}_{\text{pooled}} = \frac{\sum_{k=1}^K \text{TP}_k}{\sum_{k=1}^K (\text{TP}_k + \text{FP}_k)}, \quad \text{Recall}_{\text{pooled}} = \frac{\sum_{k=1}^K \text{TP}_k}{19}, \quad F_{1,\text{pooled}} = \frac{2 \cdot \text{Precision}_{\text{pooled}} \cdot \text{Recall}_{\text{pooled}}}{\text{Precision}_{\text{pooled}} + \text{Recall}_{\text{pooled}}}$$
+- **Corridor Macro-Averaged Metrics**: Computed as the unweighted arithmetic mean across the $K=4$ corridors:
+  $$\text{Precision}_{\text{macro}} = \frac{1}{K}\sum_{k=1}^K \text{Precision}_k, \quad \text{Recall}_{\text{macro}} = \frac{1}{K}\sum_{k=1}^K \text{Recall}_k, \quad F_{1,\text{macro}} = \frac{2 \cdot \text{Precision}_{\text{macro}} \cdot \text{Recall}_{\text{macro}}}{\text{Precision}_{\text{macro}} + \text{Recall}_{\text{macro}}}$$

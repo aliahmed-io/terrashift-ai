@@ -133,16 +133,17 @@ def run_analysis(req: AnalyzeRequest, fetcher: Optional[Fetcher] = None) -> Iter
             "t2_ndbi": stac_t2.true_ndbi,
         }
 
-    if model_type.startswith("alphaearth"):
+    if model_type.startswith("alphaearth") or model_type == "dynamic_world_lulc":
         from terrashift.acquisition.earth_engine import EarthEngineManager
         from terrashift.inference.alphaearth_change import (
             detect_alphaearth_classifier,
             detect_alphaearth_cosine,
             detect_alphaearth_dynamic_world,
             detect_alphaearth_hybrid,
+            detect_dynamic_world_lulc,
             vectorize_alphaearth_changes,
         )
-        yield _event(4, "Fetching AlphaEarth 64-D foundation model embeddings", 75)
+        yield _event(4, "Fetching AlphaEarth 64-D & Dynamic World V1 tensors via GEE", 75)
         eem = EarthEngineManager()
         t1_alpha = eem.get_annual_alphaearth_embeddings(bbox, req.year_t1, target_shape=analysis_grid.shape)
         t2_alpha = eem.get_annual_alphaearth_embeddings(bbox, req.year_t2, target_shape=analysis_grid.shape)
@@ -153,11 +154,22 @@ def run_analysis(req: AnalyzeRequest, fetcher: Optional[Fetcher] = None) -> Iter
         elif model_type in ("alphaearth_dw", "alphaearth_dynamic_world"):
             det_res = detect_alphaearth_dynamic_world(t1_alpha, t2_alpha, threshold=threshold if threshold != 0.5 else 0.10)
             collection = vectorize_alphaearth_changes(det_res, analysis_grid, min_area_m2=min_area_m2)
+        elif model_type == "dynamic_world_lulc":
+            det_res = detect_dynamic_world_lulc(t1_alpha, t2_alpha, prob_threshold=threshold if threshold != 0.5 else 0.45)
+            collection = vectorize_alphaearth_changes(det_res, analysis_grid, min_area_m2=min_area_m2)
         elif model_type == "alphaearth_supervised":
             det_res = detect_alphaearth_classifier(t1_alpha, t2_alpha, threshold=threshold)
             collection = vectorize_alphaearth_changes(det_res, analysis_grid, min_area_m2=min_area_m2)
-        else: # alphaearth_hybrid
-            det_res = detect_alphaearth_hybrid(t1_alpha, t2_alpha, multispectral_context=multi_ctx, threshold=threshold if threshold != 0.5 else 0.12)
+        else:  # alphaearth_hybrid
+            siam_det, _ = detect_change(rgb1, rgb2, valid, threshold=0.38)
+            det_res = detect_alphaearth_hybrid(
+                t1_alpha,
+                t2_alpha,
+                multispectral_context=multi_ctx,
+                siamese_mask=siam_det.mask,
+                siamese_prob=siam_det.probability,
+                threshold=threshold if threshold != 0.5 else 0.12,
+            )
             collection = vectorize_alphaearth_changes(det_res, analysis_grid, min_area_m2=min_area_m2, multispectral_context=multi_ctx)
 
         model_meta = {"name": det_res.model_name, "id": det_res.model_id, "family": "foundation_model"}

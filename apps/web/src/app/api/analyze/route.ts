@@ -13,16 +13,17 @@ const bodySchema = z
     minAreaM2: z.number().min(100).max(1000000).optional().default(2000.0),
     modelType: z
       .enum([
+        "alphaearth_hybrid",
         "siamese_tuned",
         "siamese_untuned",
         "alphaearth_cosine",
         "alphaearth_dw",
+        "dynamic_world_lulc",
         "alphaearth_supervised",
-        "alphaearth_hybrid",
         "multispectral_physical",
       ])
       .optional()
-      .default("siamese_tuned"),
+      .default("alphaearth_hybrid"),
   })
   .refine((d) => d.yearT1 < d.yearT2, {
     message: "Year T1 must precede Year T2",

@@ -66,6 +66,9 @@ def vectorize_changes(
     t1_ndbi = multispectral_context.get("t1_ndbi") if has_multi and multispectral_context else None
     t2_ndbi = multispectral_context.get("t2_ndbi") if has_multi and multispectral_context else None
 
+    aoi_bbox = getattr(grid, "bbox", None)
+    aoi_clip_box = shapely.box(*aoi_bbox) if aoi_bbox is not None else None
+
     slices = ndimage.find_objects(labels)
     candidates: List[Dict[str, Any]] = []
     for idx, sl in enumerate(slices, start=1):
@@ -78,6 +81,20 @@ def vectorize_changes(
         lon, lat = grid.to_lonlat(
             np.asarray(poly.exterior.coords)[:, 0], np.asarray(poly.exterior.coords)[:, 1]
         )
+        geo_poly = Polygon(list(zip(lon, lat)))
+        if aoi_clip_box is not None:
+            geo_poly = geo_poly.intersection(aoi_clip_box)
+            if geo_poly.is_empty:
+                continue
+            if geo_poly.geom_type == "MultiPolygon" or geo_poly.geom_type == "GeometryCollection":
+                polys = [g for g in geo_poly.geoms if g.geom_type == "Polygon" and not g.is_empty]
+                if not polys:
+                    continue
+                geo_poly = max(polys, key=lambda g: g.area)
+            if geo_poly.geom_type != "Polygon" or len(geo_poly.exterior.coords) < 3:
+                continue
+        c_coords = np.asarray(geo_poly.exterior.coords)
+        lon, lat = c_coords[:, 0], c_coords[:, 1]
         area_m2 = abs(float(_geod.polygon_area_perimeter(lon, lat)[0]))
         if area_m2 < min_area_m2:
             continue

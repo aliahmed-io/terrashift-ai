@@ -3,7 +3,7 @@
 
 \section{Saudi Reference Ground-Truth Event Catalog}
 \label{sec:ref_event_catalog}
-Table \ref{tab:catalog_reference_events} catalogs all 19 independently annotated parcel-level reference events and four negative control zones across the four Saudi evaluation corridors.
+Table \ref{tab:catalog_reference_events} catalogs all 19 coarse parcel-level reference events and four negative control zones across the four Saudi evaluation corridors ($91.19\text{ km}^2$), curated from multi-date Sentinel-2 L2A visual/spectral inspection and known Saudi landmarks.
 
 \begin{longtable}{@{}lllrrp{4.2cm}@{}}
 \caption{Complete Ground-Truth Reference Event Catalog ($91.19\text{ km}^2$).}
@@ -42,48 +42,26 @@ Al-Kharj (Held-Out) & \texttt{alkharj\_access\_road}& Road Corridor & 47.272 & 2
 Al-Kharj (Held-Out) & \texttt{alkharj\_neg\_desert}& \textbf{Negative Control} & 47.256 & 24.104 & Undisturbed gravel desert plateau \\
 \end{longtable}
 
-\section{Comprehensive Multi-Model Per-Corridor Scorecard}
+\section{Pooled vs. Corridor Macro-Averaged Summary Scorecard}
 \label{sec:complete_scorecard_table}
-Table \ref{tab:full_multi_model_scorecard} presents the complete evaluation results for all seven models across every corridor.
+Table \ref{tab:full_multi_model_scorecard} presents the Pooled (micro) and Corridor Macro-Averaged summary metrics for all seven models evaluated in the v6.1 Saudi Deployment Benchmark.
 
 \begin{table}[htbp]
 \centering
-\caption{Comprehensive Multi-Model Saudi Evaluation Matrix.}
+\caption{Pooled (Micro) vs. Corridor Macro-Averaged Multi-Model Leaderboard ($91.19\text{ km}^2$).}
 \label{tab:full_multi_model_scorecard}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{@{}llrrrrrrr@{}}
 \toprule
-\textbf{Model ID} & \textbf{Corridor Name} & \textbf{Alerts} & \textbf{TP} & \textbf{FP$_{\text{dup}}$} & \textbf{FP$_{\text{bg}}$} & \textbf{Strict Prec} & \textbf{Recall} & \textbf{FA / 100km$^2$} \\
+\textbf{Rank} & \textbf{Model ID} & \textbf{Pooled F1} & \textbf{Macro F1} & \textbf{Pooled Prec} & \textbf{Macro Prec} & \textbf{Recall} & \textbf{False Alarms} & \textbf{Neg Hits} \\
 \midrule
-\multirow{4}{*}{\texttt{siamese\_untuned}} 
- & Riyadh Sedra & 28 & 5 & 5 & 18 & 17.9\% & 100.0\% & 128.6 \\
- & Jeddah Obhur & 35 & 4 & 2 & 29 & 11.4\% & 100.0\% & 169.3 \\
- & Al-Jouf Sirhan & 25 & 5 & 1 & 19 & 20.0\% & 100.0\% & 74.6 \\
- & Al-Kharj (Held-Out) & 44 & 3 & 1 & 40 & 6.8\% & 60.0\% & 145.5 \\
-\midrule
-\multirow{4}{*}{\textbf{\texttt{siamese\_tuned\_filtered}}} 
- & \textbf{Riyadh Sedra} & \textbf{9} & \textbf{5} & \textbf{2} & \textbf{2} & \textbf{55.6\%} & \textbf{100.0\%} & \textbf{22.4} \\
- & \textbf{Jeddah Obhur} & \textbf{5} & \textbf{4} & \textbf{0} & \textbf{1} & \textbf{80.0\%} & \textbf{100.0\%} & \textbf{5.5} \\
- & \textbf{Al-Jouf Sirhan} & \textbf{22} & \textbf{5} & \textbf{1} & \textbf{16} & \textbf{22.7\%} & \textbf{100.0\%} & \textbf{63.4} \\
- & \textbf{Al-Kharj (Held-Out)} & \textbf{17} & \textbf{4} & \textbf{1} & \textbf{12} & \textbf{23.5\%} & \textbf{80.0\%} & \textbf{46.1} \\
-\midrule
-\multirow{4}{*}{\texttt{multispectral\_physical}} 
- & Riyadh Sedra & 32 & 5 & 5 & 22 & 15.6\% & 100.0\% & 151.0 \\
- & Jeddah Obhur & 32 & 4 & 4 & 24 & 12.5\% & 100.0\% & 152.9 \\
- & Al-Jouf Sirhan & 27 & 5 & 2 & 20 & 18.5\% & 100.0\% & 82.0 \\
- & Al-Kharj (Held-Out) & 27 & 4 & 1 & 22 & 14.8\% & 80.0\% & 81.6 \\
-\midrule
-\multirow{4}{*}{\texttt{alphaearth\_cosine}} 
- & Riyadh Sedra & 1 & 1 & 0 & 0 & 100.0\% & 20.0\% & 0.0 \\
- & Jeddah Obhur & 1 & 1 & 0 & 0 & 100.0\% & 25.0\% & 0.0 \\
- & Al-Jouf Sirhan & 1 & 1 & 0 & 0 & 100.0\% & 20.0\% & 0.0 \\
- & Al-Kharj (Held-Out) & 1 & 1 & 0 & 0 & 100.0\% & 20.0\% & 0.0 \\
-\midrule
-\multirow{4}{*}{\texttt{alphaearth\_hybrid}} 
- & Riyadh Sedra & 1 & 1 & 0 & 0 & 100.0\% & 20.0\% & 0.0 \\
- & Jeddah Obhur & 1 & 1 & 0 & 0 & 100.0\% & 25.0\% & 0.0 \\
- & Al-Jouf Sirhan & 1 & 1 & 0 & 0 & 100.0\% & 20.0\% & 0.0 \\
- & Al-Kharj (Held-Out) & 1 & 1 & 0 & 0 & 100.0\% & 20.0\% & 0.0 \\
+\textbf{\#1} & \textbf{\texttt{alphaearth\_hybrid} (v6.0)} & \textbf{79.2\%} & \textbf{82.5\%} & \textbf{65.5\%} & \textbf{70.1\%} & \textbf{100.0\%} & \textbf{10} & \textbf{0} \\
+\textbf{\#2} & \textbf{\texttt{siamese\_tuned\_filtered} (v5.1)} & \textbf{53.5\%} & \textbf{64.1\%} & \textbf{36.5\%} & \textbf{47.2\%} & \textbf{100.0\%} & \textbf{33} & \textbf{0} \\
+\#3 & \texttt{alphaearth\_cosine} (Model A) & 27.0\% & 31.4\% & 15.9\% & 19.1\% & 89.5\% & 90 & 23 \\
+\#4 & \texttt{multispectral\_physical} & 26.5\% & 26.7\% & 15.4\% & 15.5\% & 94.7\% & 99 & 0 \\
+\#5 & \texttt{siamese\_untuned} & 23.8\% & 25.3\% & 13.6\% & 14.6\% & 94.7\% & 114 & 5 \\
+\#6 & \texttt{dynamic\_world\_lulc} & 19.7\% & 27.9\% & 14.3\% & 33.5\% & 31.6\% & 36 & 6 \\
+\#7 & \texttt{alphaearth\_dynamic\_world} (Model B) & 16.3\% & 25.9\% & 13.3\% & 33.6\% & 21.1\% & 26 & 4 \\
 \bottomrule
 \end{tabular}%
 }

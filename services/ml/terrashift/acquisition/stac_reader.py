@@ -55,6 +55,7 @@ class STACGrid:
     res_y: float
     width: int
     height: int
+    bbox: Optional[Tuple[float, float, float, float]] = None
 
     def to_lonlat(self, col: NDArray[np.float64], row: NDArray[np.float64]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         transformer = Transformer.from_crs(self.crs, "EPSG:4326", always_xy=True)
@@ -247,6 +248,7 @@ def read_stac_scene_window(
         res_y=10.0,
         width=target_w,
         height=target_h,
+        bbox=(float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])),
     )
 
     ready_scene = AnalysisReadyScene(
