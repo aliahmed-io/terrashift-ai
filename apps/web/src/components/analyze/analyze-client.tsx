@@ -45,6 +45,15 @@ const WADI_SPECTRAL_ROWS = [
   { val: 0.04, distM: 195, pct: 3, color: "bg-[#e94235]" },
 ] as const;
 
+export const DETECTOR_MODELS = [
+  { id: "siamese_tuned", label: "Siamese U-Net + L2A Spectral Guard" },
+  { id: "alphaearth_hybrid", label: "AlphaEarth Foundation Hybrid (Model D)" },
+  { id: "alphaearth_cosine", label: "AlphaEarth 64-D Cosine Distance (Model A)" },
+  { id: "alphaearth_dw", label: "AlphaEarth + Dynamic World (Model B)" },
+  { id: "alphaearth_supervised", label: "AlphaEarth Supervised Classifier (Model C)" },
+  { id: "multispectral_physical", label: "Pure Physical Multispectral Baseline" },
+] as const;
+
 function formatComma(num: number, decimals = 3): string {
   return num.toFixed(decimals).replace(".", ",");
 }
@@ -64,7 +73,8 @@ export function AnalyzeClient() {
   const [viewMode, setViewMode] = useState<StudioViewMode>("diagnostic");
   const zoomActionsRef = useRef<{ zoomIn: () => void; zoomOut: () => void } | null>(null);
   const [cardSlide, setCardSlide] = useState<0 | 1>(0);
-  const [threshold, setThreshold] = useState<number>(0.45);
+  const [threshold, setThreshold] = useState<number>(0.48);
+  const [selectedModel, setSelectedModel] = useState<string>("siamese_tuned");
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [liveChangePct, setLiveChangePct] = useState<number | null>(null);
@@ -100,6 +110,7 @@ export function AnalyzeClient() {
           yearT2: Math.max(2018, activeYear),
           threshold,
           minAreaM2: 2000,
+          modelType: selectedModel,
         }),
       });
       if (res.ok && res.body) {
@@ -297,6 +308,23 @@ export function AnalyzeClient() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <div className="mb-1.5 flex items-center justify-between text-[12px]">
+                  <span className="text-[#636973]">Detection Paradigm</span>
+                </div>
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="w-full rounded-lg bg-[#f4f5f7] px-2.5 py-1.5 text-[11.5px] font-medium text-[#1c1f23] outline-none transition-colors hover:bg-[#edeff2]"
+                >
+                  {DETECTOR_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

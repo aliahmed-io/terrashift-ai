@@ -1,0 +1,129 @@
+\chapter{System Architecture and Implementation}
+\label{ch:architecture}
+
+\section{Introduction}
+\label{sec:arch_intro}
+Delivering a production-ready, interactive geospatial AI platform requires a decoupled, high-performance architectural design. High-resolution satellite imagery involves large raster volumes, intensive matrix transformations, and complex coordinate geometry operations. Naive architectural choices—such as processing unwindowed multi-gigabyte satellite scenes in the client or blocking HTTP requests during lengthy inferences—inevitably lead to catastrophic browser freezing and user abandonment.
+
+This chapter presents the full-stack software architecture of TerraShift AI. We detail the dual-tier topology combining a Next.js 16 frontend with a Python FastAPI inference microservice, the Server-Sent Events (SSE) streaming state machine, on-demand windowed Cloud-Optimized GeoTIFF (COG) HTTP range reading, GPU-accelerated MapLibre GL cartography, memory profiling on local CPU hardware, and security engineering.
+
+\section{Full-Stack Architectural Topology}
+\label{sec:arch_topology}
+TerraShift AI is engineered as an enterprise-grade, two-tier decoupled system (Figure \ref{fig:system_architecture}):
+\begin{enumerate}
+    \item \textbf{Web Application Layer (Next.js 16):} Hosts the user interface, cartographic canvas, client-side geodetic calculations, and API orchestration. Built on the modern Next.js 16 App Router using React 19, TypeScript (strict mode), and Tailwind CSS design tokens.
+    \item \textbf{Machine Learning \& Geospatial Microservice (FastAPI):} A specialized Python 3.12 asynchronous service dedicated to STAC querying, COG window streaming, neural network inference, foundation model feature extraction, physical spectral filtering, and polygon vectorization.
+\end{enumerate}
+
+\begin{figure}[htbp]
+\centering
+\fbox{
+\begin{minipage}{0.92\textwidth}
+\centering
+\vspace*{0.3cm}
+\textbf{\large TerraShift AI System Architectural Topology}\\[0.4cm]
+\begin{tabularx}{\textwidth}{|X|c|X|}
+\hline
+\multicolumn{3}{|c|}{\textbf{Client Tier (Web Browser / MapLibre GL Engine)}} \\
+\multicolumn{3}{|c|}{Next.js 16 App Router $\cdot$ React 19 $\cdot$ TypeScript $\cdot$ Tailwind Tokens $\cdot$ WebGL Cartography} \\
+\hline
+\multicolumn{3}{c}{$\Big\Downarrow$ JSON / SSE Stream (Proxied via \texttt{/api/analyze})} \\
+\hline
+\multicolumn{3}{|c|}{\textbf{Application Gateway Tier (Next.js Edge / Node.js Runtime)}} \\
+\multicolumn{3}{|c|}{Rate Limiter (30 req/min) $\cdot$ Zod Request Validation $\cdot$ Key Security Guard} \\
+\hline
+\multicolumn{3}{c}{$\Big\Downarrow$ Internal HTTP REST / Streaming (\texttt{http://127.0.0.1:8000})} \\
+\hline
+\multicolumn{3}{|c|}{\textbf{Geospatial Machine Learning Microservice (FastAPI / Python 3.12)}} \\
+\hline
+\textbf{Data Ingestion Layer} & \textbf{AI Inference Core} & \textbf{Vector \& Geo Engine} \\
+$\bullet$ AWS STAC Client & $\bullet$ Siamese U-Net (PyTorch) & $\bullet$ Rasterio Sieve Filter \\
+$\bullet$ COG HTTP Range Reads & $\bullet$ AlphaEarth (64-D Latent) & $\bullet$ Shapely Polygonizer \\
+$\bullet$ EOX Tile Fetcher & $\bullet$ Dynamic World LULC & $\bullet$ Geod WGS84 Metrics \\
+$\bullet$ GEE Python API & $\bullet$ Directional Physical Guards & $\bullet$ GeoJSON Formatter \\
+\hline
+\end{tabularx}
+\vspace*{0.3cm}
+\end{minipage}
+}
+\caption{End-to-end full-stack architectural topology of TerraShift AI.}
+\label{fig:system_architecture}
+\end{figure}
+
+\section{Server-Sent Events (SSE) Streaming Pipeline}
+\label{sec:arch_sse}
+Because satellite data acquisition from remote cloud repositories (AWS Earth Search) can take several seconds depending on network throughput, standard synchronous HTTP POST requests result in opaque browser loading spinners and risk client timeout disconnects. TerraShift AI resolves this by implementing a **Server-Sent Events (SSE)** streaming protocol via the endpoint \texttt{/v1/analyze/stream}.
+
+When a user initiates an analysis over an Area of Interest, the backend initiates a generator yielding progressive JSON event packets over an open HTTP connection (\texttt{text/event-stream}), updating the client's state machine in real time (Figure \ref{fig:sse_pipeline}):
+
+\begin{figure}[htbp]
+\centering
+\fbox{
+\begin{minipage}{0.9\textwidth}
+\small
+\begin{enumerate}
+    \item \textbf{Step 1 (Progress 8\%):} \texttt{\{"step": 1, "label": "Planning imagery window"\}} \\
+    Validates polygon coordinates, calculates geodetic surface area via WGS84 ellipsoidal geometry, and constructs the target bounding grid.
+    \item \textbf{Step 2 (Progress 18\%):} \texttt{\{"step": 2, "label": "Searching authentic Sentinel-2 L2A STAC acquisitions"\}} \\
+    Queries the AWS Earth Search STAC catalog for cloudless acquisitions within the target calendar month.
+    \item \textbf{Step 3 (Progress 58\%):} \texttt{\{"step": 3, "label": "Acquired genuine L2A COGs (Scene T1 \& Scene T2)"\}} \\
+    Streams windowed multi-band raster arrays (B02, B03, B04, B08, B11, SCL) and applies the bitemporal clear-land validity mask.
+    \item \textbf{Step 4 (Progress 80\%):} \texttt{\{"step": 4, "label": "Executing change inference \& physical spectral gating"\}} \\
+    Executes the selected model (Siamese U-Net or AlphaEarth) and applies directional physical spectral guards ($\Delta\text{NDBI}$, $\Delta\text{NDVI}$).
+    \item \textbf{Step 5 (Progress 96\%):} \texttt{\{"step": 5, "label": "Vectorising polygons & computing surface areas"\}} \\
+    Performs 8-connectivity component labeling, prunes noise artifacts ($<3500\text{ m}^2$), and builds georeferenced GeoJSON polygons.
+    \item \textbf{Step 6 (Done 100\%):} \texttt{\{"done": true, "result": \{...GeoJSON FeatureCollection...\}\}} \\
+    Delivers final change polygons, area measurements, and spectral metadata to the MapLibre GL layer for immediate rendering.
+\end{enumerate}
+\end{minipage}
+}
+\caption{The six-stage Server-Sent Events (SSE) progressive streaming pipeline.}
+\label{fig:sse_pipeline}
+\end{figure}
+
+\section{On-Demand Windowed STAC COG HTTP Range Reads}
+\label{sec:arch_cog_streaming}
+A single full-tile Copernicus Sentinel-2 Level-2A product spans $100\text{ km} \times 100\text{ km}$ and consumes over \textbf{600 MB} of uncompressed data per acquisition date. Downloading two entire scenes (1.2 GB) merely to inspect a $20\text{ km}^2$ urban corridor ($256 \times 256$ pixels, $\approx 1.5\text{ MB}$) is computationally and logistically prohibitive.
+
+TerraShift AI solves this bottleneck through **Cloud-Optimized GeoTIFF (COG) HTTP Range Reads**:
+\begin{enumerate}
+    \item \textbf{SpatioTemporal Asset Catalog (STAC) Discovery:} The client queries the AWS Element84 STAC API (\texttt{earth-search.aws.element84.com/v1}) to identify candidate Level-2A granules matching the AOI coordinates, acquisition year, target month, and maximum allowable cloud cover ($\le 20\%$).
+    \item \textbf{HTTP 206 Partial Content Range Streaming:} Sentinel-2 COG files hosted on AWS Open Data S3 buckets are internally organized into internal tile grids ($512 \times 512$ pixel blocks) with embedded overviews. Using GDAL's virtual file system handler (\texttt{/vsicurl/}) wrapped by \texttt{rasterio.windows.Window}, TerraShift reads \textbf{only} the specific byte ranges corresponding to the intersection of the user's bounding box and the satellite granule.
+    \item \textbf{Band Decoupling:} The system streams only the six essential analysis bands: Blue (B02), Green (B03), Red (B04), NIR (B08), SWIR-1 (B11), and Scene Classification (SCL). All remaining auxiliary bands (e.g., coastal aerosol B01, water vapor B09) are bypassed.
+\end{enumerate}
+
+This windowing architecture reduces total network data transfer from \textbf{1,200 MB down to less than 4.5 MB} per bitemporal analysis run—a \textbf{99.6\% reduction in bandwidth consumption}.
+
+\section{MapLibre GL Hardware-Accelerated Cartography}
+\label{sec:arch_maplibre}
+The web frontend incorporates MapLibre GL JS, an open-source, WebGL-accelerated mapping engine. Key cartographic capabilities include:
+\begin{itemize}
+    \item \textbf{High-Performance Polygon Rendering:} Detected change polygons are rendered as dynamic GeoJSON layers directly on the client's GPU, supporting real-time hover inspection, opacity adjustment, and click-to-zoom bounding.
+    \item \textbf{Bitemporal Split-Screen Comparison:} Users can drag an interactive optical split slider across the map canvas, comparing the cloudless baseline scene ($T_1$) with the current observation ($T_2$) to visually verify construction boundaries.
+    \item \textbf{Multispectral Shader Composites:} The map engine dynamically switches between true-color optical (RGB), false-color NIR chlorophyll enhancement (B08/B04/B03), and short-wave infrared built-up contrast ($\Delta\text{NDBI}$), allowing users to visually cross-examine algorithmic alerts against distinct spectral bands.
+\end{itemize}
+
+\section{CPU Compute Profiling and Memory Bounds}
+\label{sec:arch_profiling}
+A foundational requirement of this project (NFR-01 and NFR-02) is that the system must remain fully operational without expensive cloud GPU clusters or specialized acceleration hardware. We rigorously profiled system resource consumption on a standard commercial CPU (Intel Core i9-14900K, running on single-thread and four-thread allocations).
+
+\subsection{Latency Decomposition: Pure Compute vs. Data Acquisition}
+To provide an honest empirical baseline, TerraShift explicitly decouples **data acquisition latency** from **pure CPU compute latency**:
+\begin{itemize}
+    \item \textbf{Cold-Cache Acquisition Latency (51.14 s):} When a satellite scene is accessed for the first time, network round-trip time across AWS STAC servers, COG header parsing, and HTTP 206 byte fetches require $\approx 51$ seconds.
+    \item \textbf{Warm-Cache Pipeline Latency (4.18 s):} When imagery tiles are cached in local SSD memory (\texttt{.cache/stac/}), end-to-end pipeline execution drops to \textbf{4.18 seconds}.
+    \item \textbf{Pure CPU Compute Latency (0.495 s):} Pure compute time—encompassing tensor normalization, PyTorch neural inference, physical spectral index gating, connected-component labeling, and GeoJSON polygon generation—executes in an astonishing \textbf{0.495 seconds} on CPU hardware.
+\end{itemize}
+
+\subsection{Memory Footprint Bounds}
+Peak memory utilization during full-stack processing was monitored via Python's \texttt{tracemalloc} and memory profiler utilities. For a standard $28\text{ km}^2$ evaluation corridor, peak system memory footprint remained strictly bounded at \textbf{301 MB RAM}, far below the 500 MB design ceiling (NFR-02). This enables TerraShift to be hosted seamlessly on standard micro-servers or low-cost virtual private servers (VPS) without memory overflow risk.
+
+\section{Security and Key Management Architecture}
+\label{sec:arch_security}
+Adhering to strict enterprise security standards, TerraShift AI implements robust defensive mechanisms:
+\begin{itemize}
+    \item \textbf{Zero Client-Side Credentials:} No cloud API keys, Google Cloud service account tokens, or AWS credentials are ever transmitted to or stored within the client browser. All third-party interactions (GEE, AWS STAC, Nominatim Geocoding) are strictly mediated through authenticated, rate-limited backend endpoints.
+    \item \textbf{Sliding-Window IP Rate Limiting:} The Next.js API gateway enforces an in-memory sliding-window rate limiter restricting client IPs to a maximum of \textbf{30 requests per minute}, mitigating Denial of Service (DoS) attacks and quota exhaustion.
+    \item \textbf{Strict Input Validation via Zod and Pydantic:} Every incoming request is validated through dual schemas: Zod schemas at the Next.js API layer and Pydantic models at the FastAPI layer, ensuring that invalid coordinates, malformed polygons, or inverted observation dates are rejected with explicit HTTP 422 errors before reaching compute engines.
+\end{itemize}
+\newpage

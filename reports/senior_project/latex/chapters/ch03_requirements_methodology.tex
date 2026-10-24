@@ -1,0 +1,110 @@
+\chapter{Requirements and System Methodology}
+\label{ch:requirements}
+
+\section{Introduction}
+\label{sec:req_intro}
+Translating complex geospatial machine learning algorithms into an operational, reliable software product requires rigorous requirements engineering and a disciplined system methodology. This chapter formalizes the stakeholder landscape, articulates the functional and non-functional requirements governing TerraShift AI, outlines the Senior Project Defense Readiness Gate Framework, and details the iterative research methodology adopted throughout the project lifecycle.
+
+\section{Stakeholder Analysis and User Personas}
+\label{sec:req_stakeholders}
+The design of TerraShift AI is driven by three primary operational user personas representing real-world institutional and industrial workflows across the Kingdom of Saudi Arabia:
+
+\subsection{Persona 1: Municipal Urban Planning and Code Enforcement Officer}
+\begin{itemize}
+    \item \textbf{Role:} Spatial Compliance Inspector at a regional municipality (e.g., Amana of Riyadh Region or Amana of Jeddah).
+    \item \textbf{Operational Context:} Responsible for monitoring expansive suburban peripheries for unpermitted excavation, illegal subdivision of agricultural parcels, and unauthorized commercial storage depots.
+    \item \textbf{Pain Points:} Overwhelmed by false alerts from seasonal desert dust shifts; limited access to high-end GPU workstations; requires immediate, georeferenced polygon boundaries with physical surface area in square meters rather than abstract raster heatmaps.
+    \item \textbf{Platform Requirement:} Rapid screening of 10--30 $\text{km}^2$ growth corridors, zero false alarms in undisturbed natural desert zones, and one-click PDF audit reporting suitable for legal citation.
+\end{itemize}
+
+\subsection{Persona 2: Giga-Project Infrastructure and Progress Auditor}
+\begin{itemize}
+    \item \textbf{Role:} Senior Progress Monitoring Engineer at a national master-developer (e.g., ROSHN Real Estate Development).
+    \item \textbf{Operational Context:} Oversees multi-phase construction across master-planned residential communities encompassing tens of thousands of homes.
+    \item \textbf{Pain Points:} Ground surveying is slow and hazardous during summer months; commercial high-resolution imagery subscriptions are expensive and involve multi-week delivery lags.
+    \item \textbf{Platform Requirement:} Continuous verification of mass earthworks, spine road paving, and substation construction; ability to track bi-temporal vegetative survival in wadi green spaces; interactive split-screen cartographic comparison.
+\end{itemize}
+
+\subsection{Persona 3: Environmental and Agricultural Resource Analyst}
+\begin{itemize}
+    \item \textbf{Role:} Geospatial Analyst at the Ministry of Environment, Water and Agriculture (MEWA) or the National Center for Environmental Compliance (NCEC).
+    \item \textbf{Operational Context:} Monitors water extraction compliance across center-pivot agricultural basins in northern Saudi Arabia (Al-Jouf) and canopy health under the Saudi Green Initiative.
+    \item \textbf{Pain Points:} Standard algorithms fail to differentiate between permanent commercial crop expansion and transient desert weed emergence following winter rains.
+    \item \textbf{Platform Requirement:} Multi-year trend analysis; directional vegetative filtering ($\Delta\text{NDVI}$); quantitative tracking of cultivated hectares over multi-year observation windows.
+\end{itemize}
+
+\section{Functional Requirements}
+\label{sec:req_functional}
+The system architecture fulfills seven core functional requirements (FR-01 through FR-07), summarized in Table \ref{tab:functional_requirements}.
+
+\begin{table}[htbp]
+\centering
+\caption{System Functional Requirements Specification.}
+\label{tab:functional_requirements}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}llp{8.5cm}l@{}}
+\toprule
+\textbf{Req ID} & \textbf{Requirement Title} & \textbf{Functional Description} & \textbf{Priority} \\
+\midrule
+\textbf{FR-01} & Spatial AOI Delineation & The system shall allow users to interactively define an Area of Interest (AOI) via map-drawing tools, coordinate bounding box input, or predefined administrative corridor selection. & Essential \\
+\textbf{FR-02} & Bitemporal Data Acquisition & The system shall query, stream, and align authentic Sentinel-2 Level-2A surface reflectance COGs from AWS STAC and AlphaEarth 64-D annual embeddings from Google Earth Engine. & Essential \\
+\textbf{FR-03} & Multi-Model Inference & The system shall support user-selectable change detection paradigms, including Siamese U-Net, AlphaEarth Models A--D, and conventional multispectral physical baselines. & Essential \\
+\textbf{FR-04} & Directional Physical Guards & The system shall enforce electromagnetic physical constraints ($\Delta\text{NDBI} \ge +0.04$, $|\Delta\text{NDVI}| \ge 0.10$) to filter raw candidate predictions and suppress desert false alarms. & Essential \\
+\textbf{FR-05} & Connected Component Vectorization & The system shall transform binary change masks into georeferenced GeoJSON polygons, pruning noise artifacts ($<3500\text{ m}^2$) and computing spatial area and confidence metrics. & Essential \\
+\textbf{FR-06} & Interactive Cartography & The system shall provide an accelerated WebGL map canvas supporting bitemporal split-screen comparison, false-color composite toggling, and polygon inspection. & Desirable \\
+\textbf{FR-07} & Audit-Grade PDF Reporting & The system shall generate comprehensive, publication-quality PDF inspection reports containing change summaries, bounding coordinates, and metadata. & Essential \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\section{Non-Functional Requirements}
+\label{sec:req_non_functional}
+System quality and production viability are governed by six non-functional requirements (NFR-01 through NFR-06):
+
+\begin{enumerate}
+    \item \textbf{NFR-01: Pure CPU Compute Latency:} local inference and vectorization for a standard $25\text{ km}^2$ corridor ($256 \times 256$ pixels) shall execute entirely on standard CPU hardware in less than \textbf{2.0 seconds}, decoupling compute time from network data streaming.
+    \item \textbf{NFR-02: Bounded Memory Footprint:} Peak memory utilization during full-stack ingestion, inference, and polygonization shall not exceed \textbf{500 MB RAM}, enabling deployment on cost-effective micro-instances or standard laptops.
+    \item \textbf{NFR-03: Zero Cloud Infrastructure Cost:} The core application shall operate with \textbf{\$0 recurring cloud GPU expenses}, utilizing free open-data Copernicus Sentinel-2 STAC catalogs and Google Earth Engine non-commercial research quotas.
+    \item \textbf{NFR-04: Strict End-to-End Type Safety:} The codebase shall enforce strict typing across all layers: TypeScript strict mode (\texttt{noImplicitAny}, \texttt{strictNullChecks}) in the web frontend and Pydantic schema validation with runtime type guards in the Python backend.
+    \item \textbf{NFR-05: Web Accessibility (WCAG 2.1 AA):} The user interface shall comply with WCAG 2.1 Level AA accessibility standards, ensuring full keyboard navigability, high-contrast text ratios ($\ge 4.5:1$), and semantic HTML structure.
+    \item \textbf{NFR-06: Production Build Reliability:} The project shall enforce a strict Continuous Integration (CI) gate: zero lint warnings, clean Next.js production builds, and 100\% passing automated test suites (Vitest and Pytest).
+\end{enumerate}
+
+\section{Senior Project Defense Readiness Framework}
+\label{sec:req_defense_framework}
+To ensure the project meets the highest academic and professional standards for university graduation defense, we establish a \textbf{Defense Readiness Gate Framework} (Table \ref{tab:defense_gates}). Under this framework, subjective claims are strictly rejected; every assertion must be verified through reproducible empirical evidence.
+
+\begin{table}[htbp]
+\centering
+\caption{Senior Project Defense Readiness Gating Matrix.}
+\label{tab:defense_gates}
+\begin{tabularx}{\textwidth}{@{}lXll@{}}
+\toprule
+\textbf{Defense Gate} & \textbf{Evaluation Criteria} & \textbf{Target Metric} & \textbf{Status} \\
+\midrule
+\textbf{Gate 1: Build \& Lint} & Clean compilation; zero TypeScript errors; zero ESLint warnings; Next.js 16 build passes. & Zero errors / warnings & \textbf{PASSED} \\
+\textbf{Gate 2: Unit Testing} & Component and backend test coverage; Pytest and Vitest suites pass completely. & 100\% pass rate & \textbf{PASSED} \\
+\textbf{Gate 3: Baseline Reproduction} & Independent execution of OSCD academic baseline and raw RGB Siamese network. & Verified scorecard & \textbf{PASSED} \\
+\textbf{Gate 4: Authentic Data} & Genuine Sentinel-2 L2A BOA reflectance and SCL cloud masking; no uncalibrated RGB proxies. & L2A COGs verified & \textbf{PASSED} \\
+\textbf{Gate 5: Arid Evaluation} & Head-to-head evaluation across 4 Saudi corridors with strict greedy 1-to-1 matching. & 4 Corridors ($91.2\text{ km}^2$) & \textbf{PASSED} \\
+\textbf{Gate 6: False Alarm Suppression} & Documented reduction in false positive alerts on bare desert soil. & $\ge 50\%$ FA reduction & \textbf{PASSED (69.6\%)} \\
+\textbf{Gate 7: Generalization Test} & Frozen hyperparameter evaluation on held-out corridor (Al-Kharj). & Recall $\ge 80\%$ & \textbf{PASSED (80.0\%)} \\
+\textbf{Gate 8: CPU Efficiency} & Sub-second pure CPU compute execution without cloud GPU dependencies. & Compute $<2.0\text{ s}$ & \textbf{PASSED (0.495 s)} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Methodological Research Design}
+\label{sec:req_methodology_design}
+The research methodology adheres to an iterative, hypothesis-driven engineering design cycle consisting of four sequential phases:
+
+\begin{enumerate}
+    \item \textbf{Phase 1: Measure and Baseline:} Before modifying any algorithms, we construct automated benchmarking harnesses to evaluate the existing untuned model against published datasets (OSCD) and established remote sensing baselines (NDBI, NDVI differencing).
+    \item \textbf{Phase 2: Diagnose Arid Failure Modes:} We analyze error distributions over Saudi terrain, identifying the physical root causes of false alarms (seasonal sun angle shifts, limestone spectral confusion, sabkha moisture).
+    \item \textbf{Phase 3: Formulate and Implement Interventions:} We develop targeted algorithmic improvements: (a) directional physical spectral guards, (b) Google AlphaEarth 64-D foundation model integration, and (c) connected-component spatial filtering.
+    \item \textbf{Phase 4: Independent Multi-Model Evaluation:} We benchmark all competing paradigms under a strict, controlled matching protocol across core and held-out corridors, objectively determining the highest-performing architecture for operational deployment.
+\end{enumerate}
+
+This methodology ensures that deep learning is utilized only where it genuinely provides measurable value over conventional remote sensing algorithms, maintaining absolute scientific honesty and engineering pragmatism.
+\newpage

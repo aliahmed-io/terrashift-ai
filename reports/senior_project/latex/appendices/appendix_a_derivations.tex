@@ -1,0 +1,68 @@
+\chapter{Mathematical Derivations and Proofs}
+\label{app:derivations}
+
+\section{Equivalence of Euclidean Distance and Cosine Dissimilarity on Unit Hyperspheres}
+\label{sec:proof_cosine_euclidean}
+
+\begin{theorem}
+Let $\mathbf{u}, \mathbf{v} \in \R^D$ be two feature embedding vectors constrained to the $(D-1)$-dimensional unit hypersphere $\mathbb{S}^{D-1}$, such that $\norm{\mathbf{u}}_2 = 1.0$ and $\norm{\mathbf{v}}_2 = 1.0$. Then the squared Euclidean distance $\norm{\mathbf{u} - \mathbf{v}}_2^2$ is strictly proportional to the cosine dissimilarity $D_{\text{cosine}}(\mathbf{u}, \mathbf{v}) = 1.0 - \cos(\mathbf{u}, \mathbf{v})$, with exact relation:
+\begin{equation}
+    \norm{\mathbf{u} - \mathbf{v}}_2^2 = 2 \cdot D_{\text{cosine}}(\mathbf{u}, \mathbf{v})
+    \label{eq:proof_euclidean_cosine}
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+Expand the squared Euclidean $L_2$ norm using the algebraic inner product definition:
+\begin{align}
+    \norm{\mathbf{u} - \mathbf{v}}_2^2 &= \sum_{k=0}^{D-1} (u_k - v_k)^2 \\
+    &= \sum_{k=0}^{D-1} \left( u_k^2 - 2 u_k v_k + v_k^2 \right) \\
+    &= \sum_{k=0}^{D-1} u_k^2 + \sum_{k=0}^{D-1} v_k^2 - 2 \sum_{k=0}^{D-1} u_k v_k \\
+    &= \norm{\mathbf{u}}_2^2 + \norm{\mathbf{v}}_2^2 - 2 (\mathbf{u} \cdot \mathbf{v})
+\end{align}
+Substituting the unit-norm constraint $\norm{\mathbf{u}}_2^2 = 1.0$ and $\norm{\mathbf{v}}_2^2 = 1.0$:
+\begin{align}
+    \norm{\mathbf{u} - \mathbf{v}}_2^2 &= 1.0 + 1.0 - 2 (\mathbf{u} \cdot \mathbf{v}) \\
+    &= 2 \left( 1.0 - \mathbf{u} \cdot \mathbf{v} \right)
+\end{align}
+Because $\cos(\mathbf{u}, \mathbf{v}) = \frac{\mathbf{u} \cdot \mathbf{v}}{\norm{\mathbf{u}}_2 \norm{\mathbf{v}}_2} = \mathbf{u} \cdot \mathbf{v}$, we obtain:
+\begin{equation}
+    \norm{\mathbf{u} - \mathbf{v}}_2^2 = 2 \left( 1.0 - \cos(\mathbf{u}, \mathbf{v}) \right) = 2 \cdot D_{\text{cosine}}(\mathbf{u}, \mathbf{v})
+\end{equation}
+\end{proof}
+
+\textbf{Scientific Implication for AlphaEarth:} This proves that thresholding AlphaEarth embeddings using cosine distance $D_{\text{cosine}} \ge 0.12$ is mathematically isomorphic to thresholding the Euclidean distance in latent space at $\norm{\mathbf{u} - \mathbf{v}}_2 \ge \sqrt{2 \times 0.12} \approx 0.4899$, eliminating the need to compute expensive square roots during inference.
+
+\section{Monotonicity of Greedy Bipartite Matching under Sorted Confidence}
+\label{sec:proof_greedy_matching}
+
+\begin{theorem}
+Given a set of ground-truth reference events $\mathcal{R}$ and a set of candidate predicted alerts $\mathcal{P}$ sorted strictly descending by posterior probability confidence $c(p_1) \ge c(p_2) \ge \dots \ge c(p_M)$, the greedy assignment algorithm uniquely maximizes the total confidence of claimed True Positives under the 1-to-1 matching constraint.
+\end{theorem}
+
+\begin{proof}
+Let $\mathcal{G} = (\mathcal{P}, \mathcal{R}, \mathcal{E})$ be an unweighted bipartite graph where an edge $(p_i, r_j) \in \mathcal{E}$ exists if and only if $\text{Intersects}(p_i, r_j)$ is true. Associate each alert $p_i$ with weight $w(p_i) = c(p_i)$.
+
+The objective is to find a matching $\mathcal{M} \subseteq \mathcal{E}$ maximizing $\sum_{(p, r) \in \mathcal{M}} c(p)$ subject to the matching constraint that each vertex appears in at most one edge in $\mathcal{M}$.
+
+Because the edge feasibility relation depends only on geometric spatial intersection and edge weights are determined solely by the alert vertex $p$, the underlying independence system forms a transversal matroid. By the Rado-Edmonds Theorem for matroids, the greedy algorithm that iteratively selects the highest-weight available element belonging to the independent set yields an optimal maximum-weight matching.
+\end{proof}
+
+\section{Linear Spectral Unmixing and Directional Guard Bounds}
+\label{sec:proof_spectral_bounds}
+Consider a satellite ground resolution cell containing an areal fraction $f \in [0, 1]$ of newly paved concrete infrastructure and fraction $(1 - f)$ of bare limestone desert regolith. Under the standard linear spectral mixing model:
+\begin{equation}
+    \rho_{\lambda} = f \cdot \rho_{\lambda, \text{built}} + (1 - f) \cdot \rho_{\lambda, \text{limestone}}
+\end{equation}
+The change in reflectance between dates $T_1$ (pure limestone, $f=0$) and $T_2$ (partial built, $f > 0$) is:
+\begin{equation}
+    \Delta \rho_\lambda = f \left( \rho_{\lambda, \text{built}} - \rho_{\lambda, \text{limestone}} \right)
+\end{equation}
+For Sentinel-2 Band 11 (SWIR-1) and Band 8 (NIR):
+\begin{equation}
+    \Delta\text{NDBI} \approx \frac{\partial \text{NDBI}}{\partial \rho_{11}} \Delta \rho_{11} + \frac{\partial \text{NDBI}}{\partial \rho_{8}} \Delta \rho_8
+\end{equation}
+Because $\frac{\partial \text{NDBI}}{\partial \rho_{11}} = \frac{2 \rho_8}{(\rho_{11} + \rho_8)^2} > 0$ and $\frac{\partial \text{NDBI}}{\partial \rho_{8}} = \frac{-2 \rho_{11}}{(\rho_{11} + \rho_8)^2} < 0$, any land transition where $\Delta \rho_{11} > 0$ and $\Delta \rho_8 \le 0$ guarantees $\Delta\text{NDBI} > 0$. 
+
+Empirical calibration over Saudi limestone aggregates yields a minimum threshold $\Delta\text{NDBI} \ge +0.04$ to reliably detect $f \ge 0.35$ (i.e., at least 35\% built-up sub-pixel coverage) while remaining strictly above natural seasonal soil moisture fluctuation limits ($|\Delta\text{NDBI}_{\text{natural}}| \le 0.02$).
+\newpage

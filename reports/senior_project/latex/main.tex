@@ -1,0 +1,53 @@
+\documentclass[12pt,a4paper,oneside]{report}
+
+\input{preamble.tex}
+
+\begin{document}
+
+\pagenumbering{roman}
+
+% Front Matter
+\input{frontmatter/title.tex}
+\input{frontmatter/certificate.tex}
+\input{frontmatter/declaration.tex}
+\input{frontmatter/abstract_en.tex}
+\input{frontmatter/abstract_ar.tex}
+\input{frontmatter/acknowledgments.tex}
+
+\tableofcontents
+\newpage
+\listoffigures
+\newpage
+\listoftables
+\newpage
+\input{frontmatter/abbreviations.tex}
+
+\newpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+% Main Chapters
+\input{chapters/ch01_introduction.tex}
+\input{chapters/ch02_literature_review.tex}
+\input{chapters/ch03_requirements_methodology.tex}
+\input{chapters/ch04_data_acquisition_preprocessing.tex}
+\input{chapters/ch05_system_architecture.tex}
+\input{chapters/ch06_ai_methodology.tex}
+\input{chapters/ch07_experimental_design.tex}
+\input{chapters/ch08_results_discussion.tex}
+\input{chapters/ch09_conclusion.tex}
+
+% Bibliography
+\newpage
+\addcontentsline{toc}{chapter}{Bibliography}
+\bibliography{references}
+
+% Appendices
+\newpage
+\appendix
+\input{appendices/appendix_a_derivations.tex}
+\input{appendices/appendix_b_scorecards.tex}
+\input{appendices/appendix_c_api_schemas.tex}
+\input{appendices/appendix_d_deployment_guide.tex}
+
+\end{document}

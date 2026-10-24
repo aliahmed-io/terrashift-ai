@@ -1,0 +1,242 @@
+\chapter{AI Methodology and Model Development}
+\label{ch:ai_methodology}
+
+\section{Introduction}
+\label{sec:ai_intro}
+The central research inquiry of this senior project centers on comparing distinct algorithmic paradigms for satellite change detection in hyper-arid environments. This chapter provides a rigorous mathematical and structural exposition of all artificial intelligence models developed, calibrated, and evaluated within TerraShift AI:
+\begin{enumerate}
+    \item \textbf{Deep Siamese Convolutional U-Net} with difference-attention skip connections.
+    \item \textbf{AlphaEarth Model A:} Unsupervised 64-dimensional latent cosine dissimilarity.
+    \item \textbf{AlphaEarth Model B:} Foundation embedding divergence fused with Dynamic World LULC probability transitions.
+    \item \textbf{AlphaEarth Model C:} Lightweight supervised classification over 257-dimensional vector difference features.
+    \item \textbf{AlphaEarth Model D:} Hybrid foundation model gated by directional physical spectral guards.
+    \item \textbf{Directional Physical Spectral Guards} formulated from electromagnetic reflectance physics.
+    \item \textbf{Connected Component Polygonization} and minimum-area spatial filtering.
+\end{enumerate}
+
+\section{Siamese U-Net Deep Learning Architecture}
+\label{sec:ai_siamese}
+The core deep neural network in TerraShift AI is a modified **Fully Convolutional Siamese U-Net** (Figure \ref{fig:siamese_network_architecture}), built upon the foundational principles of \citet{daudt2018fully} and \citet{ronneberger2015unet}.
+
+\begin{figure}[htbp]
+\centering
+\fbox{
+\begin{minipage}{0.92\textwidth}
+\centering
+\vspace*{0.3cm}
+\textbf{\large TerraShift Siamese U-Net Architectural Topology}\\[0.3cm]
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Branch 1: Pre-Change ($I_1$)} & \textbf{Shared Weights ($W_\theta$)} & \textbf{Branch 2: Post-Change ($I_2$)} \\
+$I_1 \in \R^{H \times W \times 3}$ & $\longleftrightarrow$ & $I_2 \in \R^{H \times W \times 3}$ \\
+\hline
+$\downarrow$ Conv Block 1 ($64$) & Shared Conv Filters & $\downarrow$ Conv Block 1 ($64$) \\
+$\downarrow$ MaxPool ($H/2, W/2$) & $\longleftrightarrow$ & $\downarrow$ MaxPool ($H/2, W/2$) \\
+$\downarrow$ Conv Block 2 ($128$) & Shared Conv Filters & $\downarrow$ Conv Block 2 ($128$) \\
+$\downarrow$ MaxPool ($H/4, W/4$) & $\longleftrightarrow$ & $\downarrow$ MaxPool ($H/4, W/4$) \\
+$\downarrow$ Conv Block 3 ($256$) & Shared Conv Filters & $\downarrow$ Conv Block 3 ($256$) \\
+$\downarrow$ MaxPool ($H/8, W/8$) & $\longleftrightarrow$ & $\downarrow$ MaxPool ($H/8, W/8$) \\
+$\downarrow$ Conv Block 4 ($512$) & Shared Conv Filters & $\downarrow$ Conv Block 4 ($512$) \\
+\hline
+\multicolumn{3}{|c|}{$\Downarrow$ \textbf{Absolute Difference Latent Bottleneck: } $\mathbf{d}^{(4)} = |\mathbf{z}_1^{(4)} - \mathbf{z}_2^{(4)}|$} \\
+\hline
+\multicolumn{3}{|c|}{$\Uparrow$ \textbf{Decoder Level 3:} UpConv ($256$) $\oplus$ Difference Skip $\mathbf{d}^{(3)} = |\mathbf{z}_1^{(3)} - \mathbf{z}_2^{(3)}|$} \\
+\multicolumn{3}{|c|}{$\Uparrow$ \textbf{Decoder Level 2:} UpConv ($128$) $\oplus$ Difference Skip $\mathbf{d}^{(2)} = |\mathbf{z}_1^{(2)} - \mathbf{z}_2^{(2)}|$} \\
+\multicolumn{3}{|c|}{$\Uparrow$ \textbf{Decoder Level 1:} UpConv ($64$) $\oplus$ Difference Skip $\mathbf{d}^{(1)} = |\mathbf{z}_1^{(1)} - \mathbf{z}_2^{(1)}|$} \\
+\multicolumn{3}{|c|}{$\Downarrow$ \textbf{Output Layer: } $1 \times 1$ Conv $\to$ Sigmoid $\to \hat{P}_{\text{change}} \in [0, 1]^{H \times W}$} \\
+\hline
+\end{tabular}
+\vspace*{0.3cm}
+\end{minipage}
+}
+\caption{Siamese U-Net architecture with multi-scale absolute difference skip connections.}
+\label{fig:siamese_network_architecture}
+\end{figure}
+
+\subsection{Mathematical Formulation}
+Let $I_1, I_2 \in \R^{H \times W \times C}$ denote co-registered bitemporal satellite optical patches. The parameter-shared encoder $f_\theta$ processes each image independently across four hierarchical resolution stages $l \in \{1, 2, 3, 4\}$:
+\begin{equation}
+    \mathbf{z}_1^{(l)} = f_\theta^{(l)}(I_1), \quad \mathbf{z}_2^{(l)} = f_\theta^{(l)}(I_2)
+    \label{eq:encoder_stages}
+\end{equation}
+At each encoder stage, multi-scale feature difference maps $\mathbf{d}^{(l)}$ are computed using the element-wise absolute difference:
+\begin{equation}
+    \mathbf{d}^{(l)} = \abs{\mathbf{z}_1^{(l)} - \mathbf{z}_2^{(l)}} \in \R^{H_l \times W_l \times C_l}
+    \label{eq:difference_skip}
+\end{equation}
+The absolute difference operation enforces exact temporal symmetry:
+\begin{equation}
+    \abs{f_\theta^{(l)}(I_1) - f_\theta^{(l)}(I_2)} \equiv \abs{f_\theta^{(l)}(I_2) - f_\theta^{(l)}(I_1)}
+    \label{eq:temporal_symmetry}
+\end{equation}
+guaranteeing that flipping the temporal order of observation images produces mathematically identical change activation magnitudes.
+
+The decoder synthesizes features from the bottleneck upward using transposed convolutions, concatenating each upsampled feature map with its corresponding difference skip connection $\mathbf{d}^{(l)}$:
+\begin{equation}
+    \mathbf{y}^{(l-1)} = \text{Conv}\left( \left[ \text{UpConv}(\mathbf{y}^{(l)}) \,\|\, \mathbf{d}^{(l-1)} \right] \right)
+    \label{eq:decoder_upsample}
+\end{equation}
+The final layer applies a $1 \times 1$ convolution followed by a sigmoid activation function $\sigma(z) = (1 + e^{-z})^{-1}$, generating a continuous change posterior probability map $\hat{P} \in [0, 1]^{H \times W}$:
+\begin{equation}
+    \hat{P}(x, y) = \sigma\left( \mathbf{w}_{\text{out}}^T \mathbf{y}^{(0)}(x, y) + b_{\text{out}} \right)
+    \label{eq:sigmoid_output}
+\end{equation}
+
+\subsection{Training Loss and Severe Class Imbalance}
+In operational Earth observation, change detection is plagued by **extreme class imbalance**: in a typical satellite tile, genuine change pixels comprise less than $1\%\text{ to }3\%$ of total surface area, while unchanged background pixels dominate $97\%\text{ to }99\%$ of the scene. Standard Binary Cross-Entropy (BCE) loss on uncalibrated networks leads to severe failure, as the optimizer trivially minimizes loss by predicting zero change everywhere.
+
+To overcome this, TerraShift's Siamese network is trained using a compound loss function coupling Weighted Binary Cross-Entropy with Soft Generalized Dice Loss \citep{sudre2017generalised}:
+\begin{equation}
+    \mathcal{L}_{\text{total}} = \lambda_{\text{BCE}} \mathcal{L}_{\text{wBCE}} + \lambda_{\text{Dice}} \mathcal{L}_{\text{Dice}}
+    \label{eq:compound_loss}
+\end{equation}
+The weighted BCE loss penalizes false negatives heavily:
+\begin{equation}
+    \mathcal{L}_{\text{wBCE}} = -\frac{1}{N} \sum_{i=1}^N \left[ w_1 y_i \log(\hat{p}_i) + (1 - y_i) \log(1 - \hat{p}_i) \right]
+    \label{eq:weighted_bce}
+\end{equation}
+where $w_1 = (N - N_{\text{pos}}) / N_{\text{pos}}$ dynamically balances positive change pixels.
+
+The Generalized Soft Dice loss optimizes region overlap directly:
+\begin{equation}
+    \mathcal{L}_{\text{Dice}} = 1.0 - \frac{2 \sum_{i=1}^N y_i \hat{p}_i + \epsilon}{\sum_{i=1}^N y_i + \sum_{i=1}^N \hat{p}_i + \epsilon}
+    \label{eq:soft_dice}
+\end{equation}
+where $\epsilon = 10^{-6}$ provides numerical stability. Training hyperparameters are set to $\lambda_{\text{BCE}} = 0.5$, $\lambda_{\text{Dice}} = 0.5$, batch size of 16, AdamW optimizer with initial learning rate $\eta = 3 \times 10^{-4}$, and cosine annealing decay.
+
+\section{Model A: Unsupervised AlphaEarth Cosine Dissimilarity}
+\label{sec:ai_model_a}
+AlphaEarth Model A evaluates Google's 64-dimensional annual satellite embeddings in an entirely unsupervised metric-space formulation.
+
+\subsection{Unit-Sphere Cosine Formulation}
+For each pixel coordinate $(x, y)$, let $\mathbf{u}(x, y) \in \R^{64}$ denote the AlphaEarth embedding for year $T_1$ and $\mathbf{v}(x, y) \in \R^{64}$ denote the embedding for year $T_2$. Because AlphaEarth vectors are strictly unit-normalized by construction ($\norm{\mathbf{u}}_2 = 1.0$, $\norm{\mathbf{v}}_2 = 1.0$), their inner product equals their cosine similarity:
+\begin{equation}
+    S_{\text{cosine}}(x, y) = \sum_{k=0}^{63} u_k(x, y) \cdot v_k(x, y)
+    \label{eq:dot_prod_cosine}
+\end{equation}
+The cosine dissimilarity metric $D_{\text{cosine}} \in [0, 2]$ is computed as:
+\begin{equation}
+    D_{\text{cosine}}(x, y) = 1.0 - \text{clip}\left( S_{\text{cosine}}(x, y), -1.0, 1.0 \right)
+    \label{eq:cosine_dist_eval}
+\end{equation}
+A continuous normalized change score $S_{\text{change}}(x, y) \in [0, 1]$ is generated by scaling over the active dissimilarity range:
+\begin{equation}
+    S_{\text{change}}(x, y) = \text{clip}\left( \frac{D_{\text{cosine}}(x, y)}{0.50}, 0.0, 1.0 \right)
+    \label{eq:scaled_change_score}
+\end{equation}
+Applying the optimal screening threshold $\tau_{\text{dist}} = 0.12$ established by \citet{manikandan2026alphaearth} (corresponding to cosine similarity $< 0.88$) generates the candidate binary change mask:
+\begin{equation}
+    M_A(x, y) = \begin{cases} 
+        1, & \text{if } D_{\text{cosine}}(x, y) \ge 0.12 \land V(x, y) = 1 \\ 
+        0, & \text{otherwise} 
+    \end{cases}
+    \label{eq:mask_model_a}
+\end{equation}
+
+\section{Model B: AlphaEarth + Dynamic World Transition Analysis}
+\label{sec:ai_model_b}
+Model B couples AlphaEarth latent embedding divergence with explicit land-cover transition probabilities from Google Dynamic World \citep{brown2022dynamicworld}.
+
+\subsection{Semantic Transition Verification}
+Let $\mathbf{P}_1(x, y), \mathbf{P}_2(x, y) \in [0, 1]^9$ denote the Dynamic World 9-class probability vectors at dates $T_1$ and $T_2$. In Saudi development corridors, genuine anthropogenic changes are dominated by two primary class transitions:
+\begin{enumerate}
+    \item \textbf{Built-Up Infrastructure Expansion:} A positive surge in built-up land probability:
+    \begin{equation}
+        \Delta P_{\text{built}}(x, y) = P_2(x, y)[\text{built}] - P_1(x, y)[\text{built}] \ge +0.15
+        \label{eq:dw_built_delta}
+    \end{equation}
+    \item \textbf{Agricultural Dynamic Shift:} A significant change in crop probability:
+    \begin{equation}
+        \abs{\Delta P_{\text{crops}}(x, y)} = \abs{P_2(x, y)[\text{crops}] - P_1(x, y)[\text{crops}]} \ge 0.20
+        \label{eq:dw_crop_delta}
+    \end{equation}
+\end{enumerate}
+Model B enforces that a pixel is flagged as changed if and only if **both** latent vector divergence and physical semantic class transitions coincide:
+\begin{equation}
+    M_B(x, y) = \left( D_{\text{cosine}}(x, y) \ge 0.10 \right) \land \left( \Delta P_{\text{built}}(x, y) \ge 0.15 \lor \abs{\Delta P_{\text{crops}}(x, y)} \ge 0.20 \right) \land V(x, y)
+    \label{eq:mask_model_b}
+\end{equation}
+
+\section{Model C: Supervised AlphaEarth Vector Difference Classifier}
+\label{sec:ai_model_c}
+Model C introduces a lightweight supervised machine learning classifier operating directly on embedding transition feature vectors.
+
+\subsection{Feature Vector Formulation}
+For each pixel $(x, y)$, we construct a 257-dimensional feature representation $\mathbf{f}(x, y)$ that explicitly captures both baseline states, directional difference, absolute magnitude, and angular distance:
+\begin{equation}
+    \mathbf{f}(x, y) = \Big[ \mathbf{u}(x, y) \,\|\, \mathbf{v}(x, y) \,\|\, (\mathbf{v} - \mathbf{u}) \,\|\, \abs{\mathbf{v} - \mathbf{u}} \,\|\, D_{\text{cosine}}(x, y) \Big] \in \R^{257}
+    \label{eq:feature_vector_c}
+\end{equation}
+where $\mathbf{u}, \mathbf{v} \in \R^{64}$, $(\mathbf{v} - \mathbf{u}) \in \R^{64}$, $|\mathbf{v} - \mathbf{u}| \in \R^{64}$, and $D_{\text{cosine}} \in \R^1$.
+
+\subsection{Classifier Architecture and CPU Execution}
+To satisfy NFR-01 (sub-second CPU compute), we employ a \textbf{Histogram-Based Gradient Boosting Classifier} (\texttt{HistGradientBoostingClassifier} from Scikit-Learn). The model is configured with:
+\begin{itemize}
+    \item Maximum iterations (trees): $M = 35$
+    \item Maximum tree depth: $d = 5$
+    \item Minimum samples per leaf: 20
+    \item Learning rate: $\alpha = 0.10$
+\end{itemize}
+Because features are pre-binned into 256 discrete histogram integer bins, inference over an entire $256 \times 256$ corridor ($65,536$ feature vectors) executes in under \textbf{40 milliseconds} on a single CPU thread. Change predictions are generated by thresholding the predicted positive class posterior probability $\hat{P}_C(x, y) \ge 0.50$.
+
+\section{Model D: AlphaEarth + TerraShift Physical Spectral Guard Hybrid}
+\label{sec:ai_model_d}
+Model D represents the pinnacle of our foundation model research: a hybrid framework that bridges self-supervised latent representation learning with deterministic electromagnetic remote sensing physics.
+
+\subsection{Directional Physical Spectral Guard Logic}
+Model D leverages AlphaEarth cosine distance ($\tau=0.12$) as a broad, high-sensitivity initial screening filter, but gates all candidates through directional physical spectral rules derived from authentic Sentinel-2 Level-2A surface reflectance:
+\begin{enumerate}
+    \item \textbf{Built Infrastructure Development Rule:} Natural desert soil converting into graded residential foundations, roads, or industrial pads must exhibit a positive shift in the Normalized Difference Built-Up Index:
+    \begin{equation}
+        \Delta\text{NDBI}(x, y) = \text{NDBI}_{T_2}(x, y) - \text{NDBI}_{T_1}(x, y) \ge +0.04
+        \label{eq:guard_ndbi}
+    \end{equation}
+    \item \textbf{Vegetation Dynamics Rule:} Agricultural parcel activation (center pivots) or date palm cultivation must exhibit substantial greening, while seasonal crop harvesting produces symmetric vegetative loss:
+    \begin{equation}
+        \abs{\Delta\text{NDVI}(x, y)} = \abs{\text{NDVI}_{T_2}(x, y) - \text{NDVI}_{T_1}(x, y)} \ge 0.10
+        \label{eq:guard_ndvi}
+    \end{equation}
+    \item \textbf{Extreme Latent Divergence Override:} In rare events of major structural transformation where spectral indices may saturate, an extreme cosine distance override is triggered:
+    \begin{equation}
+        D_{\text{cosine}}(x, y) \ge 0.25
+        \label{eq:guard_override}
+    \end{equation}
+\end{enumerate}
+
+\subsection{Composite Decision Rule}
+The final binary change mask for Model D is defined as:
+\begin{equation}
+    M_D(x, y) = \left( D_{\text{cosine}}(x, y) \ge 0.12 \right) \land \left( \Delta\text{NDBI} \ge +0.04 \lor \abs{\Delta\text{NDVI}} \ge 0.10 \lor D_{\text{cosine}} \ge 0.25 \right) \land V(x, y)
+    \label{eq:mask_model_d}
+\end{equation}
+This formulation mathematically eliminates false alarms triggered by natural desert gravel albedo shifts, sun angle variation, or sabkha moisture fluctuations, because unpaved desert terrain cannot produce positive $\Delta\text{NDBI} \ge +0.04$ or significant $\Delta\text{NDVI}$ shifts.
+
+\section{Connected Component Analysis and Minimum-Area Pruning}
+\label{sec:ai_polygonization}
+Raw pixel-level classification masks contain high-frequency spatial noise, isolated single-pixel misclassifications, and fragmented parcel boundaries. TerraShift AI converts raw raster masks into analysis-ready vector GIS layers through an automated topological polygonization pipeline:
+
+\begin{enumerate}
+    \item \textbf{8-Connectivity Component Labeling:} Contiguous clusters of active change pixels are segmented using 2D 8-connectivity connected-component labeling via \texttt{scipy.ndimage.label}:
+    \begin{equation}
+        \mathcal{C} = \{ C_1, C_2, \dots, C_K \}
+        \label{eq:connected_components}
+    \end{equation}
+    \item \textbf{Geometric Boundary Extraction:} For each connected component $C_k$, exterior boundary coordinates are traced using Rasterio contouring and converted into closed 2D polygons using Shapely.
+    \item \textbf{Geodetic WGS84 Surface Area Measurement:} Polygon vertex coordinates are transformed from raster pixel indices $(i, j)$ into geographic lon/lat coordinates $(\lambda, \phi)$ via the georeferenced affine transformation matrix:
+    \begin{equation}
+        \begin{bmatrix} \lambda \\ \phi \\ 1 \end{bmatrix} = \begin{bmatrix} a & b & c \\ d & e & f \\ 0 & 0 & 1 \end{bmatrix} \begin{bmatrix} j \\ i \\ 1 \end{bmatrix}
+        \label{eq:affine_transform}
+    \end{equation}
+    True physical surface area in square meters ($A_k$) is calculated using the WGS84 ellipsoidal geodesic formula via \texttt{pyproj.Geod}:
+    \begin{equation}
+        A_k = \text{Geod.polygon\_area}(\bm{\lambda}_k, \bm{\phi}_k)
+        \label{eq:geod_area}
+    \end{equation}
+    \item \textbf{Minimum-Area Spatial Pruning:} In operational municipal surveillance, human authorities cannot inspect sub-pixel or trivial noise speckles. Any detected polygon whose true physical surface area is smaller than a calibrated minimum threshold ($A_{\min} = 3,500\text{ m}^2$, corresponding to approximately 35 contiguous Sentinel-2 pixels) is pruned:
+    \begin{equation}
+        \mathcal{C}_{\text{pruned}} = \{ C_k \in \mathcal{C} \mid A_k \ge 3,500\text{ m}^2 \}
+        \label{eq:area_pruning}
+    \end{equation}
+    \item \textbf{Attribution and Semantic Labeling:} For each surviving polygon, the system extracts the mean confidence score, mean cosine distance, and mean $\Delta\text{NDBI}$ and $\Delta\text{NDVI}$ values, dynamically assigning semantic labels (e.g., ``Bare ground to built infrastructure'', ``Agricultural vegetative activation'').
+\end{enumerate}
+\newpage

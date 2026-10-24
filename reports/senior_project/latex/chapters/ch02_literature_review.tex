@@ -1,0 +1,199 @@
+\chapter{Literature Review and Related Work}
+\label{ch:lit_review}
+
+\section{Introduction}
+\label{sec:lit_intro}
+Satellite change detection has been a focal domain of research in digital image processing and Earth observation for over four decades. This chapter provides a rigorous, critical synthesis of the theoretical foundations, algorithms, and recent breakthroughs that inform the architecture of TerraShift AI. We survey the evolution of change detection methodologies across three distinct paradigms: (1) classical algebraic and statistical algorithms, (2) deep-learning convolutional and attention-based Siamese neural networks, and (3) emerging self-supervised satellite foundation models, including Google's AlphaEarth and recent Chinese Earth observation foundation models (SIGMAE, GenCD, CSD-Net, SEED, BTC). We analyze the specific spectral and physical characteristics of hyper-arid environments, review prior remote sensing investigations in Saudi Arabia, present a structured literature comparison matrix, and identify the scientific gaps that this thesis addresses.
+
+\section{Classical Remote Sensing Change Detection Paradigms}
+\label{sec:lit_classical}
+Before the widespread adoption of deep learning, satellite change detection relied on deterministic algebraic transformations, spectral vector analysis, and supervised post-classification comparisons \citep{radke2005image, hussain2013change}.
+
+\subsection{Image Differencing and Ratioing}
+The simplest change detection technique computes pixel-by-pixel intensity differences between co-registered bitemporal acquisitions $I_1$ and $I_2$:
+\begin{equation}
+    \Delta I(x, y) = I_2(x, y) - I_1(x, y)
+    \label{eq:image_diff}
+\end{equation}
+A binary change mask $M(x, y)$ is obtained by applying an empirical threshold $\tau$:
+\begin{equation}
+    M(x, y) = \begin{cases} 
+        1, & \text{if } |\Delta I(x, y)| \ge \tau \\ 
+        0, & \text{otherwise} 
+    \end{cases}
+    \label{eq:threshold_diff}
+\end{equation}
+Alternatively, image ratioing computes $R(x, y) = I_2(x, y) / (I_1(x, y) + \epsilon)$. While computationally trivial, these univariate techniques are notoriously susceptible to noise: they treat all radiometric variations identically, regardless of whether intensity shifts stem from genuine surface grading, seasonal vegetation dormancy, or shifting solar zenith angles. In hyper-arid regions, natural variations in sun elevation regularly produce $\Delta I(x, y)$ values that eclipse real structural changes, rendering simple differencing unviable for operational alert systems.
+
+\subsection{Change Vector Analysis (CVA)}
+Change Vector Analysis (CVA) extends differencing across multiple spectral bands simultaneously \citep{bovolo2007theoretical, zanotta2018continuous}. For a pixel with multispectral reflectance vectors $\mathbf{x}_1, \mathbf{x}_2 \in \R^B$ across $B$ bands:
+\begin{equation}
+    \Delta \mathbf{x} = \mathbf{x}_2 - \mathbf{x}_1
+    \label{eq:cva_vector}
+\end{equation}
+The change magnitude $\rho$ represents the Euclidean distance in spectral feature space:
+\begin{equation}
+    \rho = \norm{\Delta \mathbf{x}}_2 = \sqrt{\sum_{b=1}^B \left(x_{2, b} - x_{1, b}\right)^2}
+    \label{eq:cva_magnitude}
+\end{equation}
+The direction of the change vector in polar or spherical coordinates indicates the nature or trajectory of the physical transition (e.g., greening vs. defoliation, moistening vs. drying). While CVA offers greater spectral robustness than single-band differencing, it evaluates each pixel in spatial isolation. It possesses no spatial receptive field, making it incapable of distinguishing isolated noisy pixels from contiguous, structured engineering projects.
+
+\subsection{Post-Classification Comparison (PCC)}
+In Post-Classification Comparison (PCC), bitemporal satellite scenes are independently classified into categorical thematic maps (e.g., using Maximum Likelihood, Random Forests, or Support Vector Machines) prior to logical matrix comparison. PCC provides explicit ``from--to'' transition trajectories. However, PCC suffers from the severe statistical law of error multiplication \citep{congalton1991review, foody2002status}: if classification accuracy at epoch $T_1$ is $A_1 = 85\%$ and at $T_2$ is $A_2 = 85\%$, the theoretical upper bound on change detection accuracy is $A_1 \times A_2 \approx 72.25\%$. Minor misclassifications at either date manifest as spurious change alerts, producing unacceptable false alarm rates in desert regions where land classes share overlapping spectral signatures.
+
+\section{Deep Learning Architectures for Change Detection}
+\label{sec:lit_deep_learning}
+The advent of deep convolutional neural networks (CNNs) revolutionized remote sensing by replacing handcrafted spectral heuristics with hierarchical, spatial-contextual feature representations learned directly from data.
+
+\subsection{Siamese Convolutional Networks}
+In their seminal work, \citet{daudt2018fully} demonstrated that bitemporal change detection is fundamentally suited to \textbf{Siamese neural network architectures}. Instead of stacking bitemporal images into an early-fusion single input tensor (which forces standard convolutional filters to learn temporal differences from scratch), a Siamese network employs two parallel, weight-sharing convolutional branches to extract multi-scale feature hierarchies from $I_1$ and $I_2$ independently:
+\begin{equation}
+    \mathbf{z}_1 = f_\theta(I_1), \quad \mathbf{z}_2 = f_\theta(I_2)
+    \label{eq:siamese_encoding}
+\end{equation}
+where $f_\theta$ denotes the parameter-shared encoder. Weight sharing guarantees that identical physical objects present in both images yield identical latent activations regardless of acquisition order, enforcing temporal symmetry.
+
+\citet{daudt2018fully} evaluated two primary feature aggregation paradigms:
+\begin{enumerate}
+    \item \textbf{FC-Siam-diff (Difference Concatenation):} Absolute feature differences $|\mathbf{z}_1^{(l)} - \mathbf{z}_2^{(l)}|$ are computed at each encoder level $l$ and passed to the decoder via skip connections:
+    \begin{equation}
+        \mathbf{d}^{(l)} = \abs{f_\theta^{(l)}(I_1) - f_\theta^{(l)}(I_2)}
+        \label{eq:fc_siam_diff}
+    \end{equation}
+    This formulation enforces an explicit algebraic constraint: identical features cancel to zero, highlighting regions of spatial-radiometric divergence.
+    \item \textbf{FC-Siam-conc (Channel Concatenation):} Feature maps from both branches are concatenated along the channel dimension at each skip connection:
+    \begin{equation}
+        \mathbf{c}^{(l)} = \left[ f_\theta^{(l)}(I_1) \,\|\, f_\theta^{(l)}(I_2) \right]
+        \label{eq:fc_siam_conc}
+    \end{equation}
+    This allows subsequent decoder convolutions to learn nonlinear relationship functions between epochs, though at the cost of higher parameter counts.
+\end{enumerate}
+
+On the benchmark Onera Satellite Change Detection (OSCD) dataset, FC-Siam-diff achieved an F1 score of 0.4886 on raw RGB images \citep{daudt2018urban}, demonstrating superior precision and boundary delineation compared to classical methods.
+
+\subsection{Attention Mechanisms and Transformers}
+Recent research has enhanced Siamese backbones with spatial, channel, and temporal attention mechanisms. \citet{chen2020spatial} introduced STANet, incorporating a spatial-temporal attention module that calculates attention weights across space and time, enabling the network to suppress irrelevant illumination changes while amplifying structural object displacements. \citet{bandara2022transformer} proposed ChangeFormer, replacing convolutional encoders with hierarchical Vision Transformers (ViTs) \citep{dosovitskiy2020image} to capture long-range global spatial dependencies across large satellite scenes.
+
+However, Vision Transformers introduce severe computational drawbacks: self-attention scales quadratically with spatial resolution ($\mathcal{O}(N^2)$), requiring high-end GPU hardware, multi-gigabyte memory footprints, and extensive training datasets to avoid overfitting. For resource-constrained senior projects and real-time operational platforms deployed on edge CPUs, compact convolutional Siamese networks (such as modified Siamese U-Nets \citep{ronneberger2015unet}) remain substantially more efficient and deployable.
+
+\section{Pretrained Earth Observation Foundation Models}
+\label{sec:lit_foundation_models}
+The remote sensing community has recently transitioned toward \textbf{Earth Observation Foundation Models}: massive neural networks pretrained on planetary-scale unlabeled satellite imagery using self-supervised learning objectives (such as masked autoencoding or contrastive learning) to produce generalized, multi-purpose latent representations \citep{brown2025alphaearth, zhang2026sigmae}.
+
+\subsection{Google AlphaEarth Satellite Embeddings}
+In 2025, Google and Google DeepMind released \textbf{AlphaEarth} (accessible via Google Earth Engine under the asset ID \texttt{GOOGLE/SATELLITE\_EMBEDDING/V1/ANNUAL}) \citep{brown2025alphaearth}. AlphaEarth generates 64-dimensional dense latent feature vectors ($A_{00}$ through $A_{63}$) for every $10\text{ m} \times 10\text{ m}$ pixel on Earth for each calendar year from 2017 to the present.
+
+The mathematical foundation of AlphaEarth embeddings possesses critical properties for change detection:
+\begin{enumerate}
+    \item \textbf{Unit-Sphere Normalization:} Each 64-dimensional feature vector $\mathbf{u} \in \R^{64}$ is explicitly normalized to have a Euclidean norm of exactly unity:
+    \begin{equation}
+        \norm{\mathbf{u}}_2 = \sqrt{\sum_{k=0}^{63} u_k^2} = 1.0
+        \label{eq:unit_norm}
+    \end{equation}
+    \item \textbf{Dot Product Equivalence to Cosine Similarity:} Because both temporal embedding vectors $\mathbf{u}$ and $\mathbf{v}$ lie on the 64-dimensional unit hypersphere ($\mathbb{S}^{63}$), the cosine of the angle between them simplifies exactly to their algebraic dot product:
+    \begin{equation}
+        \cos(\mathbf{u}, \mathbf{v}) = \frac{\mathbf{u} \cdot \mathbf{v}}{\norm{\mathbf{u}}_2 \norm{\mathbf{v}}_2} = \sum_{k=0}^{63} u_k v_k
+        \label{eq:cosine_dot}
+    \end{equation}
+    \item \textbf{Cosine Distance as a Change Metric:} The corresponding cosine distance metric $D_{\text{cosine}}(\mathbf{u}, \mathbf{v})$ is bounded in $[0, 2]$:
+    \begin{equation}
+        D_{\text{cosine}}(\mathbf{u}, \mathbf{v}) = 1.0 - \cos(\mathbf{u}, \mathbf{v})
+        \label{eq:cosine_dist_def}
+    \end{equation}
+    Regions experiencing zero ground change exhibit high cosine similarity ($\cos(\mathbf{u}, \mathbf{v}) \approx 1.0$, $D_{\text{cosine}} \approx 0.0$), whereas physical surface transformations cause latent vector divergence.
+\end{enumerate}
+
+\subsection{Google Dynamic World Near-Real-Time Land Cover}
+\citet{brown2022dynamicworld} introduced Dynamic World (\texttt{GOOGLE/DYNAMICWORLD/V1}), an operational deep-learning pipeline that processes every Sentinel-2 Level-1C acquisition globally to infer pixel-wise probability distributions across nine land-use and land-cover (LULC) classes: water, trees, grass, flooded vegetation, crops, shrub/scrub, built, bare, and snow/ice. Because Dynamic World outputs continuous probabilities $\mathbf{p} = [p_1, \dots, p_9]$ where $\sum_{c=1}^9 p_c = 1.0$, bitemporal changes in specific class probabilities (e.g., $\Delta p_{\text{built}} = p_{\text{built}}^{T_2} - p_{\text{built}}^{T_1}$) provide valuable semantic priors to confirm physical urban expansion.
+
+\subsection{Critical Review of the Saudi AlphaEarth Benchmark (Manikandan et al., 2026)}
+In a landmark 2026 study published in \textit{Remote Sensing}, \citet{manikandan2026alphaearth} conducted the first comprehensive scientific evaluation of AlphaEarth embeddings across the Kingdom of Saudi Arabia. Investigating an independent dataset of 4,000 manually interpreted reference points and ESA WorldCover 2021 labels, the authors achieved an outstanding \textbf{81.5\% overall accuracy} for static land-cover classification using a spatially blocked (5-degree) cross-validation protocol.
+
+However, a critical distinction must be drawn between \textbf{static land-cover classification accuracy} and \textbf{bitemporal change detection accuracy}:
+\begin{itemize}
+    \item \textbf{Baseline Latent Drift on Arid Terrain:} \citet{manikandan2026alphaearth} explicitly documented that multi-year AlphaEarth cosine similarity distributions exhibit natural baseline drift over undisturbed desert terrain. Across Saudi Arabia's vast desert expanses, annual variations in windblown sand ripple orientation, desert pavement weathering, and seasonal humidity fluctuations produce subtle latent vector shifts. At a screening threshold of $\tau_{\text{sim}} = 0.90$ ($D_{\text{cosine}} = 0.10$), approximately \textbf{18.2\% of the entire Kingdom of Saudi Arabia} is flagged as divergent, despite experiencing no anthropogenic alteration.
+    \item \textbf{Optimal Screening Threshold:} The authors identified an optimal screening threshold of $\tau_{\text{sim}} = 0.88$, corresponding to a cosine distance threshold of $\tau_{\text{dist}} = 0.12$. While this threshold successfully suppresses natural desert albedo drift, it limits sensitivity to subtle, sub-parcel urban earthworks.
+\end{itemize}
+
+This finding forms the primary theoretical justification for TerraShift's Model D: AlphaEarth embeddings must not be used in isolation for change detection in arid lands; they must be gated by directional physical spectral guards to eliminate false alerts.
+
+\subsection{Chinese Remote Sensing Foundation Models and Frontier Architectures}
+In 2025 and 2026, research groups in China have accelerated the development of specialized remote sensing foundation models:
+\begin{enumerate}
+    \item \textbf{SIGMAE (Zhang et al., 2026):} A spatial-spectral unified foundation model \citep{zhang2026sigmae} that combines multi-scale masked autoencoding across both high-resolution spatial patches and continuous multispectral channels. Evaluated on diverse Chinese and international benchmarks, SIGMAE demonstrated superior feature transferability for fine-grained change segmentation.
+    \item \textbf{GenCD (Wang et al., AAAI 2026):} A generative bitemporal change detection framework \citep{wang2026gencd} designed specifically to bridge extreme cross-sensor and cross-season domain gaps. By employing conditional diffusion priors to normalize illumination differences between pre-change and post-change scenes, GenCD achieved state-of-the-art robustness against seasonal false alarms.
+    \item \textbf{CSD-Net (Liu et al., 2026):} A cross-scale semantic decoupled network \citep{liu2026csdnet} that decouples semantic object boundaries from temporal spectral variations, substantially reducing edge artifacts in complex urban environments.
+    \item \textbf{SEED (Zhao et al., 2026):} A spatial-spectral Earth foundation model \citep{zhao2026seed} engineered to preserve physical spectral fidelity in self-supervised latent embeddings.
+    \item \textbf{BTC (Ding et al., 2025):} Bitemporal Token Contrast \citep{ding2025btc}, which enforces contrastive invariance between unchanged spatial tokens across multi-year satellite series.
+\end{enumerate}
+
+While these frontier architectures exhibit impressive academic metrics on server-grade GPU clusters, their deployment requirements (hundreds of millions of parameters, multi-GPU memory footprints) render them unfeasible for low-cost operational systems deployed on local CPUs.
+
+\section{Remote Sensing in Arid Environments and Spectral Confusion}
+\label{sec:lit_arid_spectroscopy}
+The optical properties of hyper-arid substrates have been investigated by several researchers focusing on the Middle East:
+
+\subsection{The Limestone-Concrete Spectral Dilemma}
+In a multi-temporal study of Riyadh, \citet{alkharusi2024monitoring} demonstrated that crushed limestone regolith—the predominant natural soil substrate across central Saudi Arabia—possesses an electromagnetic reflectance spectrum remarkably similar to that of cured Portland cement and concrete aggregates. Both materials exhibit high reflectance in the red and near-infrared bands, accompanied by a moderate absorption feature in the short-wave infrared (SWIR-2, Band 12) due to carbonate ($\text{CO}_3^{2-}$) vibrational overtones. Consequently, when a residential developer excavates, grades, and paves a natural limestone plateau (as in ROSHN Sedra), the net change in broadband optical RGB reflectance is frequently near zero ($|\Delta \text{RGB}| < 0.05$). Conversely, slight changes in soil moisture from rare rain showers dramatically darken the limestone substrate, mimicking asphalt paving.
+
+\subsection{Sabkha Hydrology along the Red Sea Coast}
+\citet{hereher2020assessment} examined coastal land-use changes in Jeddah, documenting extensive expansions into coastal sabkhas and maritime infill zones along the Obhur creek. Sabkhas are hypersaline supratidal flats composed of halite, gypsum, and calcareous sand. When tidal surges or seasonal humidity fluctuations increase water table saturation, surface albedo drops precipitously, producing severe false positive alerts in automated detectors. Similar findings were reported by \citet{alqurashi2014land} in western Saudi Arabia and \citet{mallick2021evaluating} in southwestern regions.
+
+\subsection{Formulation of Directional Physical Spectral Guards}
+To overcome these spectral ambiguities without relying exclusively on black-box neural networks, remote sensing science provides targeted physical band indices:
+\begin{enumerate}
+    \item \textbf{Normalized Difference Built-Up Index (NDBI):} Introduced by \citet{zha2003use}, NDBI capitalizes on the physical phenomenon that built infrastructure reflects more strongly in the SWIR spectrum than in the NIR spectrum:
+    \begin{equation}
+        \text{NDBI} = \frac{\rho_{\text{SWIR1}} - \rho_{\text{NIR}}}{\rho_{\text{SWIR1}} + \rho_{\text{NIR}}} = \frac{\text{B11} - \text{B08}}{\text{B11} + \text{B08}}
+        \label{eq:ndbi_formulation}
+    \end{equation}
+    Natural undisturbed soils exhibit flat or negative slopes between NIR and SWIR1, whereas structural concrete and asphalt grading produce a sharp positive shift ($\Delta\text{NDBI} \ge +0.04$).
+    \item \textbf{Normalized Difference Vegetation Index (NDVI):} First formalized by \citet{rouse1974monitoring}, NDVI isolates the steep reflectance surge across the chlorophyll ``red edge'':
+    \begin{equation}
+        \text{NDVI} = \frac{\rho_{\text{NIR}} - \rho_{\text{Red}}}{\rho_{\text{NIR}} + \rho_{\text{Red}}} = \frac{\text{B08} - \text{B04}}{\text{B08} + \text{B04}}
+        \label{eq:ndvi_formulation}
+    \end{equation}
+    Agricultural circular pivot activation in Al-Jouf and date palm cultivation in Al-Kharj exhibit dramatic positive surges ($\Delta\text{NDVI} \ge +0.10$), whereas seasonal crop harvest yields symmetric negative drops ($\Delta\text{NDVI} \le -0.10$).
+    \item \textbf{Enhanced Built-Up and Bareness Index (EBBI):} Developed by \citet{assyakur2012enhanced}, EBBI incorporates thermal infrared bands to separate bare desert soil from urban buildings, though its application to Sentinel-2 is limited by the absence of onboard thermal sensors.
+\end{enumerate}
+
+\section{Literature Comparison Matrix}
+\label{sec:lit_matrix}
+To position TerraShift AI within the broader landscape of satellite change detection research, Table \ref{tab:lit_comparison_matrix} presents a detailed comparative analysis of ten representative systems across input modalities, parameter scales, compute hardware requirements, arid environment robustness, and reported performance.
+
+\begin{table}[htbp]
+\centering
+\caption{Comparative synthesis of leading satellite change detection systems and foundation models vs. TerraShift AI.}
+\label{tab:lit_comparison_matrix}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lllllll@{}}
+\toprule
+\textbf{System / Architecture} & \textbf{Publication} & \textbf{Primary Modality} & \textbf{Parameters} & \textbf{Hardware} & \textbf{Arid Robustness} & \textbf{Key Benchmark Metric} \\
+\midrule
+FC-Siam-diff \citep{daudt2018fully} & ICIP 2018 & Sentinel-2 RGB & 1.35 M & GPU & Poor (High solar FA) & OSCD F1: 0.4886 (RGB) \\
+STANet \citep{chen2020spatial} & RS 2020 & VHR Optical & 12.1 M & Multi-GPU & Moderate & LEVIR-CD F1: 0.8730 \\
+ChangeFormer \citep{bandara2022transformer} & LGRS 2022 & VHR Bitemporal & 41.0 M & High-End GPU & Low (Severe overfitting) & DSIFN-CD F1: 0.8667 \\
+Dynamic World \citep{brown2022dynamicworld} & Sci. Data 2022 & Sentinel-2 L1C (10 bands) & $\approx$15 M & GEE Cloud & Moderate (Pixel speckle) & Global LULC Acc: 73.8\% \\
+AlphaEarth Latent \citep{brown2025alphaearth} & arXiv 2025 & Sentinel-2 MSI (64-D) & Foundation & GEE Cloud & High Prec / Low Rec & Multi-task Latent Dot \\
+AlphaEarth Saudi \citep{manikandan2026alphaearth} & RS 2026 & AlphaEarth + WorldCover & N/A & GEE + CPU & Baseline Drift ($\tau=0.88$) & Saudi LULC Acc: 81.5\% \\
+SIGMAE \citep{zhang2026sigmae} & arXiv 2026 & Multi-Sensor Spatial-Spectral & $>$300 M & Multi-GPU & Untested in Saudi & Pretraining Top-1 Acc \\
+GenCD \citep{wang2026gencd} & AAAI 2026 & Diffusion Bitemporal & $>$150 M & Cloud Cluster & High (Generative norm) & Cross-Domain F1: 0.742 \\
+CSD-Net \citep{liu2026csdnet} & RS 2026 & High-Res Earth Obs & 28.4 M & GPU & Moderate & Urban CD F1: 0.891 \\
+\textbf{TerraShift AI (Tuned+Guards)} & \textbf{This Work} & \textbf{Sentinel-2 L2A + Hybrid} & \textbf{1.41 M} & \textbf{Local CPU} & \textbf{Superior (0 Neg Hits)} & \textbf{Saudi Strict F1: 61.5\%} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\section{Identified Research Gaps and Thesis Value Proposition}
+\label{sec:lit_gaps}
+Our systematic survey reveals three critical unresolved gaps in the current state of the art:
+
+\begin{enumerate}
+    \item \textbf{The Hyper-Arid Evaluation Void:} The overwhelming majority of deep-learning change detection architectures are benchmarked exclusively on temperate datasets characterized by dense vegetative canopies and high-contrast urban features. Prior to this work, no open, reproducible benchmark existed to evaluate competing change detection paradigms against parcel-level ground truth in the Arabian Peninsula.
+    \item \textbf{The Foundation Model Operational Dilemma:} While global satellite foundation models like AlphaEarth demonstrate exceptional static representation capabilities, their raw cosine distance divergence exhibits natural baseline drift on desert surfaces. Unsupervised foundation metrics yield either excessive false alarms (at $\tau_{\text{sim}} \ge 0.90$) or severely restricted sensitivity (at $\tau_{\text{sim}} \le 0.88$), proving that foundation embeddings require integration with physical domain constraints.
+    \item \textbf{The Edge Deployability Bottleneck:} State-of-the-art research models increasingly demand multi-billion-parameter transformer weights and cloud GPU clusters, incurring prohibitive latency and cloud infrastructure costs. There is a pressing need for a lightweight, scientifically robust architecture that executes sub-second inference on standard consumer CPUs without sacrificing precision.
+\end{enumerate}
+
+TerraShift AI bridges these gaps by pioneering a directional hybrid framework: combining lightweight Siamese feature difference representations with authentic Sentinel-2 Level-2A physical surface reflectance guards and AlphaEarth foundation embeddings, validated against strict greedy 1-to-1 event benchmarks across Saudi Arabia.
+\newpage

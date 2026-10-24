@@ -11,6 +11,18 @@ const bodySchema = z
     yearT2: z.number().int().min(2017).max(2025),
     threshold: z.number().min(0.1).max(0.9).optional().default(0.5),
     minAreaM2: z.number().min(100).max(1000000).optional().default(2000.0),
+    modelType: z
+      .enum([
+        "siamese_tuned",
+        "siamese_untuned",
+        "alphaearth_cosine",
+        "alphaearth_dw",
+        "alphaearth_supervised",
+        "alphaearth_hybrid",
+        "multispectral_physical",
+      ])
+      .optional()
+      .default("siamese_tuned"),
   })
   .refine((d) => d.yearT1 < d.yearT2, {
     message: "Year T1 must precede Year T2",
@@ -51,7 +63,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const { polygon, yearT1, yearT2, threshold, minAreaM2 } = parsed.data;
+  const { polygon, yearT1, yearT2, threshold, minAreaM2, modelType } = parsed.data;
   const mlUrl = process.env["ML_SERVICE_URL"] ?? "http://127.0.0.1:8000";
 
   try {
@@ -64,6 +76,7 @@ export async function POST(req: NextRequest) {
         year_t2: yearT2,
         threshold,
         min_area_m2: minAreaM2,
+        model_type: modelType,
       }),
       signal: AbortSignal.timeout(30000),
     });

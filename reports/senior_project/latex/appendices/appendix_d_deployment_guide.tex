@@ -1,0 +1,91 @@
+\chapter{System Deployment and Replication Manual}
+\label{app:deployment}
+
+\section{System Prerequisites}
+\label{sec:deploy_prereqs}
+TerraShift AI is designed for cross-platform deployment across Linux (Ubuntu 22.04+), macOS (Apple Silicon / Intel), and Microsoft Windows 11.
+\begin{itemize}
+    \item \textbf{Node.js Runtime:} Node.js version 20.12.0 LTS or 22.0+ with npm.
+    \item \textbf{Python Environment:} Python 3.11 or 3.12 (64-bit).
+    \item \textbf{System Hardware:} Dual-core CPU or higher, minimum 4 GB system RAM, 5 GB available disk space for tile caches.
+\end{itemize}
+
+\section{Backend Machine Learning Service Setup}
+\label{sec:deploy_backend}
+\begin{enumerate}
+    \item Navigate to the Python service directory and create a clean virtual environment:
+\begin{lstlisting}[language=bash]
+cd services/ml
+python -m venv .venv
+# On Windows:
+.venv\Scripts\activate
+# On Linux / macOS:
+source .venv/bin/activate
+\end{lstlisting}
+    \item Install all core dependencies:
+\begin{lstlisting}[language=bash]
+pip install --upgrade pip
+pip install -r requirements.txt
+\end{lstlisting}
+    \item Run unit tests to verify mathematical and geospatial components:
+\begin{lstlisting}[language=bash]
+pytest tests/ -v
+\end{lstlisting}
+    \item Launch the FastAPI inference microservice:
+\begin{lstlisting}[language=bash]
+uvicorn terrashift.api.main:app --host 127.0.0.1 --port 8000 --reload
+\end{lstlisting}
+\end{enumerate}
+
+\section{Web Application Setup (Next.js 16)}
+\label{sec:deploy_frontend}
+\begin{enumerate}
+    \item In a separate terminal, navigate to the web directory and install dependencies:
+\begin{lstlisting}[language=bash]
+cd apps/web
+npm install
+\end{lstlisting}
+    \item Configure local environment variables in \texttt{.env.local}:
+\begin{lstlisting}[language=bash]
+NEXT_PUBLIC_MAPBOX_TOKEN="" # Optional: MapLibre uses public raster tiles
+ML_SERVICE_URL="http://127.0.0.1:8000"
+\end{lstlisting}
+    \item Verify code quality through the automated lint and test suite:
+\begin{lstlisting}[language=bash]
+npm run lint
+npm run test
+\end{lstlisting}
+    \item Build and start the production application:
+\begin{lstlisting}[language=bash]
+npm run build
+npm run start
+\end{lstlisting}
+    The web console is accessible at \texttt{http://localhost:3000}.
+\end{enumerate}
+
+\section{Independent Benchmark Reproduction}
+\label{sec:deploy_benchmark_reproduction}
+To reproduce the empirical results reported in Chapter \ref{ch:results}:
+\begin{enumerate}
+    \item \textbf{Reproduce the Saudi Multi-Model Benchmark (v6.0):}
+\begin{lstlisting}[language=bash]
+# From repository root:
+python scripts/saudi_evaluation.py
+\end{lstlisting}
+    This script queries the 4 Saudi reference corridors, evaluates all seven models under strict greedy 1-to-1 matching, prints the terminal leaderboard, and writes the JSON report to \texttt{reports/saudi\_pilot\_evaluation.json}.
+    \item \textbf{Reproduce the Academic OSCD Baseline:}
+\begin{lstlisting}[language=bash]
+python scripts/evaluate_oscd.py
+\end{lstlisting}
+\end{enumerate}
+
+\section{Google Earth Engine Configuration (Optional)}
+\label{sec:deploy_gee}
+To enable live Earth Engine streaming for AlphaEarth embeddings:
+\begin{lstlisting}[language=bash]
+# Authenticate your Google Cloud Project:
+earthengine authenticate
+export EARTH_ENGINE_PROJECT_ID="your-gcp-project-id"
+\end{lstlisting}
+\textbf{Note:} If Earth Engine credentials are not configured, TerraShift automatically operates in deterministic offline fallback mode with local caching, ensuring 100\% functionality without network dependencies.
+\newpage

@@ -1,0 +1,91 @@
+\chapter{Complete Empirical Scorecards and Reference Event Catalog}
+\label{app:scorecards}
+
+\section{Saudi Reference Ground-Truth Event Catalog}
+\label{sec:ref_event_catalog}
+Table \ref{tab:catalog_reference_events} catalogs all 19 independently annotated parcel-level reference events and four negative control zones across the four Saudi evaluation corridors.
+
+\begin{longtable}{@{}lllrrp{4.2cm}@{}}
+\caption{Complete Ground-Truth Reference Event Catalog ($91.19\text{ km}^2$).}
+\label{tab:catalog_reference_events} \\
+\toprule
+\textbf{Corridor} & \textbf{Event ID} & \textbf{Change Type} & \textbf{Lon} & \textbf{Lat} & \textbf{Description} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Riyadh Sedra & \texttt{sedra\_grading\_sec1} & Built Earthwork & 46.724 & 24.877 & Residential sector 1 mass grading (52 ha) \\
+Riyadh Sedra & \texttt{sedra\_spine\_paving} & Paved Road & 46.721 & 24.870 & Central spine road paving \& trenching \\
+Riyadh Sedra & \texttt{sedra\_substation} & Infrastructure & 46.733 & 24.867 & Electrical distribution substation apron \\
+Riyadh Sedra & \texttt{sedra\_block\_a} & Built Earthwork & 46.718 & 24.876 & Phase 2 residential block leveling \\
+Riyadh Sedra & \texttt{sedra\_access\_junc} & Road Junction & 46.710 & 24.867 & Southern access road junction \& berm \\
+Riyadh Sedra & \texttt{sedra\_neg\_plateau} & \textbf{Negative Control} & 46.708 & 24.882 & Undisturbed natural limestone plateau \\
+\midrule
+Jeddah Obhur & \texttt{obhur\_lot\_grading} & Urban Grading & 39.107 & 21.727 & Residential plot subdivision \& lot leveling \\
+Jeddah Obhur & \texttt{obhur\_infill\_subdiv} & Urban Infill & 39.098 & 21.726 & Western infill lot boundary walls \\
+Jeddah Obhur & \texttt{obhur\_junction} & Road Paving & 39.099 & 21.739 & Commercial street junction paving \\
+Jeddah Obhur & \texttt{obhur\_eastern\_paving}& Road Paving & 39.118 & 21.733 & Eastern dual carriageway access \\
+Jeddah Obhur & \texttt{obhur\_neg\_sabkha} & \textbf{Negative Control} & 39.090 & 21.753 & Undisturbed coastal sabkha \& salt flat \\
+\midrule
+Al-Jouf Sirhan & \texttt{pivot\_field\_alpha} & Agriculture & 38.264 & 29.768 & 50-ha circular pivot field Alpha \\
+Al-Jouf Sirhan & \texttt{pivot\_field\_beta} & Agriculture & 38.254 & 29.754 & 50-ha circular pivot field Beta \\
+Al-Jouf Sirhan & \texttt{pivot\_field\_gamma} & Agriculture & 38.278 & 29.789 & 50-ha circular pivot field Gamma \\
+Al-Jouf Sirhan & \texttt{pivot\_field\_delta} & Agriculture & 38.274 & 29.783 & 50-ha circular pivot field Delta \\
+Al-Jouf Sirhan & \texttt{pivot\_field\_epsilon}& Agriculture & 38.259 & 29.761 & 50-ha circular pivot field Epsilon \\
+Al-Jouf Sirhan & \texttt{aljouf\_neg\_dunes} & \textbf{Negative Control} & 38.290 & 29.785 & Great Nefud hyper-arid sand dunes \\
+\midrule
+Al-Kharj (Held-Out) & \texttt{alkharj\_warehouse}& Industrial & 47.281 & 24.133 & Logistics warehouse pad mass grading \\
+Al-Kharj (Held-Out) & \texttt{alkharj\_substation}& Infrastructure & 47.284 & 24.131 & Industrial substation \& yard paving \\
+Al-Kharj (Held-Out) & \texttt{alkharj\_depot} & Commercial & 47.285 & 24.143 & Commercial distribution depot \\
+Al-Kharj (Held-Out) & \texttt{alkharj\_date\_orchard}& Agriculture & 47.272 & 24.144 & Date palm cultivation parcel activation \\
+Al-Kharj (Held-Out) & \texttt{alkharj\_access\_road}& Road Corridor & 47.272 & 24.140 & Access roadway corridor \& grading \\
+Al-Kharj (Held-Out) & \texttt{alkharj\_neg\_desert}& \textbf{Negative Control} & 47.256 & 24.104 & Undisturbed gravel desert plateau \\
+\end{longtable}
+
+\section{Comprehensive Multi-Model Per-Corridor Scorecard}
+\label{sec:complete_scorecard_table}
+Table \ref{tab:full_multi_model_scorecard} presents the complete evaluation results for all seven models across every corridor.
+
+\begin{table}[htbp]
+\centering
+\caption{Comprehensive Multi-Model Saudi Evaluation Matrix.}
+\label{tab:full_multi_model_scorecard}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}llrrrrrrr@{}}
+\toprule
+\textbf{Model ID} & \textbf{Corridor Name} & \textbf{Alerts} & \textbf{TP} & \textbf{FP$_{\text{dup}}$} & \textbf{FP$_{\text{bg}}$} & \textbf{Strict Prec} & \textbf{Recall} & \textbf{FA / 100km$^2$} \\
+\midrule
+\multirow{4}{*}{\texttt{siamese\_untuned}} 
+ & Riyadh Sedra & 28 & 5 & 5 & 18 & 17.9\% & 100.0\% & 128.6 \\
+ & Jeddah Obhur & 35 & 4 & 2 & 29 & 11.4\% & 100.0\% & 169.3 \\
+ & Al-Jouf Sirhan & 25 & 5 & 1 & 19 & 20.0\% & 100.0\% & 74.6 \\
+ & Al-Kharj (Held-Out) & 44 & 3 & 1 & 40 & 6.8\% & 60.0\% & 145.5 \\
+\midrule
+\multirow{4}{*}{\textbf{\texttt{siamese\_tuned\_filtered}}} 
+ & \textbf{Riyadh Sedra} & \textbf{9} & \textbf{5} & \textbf{2} & \textbf{2} & \textbf{55.6\%} & \textbf{100.0\%} & \textbf{22.4} \\
+ & \textbf{Jeddah Obhur} & \textbf{5} & \textbf{4} & \textbf{0} & \textbf{1} & \textbf{80.0\%} & \textbf{100.0\%} & \textbf{5.5} \\
+ & \textbf{Al-Jouf Sirhan} & \textbf{22} & \textbf{5} & \textbf{1} & \textbf{16} & \textbf{22.7\%} & \textbf{100.0\%} & \textbf{63.4} \\
+ & \textbf{Al-Kharj (Held-Out)} & \textbf{17} & \textbf{4} & \textbf{1} & \textbf{12} & \textbf{23.5\%} & \textbf{80.0\%} & \textbf{46.1} \\
+\midrule
+\multirow{4}{*}{\texttt{multispectral\_physical}} 
+ & Riyadh Sedra & 32 & 5 & 5 & 22 & 15.6\% & 100.0\% & 151.0 \\
+ & Jeddah Obhur & 32 & 4 & 4 & 24 & 12.5\% & 100.0\% & 152.9 \\
+ & Al-Jouf Sirhan & 27 & 5 & 2 & 20 & 18.5\% & 100.0\% & 82.0 \\
+ & Al-Kharj (Held-Out) & 27 & 4 & 1 & 22 & 14.8\% & 80.0\% & 81.6 \\
+\midrule
+\multirow{4}{*}{\texttt{alphaearth\_cosine}} 
+ & Riyadh Sedra & 1 & 1 & 0 & 0 & 100.0\% & 20.0\% & 0.0 \\
+ & Jeddah Obhur & 1 & 1 & 0 & 0 & 100.0\% & 25.0\% & 0.0 \\
+ & Al-Jouf Sirhan & 1 & 1 & 0 & 0 & 100.0\% & 20.0\% & 0.0 \\
+ & Al-Kharj (Held-Out) & 1 & 1 & 0 & 0 & 100.0\% & 20.0\% & 0.0 \\
+\midrule
+\multirow{4}{*}{\texttt{alphaearth\_hybrid}} 
+ & Riyadh Sedra & 1 & 1 & 0 & 0 & 100.0\% & 20.0\% & 0.0 \\
+ & Jeddah Obhur & 1 & 1 & 0 & 0 & 100.0\% & 25.0\% & 0.0 \\
+ & Al-Jouf Sirhan & 1 & 1 & 0 & 0 & 100.0\% & 20.0\% & 0.0 \\
+ & Al-Kharj (Held-Out) & 1 & 1 & 0 & 0 & 100.0\% & 20.0\% & 0.0 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+\newpage

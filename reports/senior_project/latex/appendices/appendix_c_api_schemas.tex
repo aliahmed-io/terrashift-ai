@@ -1,0 +1,91 @@
+\chapter{REST API Specification and GeoJSON Schemas}
+\label{app:api_schemas}
+
+\section{Overview}
+\label{sec:api_overview}
+TerraShift AI exposes an OpenAPI 3.1-compliant asynchronous REST interface implemented with FastAPI. This appendix documents the core endpoints and JSON request/response contracts.
+
+\section{Analysis Streaming Endpoint: \texttt{POST /v1/analyze/stream}}
+\label{sec:api_analyze_stream}
+Initiates bi-temporal change detection over an arbitrary geographic polygon, streaming progressive SSE status events followed by the final GeoJSON FeatureCollection.
+
+\subsection{Request Schema (\texttt{application/json})}
+\begin{lstlisting}[language=json, caption={AnalyzeRequest JSON schema.}]
+{
+  "polygon": [
+    [46.7000, 24.8500],
+    [46.7400, 24.8500],
+    [46.7400, 24.8900],
+    [46.7000, 24.8900],
+    [46.7000, 24.8500]
+  ],
+  "year_t1": 2021,
+  "year_t2": 2024,
+  "threshold": 0.48,
+  "min_area_m2": 3500.0,
+  "model_type": "siamese_tuned"
+}
+\end{lstlisting}
+
+\subsection{Response Stream (\texttt{text/event-stream})}
+\begin{lstlisting}[language=json, caption={Progressive SSE data events.}]
+data: {"step": 1, "label": "Planning imagery window", "progress": 8}
+
+data: {"step": 2, "label": "Searching authentic Sentinel-2 Level-2A STAC acquisitions", "progress": 18}
+
+data: {"step": 3, "label": "Acquired genuine L2A COGs (S2A_MSIL2A...)", "progress": 58}
+
+data: {"step": 4, "label": "Aligning radiometry and detecting change via Siamese U-Net", "progress": 80}
+
+data: {"step": 5, "label": "Vectorising polygons", "progress": 96}
+
+data: {"done": true, "result": { ...GeoJSON FeatureCollection... }}
+\end{lstlisting}
+
+\section{Output GeoJSON FeatureCollection Contract}
+\label{sec:geojson_contract}
+The final change payload conforms to RFC 7946 GeoJSON specifications, with enriched metadata and properties:
+
+\begin{lstlisting}[language=json, caption={Change detection GeoJSON Feature output structure.}]
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "bbox": [46.7000, 24.8500, 46.7400, 24.8900],
+    "year_t1": 2021,
+    "year_t2": 2024,
+    "aoi_km2": 17.88,
+    "total_changed_km2": 0.842,
+    "changed_pct": 4.71,
+    "threshold": 0.48,
+    "min_area_m2": 3500.0,
+    "data_source": "authentic_stac_l2a",
+    "model": {
+      "name": "Siamese U-Net + Directional Spectral Guards",
+      "id": "siamese_tuned_filtered",
+      "family": "hybrid_deep_learning"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [[46.7214, 24.8732], [46.7268, 24.8735], [46.7265, 24.8808], [46.7210, 24.8805], [46.7214, 24.8732]]
+        ]
+      },
+      "properties": {
+        "id": 1,
+        "class": "bare_to_built",
+        "label": "Bare ground to built infrastructure",
+        "area_m2": 521400.0,
+        "confidence": 0.942,
+        "true_ndbi_delta": 0.084,
+        "true_ndvi_delta": -0.012,
+        "model": "siamese_tuned_filtered"
+      }
+    }
+  ]
+}
+\end{lstlisting}
+\newpage

@@ -122,9 +122,7 @@ def run_analysis(req: AnalyzeRequest, fetcher: Optional[Fetcher] = None) -> Iter
 
     threshold = getattr(req, "threshold", 0.50)
     min_area_m2 = getattr(req, "min_area_m2", 3500.0)
-
-    detection, matched = detect_change(rgb1, rgb2, valid, threshold=threshold)
-    yield _event(4, "Aligning radiometry and detecting change", 80)
+    model_type = getattr(req, "model_type", "siamese_tuned")
 
     multi_ctx = None
     if stac_success:
@@ -135,15 +133,60 @@ def run_analysis(req: AnalyzeRequest, fetcher: Optional[Fetcher] = None) -> Iter
             "t2_ndbi": stac_t2.true_ndbi,
         }
 
-    collection = vectorize_changes(
-        detection.mask,
-        detection.probability,
-        rgb1,
-        matched,
-        analysis_grid,
-        min_area_m2=min_area_m2,
-        multispectral_context=multi_ctx,
-    )
+    if model_type.startswith("alphaearth"):
+        from terrashift.acquisition.earth_engine import EarthEngineManager
+        from terrashift.inference.alphaearth_change import (
+            detect_alphaearth_classifier,
+            detect_alphaearth_cosine,
+            detect_alphaearth_dynamic_world,
+            detect_alphaearth_hybrid,
+            vectorize_alphaearth_changes,
+        )
+        yield _event(4, "Fetching AlphaEarth 64-D foundation model embeddings", 75)
+        eem = EarthEngineManager()
+        t1_alpha = eem.get_annual_alphaearth_embeddings(bbox, req.year_t1, target_shape=analysis_grid.shape)
+        t2_alpha = eem.get_annual_alphaearth_embeddings(bbox, req.year_t2, target_shape=analysis_grid.shape)
+
+        if model_type == "alphaearth_cosine":
+            det_res = detect_alphaearth_cosine(t1_alpha, t2_alpha, threshold=threshold if threshold != 0.5 else 0.12)
+            collection = vectorize_alphaearth_changes(det_res, analysis_grid, min_area_m2=min_area_m2)
+        elif model_type in ("alphaearth_dw", "alphaearth_dynamic_world"):
+            det_res = detect_alphaearth_dynamic_world(t1_alpha, t2_alpha, threshold=threshold if threshold != 0.5 else 0.10)
+            collection = vectorize_alphaearth_changes(det_res, analysis_grid, min_area_m2=min_area_m2)
+        elif model_type == "alphaearth_supervised":
+            det_res = detect_alphaearth_classifier(t1_alpha, t2_alpha, threshold=threshold)
+            collection = vectorize_alphaearth_changes(det_res, analysis_grid, min_area_m2=min_area_m2)
+        else: # alphaearth_hybrid
+            det_res = detect_alphaearth_hybrid(t1_alpha, t2_alpha, multispectral_context=multi_ctx, threshold=threshold if threshold != 0.5 else 0.12)
+            collection = vectorize_alphaearth_changes(det_res, analysis_grid, min_area_m2=min_area_m2, multispectral_context=multi_ctx)
+
+        model_meta = {"name": det_res.model_name, "id": det_res.model_id, "family": "foundation_model"}
+        used_threshold = threshold
+    elif model_type == "multispectral_physical" and multi_ctx is not None:
+        yield _event(4, "Computing multispectral physical delta indices (NDBI/NDVI)", 80)
+        d_ndvi = multi_ctx["t2_ndvi"] - multi_ctx["t1_ndvi"]
+        d_ndbi = multi_ctx["t2_ndbi"] - multi_ctx["t1_ndbi"]
+        phys_mask = ((d_ndbi >= 0.06) | (np.abs(d_ndvi) >= 0.15)) & valid
+        phys_score = np.clip(np.maximum(d_ndbi / 0.20, np.abs(d_ndvi) / 0.30), 0.0, 1.0).astype(np.float32)
+        collection = vectorize_changes(phys_mask, phys_score, rgb1, rgb2, analysis_grid, min_area_m2=min_area_m2, multispectral_context=multi_ctx)
+        model_meta = {"name": "Multispectral Physical Index Delta", "id": "multispectral_physical", "family": "conventional_remote_sensing"}
+        used_threshold = 0.06
+    else:
+        # Default Siamese CNN
+        active_multi_ctx = None if model_type == "siamese_untuned" else multi_ctx
+        detection, matched = detect_change(rgb1, rgb2, valid, threshold=threshold)
+        yield _event(4, "Aligning radiometry and detecting change via Siamese U-Net", 80)
+        collection = vectorize_changes(
+            detection.mask,
+            detection.probability,
+            rgb1,
+            matched,
+            analysis_grid,
+            min_area_m2=min_area_m2,
+            multispectral_context=active_multi_ctx,
+        )
+        model_meta = detection.model_metadata
+        used_threshold = detection.threshold
     center_lat = float(np.mean(lats))
     changed_km2 = collection["metadata"]["total_changed_km2"]
 
@@ -157,10 +200,10 @@ def run_analysis(req: AnalyzeRequest, fetcher: Optional[Fetcher] = None) -> Iter
             "aoi_km2": round(area_km2, 3),
             "changed_pct": round(changed_km2 / area_km2 * 100.0, 2) if area_km2 else 0.0,
             "resolution_m": round(analysis_grid.meters_per_pixel(center_lat), 1),
-            "threshold": round(detection.threshold, 4),
+            "threshold": round(float(used_threshold), 4),
             "min_area_m2": min_area_m2,
             "data_source": data_mode,
-            "model": detection.model_metadata,
+            "model": model_meta,
             "stac_provenance": stac_metadata,
             "provenance": active_provenance,
             "generated_at": datetime.now(timezone.utc).isoformat(),

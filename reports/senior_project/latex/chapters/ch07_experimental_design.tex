@@ -1,0 +1,183 @@
+\chapter{Experimental Design and Benchmark Protocol}
+\label{ch:experimental_design}
+
+\section{Introduction}
+\label{sec:exp_intro}
+In empirical machine learning and computer vision, evaluation methodology dictates the validity of scientific conclusions. Flawed evaluation protocols—such as overlapping training and testing splits, threshold cherry-picking, or lenient true-positive matching criteria—can artificially inflate performance metrics, producing optimistic claims that collapse upon real-world deployment.
+
+This chapter details the rigorous experimental design and benchmarking protocols established in TerraShift AI. We describe the academic OSCD benchmark protocol, formalize the mathematical framework of our **Strict Greedy 1-to-1 Event-Matching Algorithm**, explain our accounting for alert fragmentation and background false alarms, establish spatial false alert density metrics, and define the held-out generalization and latency measurement protocols.
+
+\section{Academic Benchmark Protocol: OSCD}
+\label{sec:exp_oscd}
+To establish reproducibility against published academic literature, TerraShift AI is first evaluated against the **Onera Satellite Change Detection (OSCD)** benchmark \citep{daudt2018urban}. 
+
+\subsection{Dataset Composition}
+OSCD comprises 24 registered Sentinel-2 Level-1C/Level-2A image pairs acquired between 2015 and 2018 over major metropolitan regions worldwide (e.g., Paris, Montpellier, Beirut, Las Vegas, Dubai, Rio de Janeiro). The dataset is partitioned into:
+\begin{itemize}
+    \item \textbf{Training Set (14 image pairs):} Used for training supervised Siamese convolutional architectures.
+    \item \textbf{Evaluation Test Set (10 image pairs):} Completely withheld during training; contains 3,077,936 evaluated ground-truth pixels.
+\end{itemize}
+
+\subsection{Pixel-Level Evaluation Metrics}
+On OSCD, performance is measured at the raw pixel level by comparing predicted binary change masks $\hat{Y} \in \{0, 1\}^{H \times W}$ against ground-truth change annotations $Y \in \{0, 1\}^{H \times W}$. Let $TP_{\text{pix}}$, $FP_{\text{pix}}$, $TN_{\text{pix}}$, and $FN_{\text{pix}}$ denote pixel counts:
+\begin{equation}
+    \text{Precision}_{\text{pix}} = \frac{TP_{\text{pix}}}{TP_{\text{pix}} + FP_{\text{pix}}}
+    \label{eq:pix_precision}
+\end{equation}
+\begin{equation}
+    \text{Recall}_{\text{pix}} = \frac{TP_{\text{pix}}}{TP_{\text{pix}} + FN_{\text{pix}}}
+    \label{eq:pix_recall}
+\end{equation}
+\begin{equation}
+    \text{F1}_{\text{pix}} = \frac{2 \cdot \text{Precision}_{\text{pix}} \cdot \text{Recall}_{\text{pix}}}{\text{Precision}_{\text{pix}} + \text{Recall}_{\text{pix}}}
+    \label{eq:pix_f1}
+\end{equation}
+\begin{equation}
+    \text{IoU}_{\text{pix}} = \frac{TP_{\text{pix}}}{TP_{\text{pix}} + FP_{\text{pix}} + FN_{\text{pix}}}
+    \label{eq:pix_iou}
+\end{equation}
+\begin{equation}
+    \text{FPR}_{\text{pix}} = \frac{FP_{\text{pix}}}{FP_{\text{pix}} + TN_{\text{pix}}}
+    \label{eq:pix_fpr}
+\end{equation}
+
+\section{The Polygon Fragmentation Problem}
+\label{sec:exp_fragmentation_problem}
+While pixel-level metrics are standard in academic segmentation challenges, they fail to reflect the operational realities of municipal surveillance and infrastructure monitoring. Planning authorities do not inspect individual $10\text{ m} \times 10\text{ m}$ pixels; they dispatch field inspectors to investigate discrete **vector polygons** representing physical land parcels.
+
+Furthermore, naive object-level evaluation introduces a severe methodological flaw known as the **Polygon Fragmentation Artifact** (Figure \ref{fig:fragmentation_artifact}):
+\begin{quote}
+\textit{Suppose a single 50-hectare construction site is detected by a neural network not as a single coherent polygon, but as five fragmented sub-polygons due to internal boundary noise. Under naive overlap matching, each of the five sub-polygons intersects the ground-truth bounding box, and is therefore counted as a separate True Positive. Consequently, the detector is credited with $5\text{ TPs}$ for a single real event, artificially boosting precision while masking poor boundary cohesion.}
+\end{quote}
+
+\begin{figure}[htbp]
+\centering
+\fbox{
+\begin{minipage}{0.9\textwidth}
+\centering
+\vspace*{0.2cm}
+\textbf{The Polygon Fragmentation Dilemma}\\[0.2cm]
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Ground Truth Reference Event} & \textbf{Naive Overlap Matching} & \textbf{Strict Greedy 1-to-1 Matching} \\
+\hline
+Single 50-ha parcel & 5 fragmented alert polygons & 5 fragmented alert polygons \\
+($N_{\text{ref}} = 1$) & all intersect reference box & sorted by confidence descending \\
+\hline
+\textbf{Result:} & $\mathbf{TP = 5}$, $FP = 0$ & $\mathbf{TP = 1}$ (Highest confidence) \\
+& \textbf{Artificially Inflated Prec} & $\mathbf{FP_{\text{dup}} = 4}$ (Duplicate Detections) \\
+& (Hides fragmentation) & \textbf{Strict Precision = 20.0\%} \\
+\hline
+\end{tabular}
+\vspace*{0.2cm}
+\end{minipage}
+}
+\caption{Comparison of naive overlap matching vs. strict greedy 1-to-1 matching.}
+\label{fig:fragmentation_artifact}
+\end{figure}
+
+To guarantee absolute scientific honesty and prevent artificial metric inflation, TerraShift AI formalizes and enforces a **Strict Greedy 1-to-1 Event-Matching Protocol**.
+
+\section{Strict Greedy 1-to-1 Event-Matching Algorithm}
+\label{sec:exp_greedy_matching}
+Let $\mathcal{R} = \{r_1, r_2, \dots, r_K\}$ denote the set of independently delineated ground-truth reference change events in a corridor, each defined by a geographic bounding polygon $B(r_k)$. Let $\mathcal{P} = \{p_1, p_2, \dots, p_M\}$ denote the set of predicted change polygons generated by a model, with associated confidence scores $c(p_m) \in [0, 1]$.
+
+A predicted polygon $p_m$ is considered a spatial candidate for reference event $r_k$ if their intersection satisfies minimum geometric overlap criteria:
+\begin{equation}
+    \text{Intersects}(p_m, r_k) \iff \text{Area}\left(p_m \cap B(r_k)\right) \ge 4,000\text{ m}^2 \;\lor\; \frac{\text{Area}\left(p_m \cap B(r_k)\right)}{\text{Area}\left(B(r_k)\right)} \ge 0.08
+    \label{eq:spatial_overlap}
+\end{equation}
+
+Algorithm \ref{alg:greedy_matching} formalizes the strict greedy assignment procedure.
+
+\begin{algorithm}[H]
+\caption{Strict Greedy 1-to-1 Event-Matching Algorithm}
+\label{alg:greedy_matching}
+\begin{algorithmic}[1]
+\REQUIRE Set of predicted polygons $\mathcal{P}$, Reference events $\mathcal{R}$, Negative zones $\mathcal{N}$
+\STATE Sort $\mathcal{P}$ descending by confidence: $c(p_1) \ge c(p_2) \ge \dots \ge c(p_M)$
+\STATE Initialize claimed reference set: $\mathcal{R}_{\text{claimed}} \leftarrow \emptyset$
+\STATE Initialize counters: $TP \leftarrow 0$, $FP_{\text{dup}} \leftarrow 0$, $FP_{\text{bg}} \leftarrow 0$, $Hits_{\text{neg}} \leftarrow 0$
+\FORALL{$p_m \in \mathcal{P}$}
+    \STATE Find matching reference events: $\mathcal{M}_m = \{r_k \in \mathcal{R} \mid \text{Intersects}(p_m, r_k)\}$
+    \IF{$\mathcal{M}_m \neq \emptyset$}
+        \STATE Find unclaimed candidates: $\mathcal{U}_m = \mathcal{M}_m \setminus \mathcal{R}_{\text{claimed}}$
+        \IF{$\mathcal{U}_m \neq \emptyset$}
+            \STATE Select primary event: $r^* \leftarrow \text{first}(\mathcal{U}_m)$
+            \STATE $\mathcal{R}_{\text{claimed}} \leftarrow \mathcal{R}_{\text{claimed}} \cup \{r^*\}$
+            \STATE $TP \leftarrow TP + 1$ \COMMENT{Claimed as single True Positive}
+        \ELSE
+            \STATE $FP_{\text{dup}} \leftarrow FP_{\text{dup}} + 1$ \COMMENT{Overlaps already-claimed event}
+        \ENDIF
+    \ELSE
+        \STATE $FP_{\text{bg}} \leftarrow FP_{\text{bg}} + 1$ \COMMENT{Unlinked background false alarm}
+        \FORALL{$n_j \in \mathcal{N}$}
+            \IF{$\text{Intersects}(p_m, n_j)$}
+                \STATE $Hits_{\text{neg}} \leftarrow Hits_{\text{neg}} + 1$ \COMMENT{Negative control violation}
+                \STATE \textbf{break}
+            \ENDIF
+        \ENDFOR
+    \ENDIF
+\ENDFOR
+\RETURN $TP, FP_{\text{dup}}, FP_{\text{bg}}, Hits_{\text{neg}}, |\mathcal{R}_{\text{claimed}}|$
+\end{algorithmic}
+\end{algorithm}
+
+\section{Event-Level Performance Metrics}
+\label{sec:exp_metrics}
+From the outputs of Algorithm \ref{alg:greedy_matching}, we compute three complementary precision metrics alongside recall and F1:
+
+\begin{enumerate}
+    \item \textbf{Strict 1-to-1 Event Precision ($\text{Prec}_{\text{strict}}$):} Penalizes both background false alarms and duplicate fragmented alerts. Represents the probability that any alert generated by the system corresponds to a unique, distinct real-world development project:
+    \begin{equation}
+        \text{Prec}_{\text{strict}} = \frac{TP}{TP + FP_{\text{dup}} + FP_{\text{bg}}} = \frac{TP}{|\mathcal{P}|}
+        \label{eq:strict_precision}
+    \end{equation}
+    \item \textbf{Event Validity Precision ($\text{Prec}_{\text{validity}}$):} Measures the proportion of alerts that fall within genuine change zones, treating fragmented polygons within real projects as valid detections:
+    \begin{equation}
+        \text{Prec}_{\text{validity}} = \frac{TP}{TP + FP_{\text{bg}}}
+        \label{eq:validity_precision}
+    \end{equation}
+    \item \textbf{Duplicate Alert Rate ($\text{Rate}_{\text{dup}}$):} Quantifies alert fragmentation:
+    \begin{equation}
+        \text{Rate}_{\text{dup}} = \frac{FP_{\text{dup}}}{|\mathcal{P}|}
+        \label{eq:duplicate_rate}
+    \end{equation}
+    \item \textbf{Event Recall ($\text{Rec}_{\text{event}}$):} Measures the proportion of independent ground-truth projects successfully identified:
+    \begin{equation}
+        \text{Rec}_{\text{event}} = \frac{|\mathcal{R}_{\text{claimed}}|}{|\mathcal{R}|}
+        \label{eq:event_recall}
+    \end{equation}
+    \item \textbf{Strict Event F1 Score ($\text{F1}_{\text{event}}$):} The harmonic mean of Strict Precision and Event Recall:
+    \begin{equation}
+        \text{F1}_{\text{event}} = \frac{2 \cdot \text{Prec}_{\text{strict}} \cdot \text{Rec}_{\text{event}}}{\text{Prec}_{\text{strict}} + \text{Rec}_{\text{event}}}
+        \label{eq:event_f1}
+    \end{equation}
+\end{enumerate}
+
+\section{Spatial False Alert Density Formulations}
+\label{sec:exp_alert_density}
+In operational GIS, raw false positive counts are meaningless without normalizing for the geographic area evaluated. A system generating 10 false alarms across $1,000\text{ km}^2$ is exceptionally reliable, whereas the same 10 false alarms in a $1\text{ km}^2$ neighborhood indicates failure.
+
+We report two rigorous spatial density formulations:
+\begin{enumerate}
+    \item \textbf{Pooled False Alert Density ($D_{\text{pooled}}$):} Total false alarms across all corridors divided by total evaluated land area, normalized to a standard unit of $100\text{ km}^2$:
+    \begin{equation}
+        D_{\text{pooled}} = \frac{\sum_{k=1}^K \left(FP_{\text{dup}, k} + FP_{\text{bg}, k}\right)}{\sum_{k=1}^K \text{Area}_k} \times 100\text{ km}^2
+        \label{eq:pooled_density}
+    \end{equation}
+    \item \textbf{Macro-Averaged False Alert Density ($D_{\text{macro}}$):} The unweighted arithmetic mean of per-corridor false alert densities:
+    \begin{equation}
+        D_{\text{macro}} = \frac{1}{K} \sum_{k=1}^K \left( \frac{FP_{\text{dup}, k} + FP_{\text{bg}, k}}{\text{Area}_k} \times 100\text{ km}^2 \right)
+        \label{eq:macro_density}
+    \end{equation}
+\end{enumerate}
+
+\section{Negative Zone Auditing and Generalization Testing}
+\label{sec:exp_negative_zones}
+\subsection{Negative Control Auditing}
+Each evaluation corridor contains an explicitly designated **Negative Control Zone** (e.g., undisturbed limestone plateaus, natural sand dunes, stable sabkhas) verified by human remote sensing experts to have experienced zero anthropogenic or physical change across the observation epochs. Any detected polygon intersecting a negative control zone is recorded as an unambiguous algorithmic failure ($Hits_{\text{neg}}$). An operational production system must maintain $Hits_{\text{neg}} = 0$.
+
+\subsection{Held-Out Corridor Generalization Protocol}
+To evaluate geographical generalization, the **Al-Kharj Industrial & Logistics Corridor ($28.18\text{ km}^2$)** is designated as a strict held-out test corridor. All model parameters, detection thresholds ($\tau=0.48$ for Siamese, $\tau=0.12$ for AlphaEarth), and minimum area filters ($A_{\min}=3500\text{ m}^2$) were calibrated exclusively on the three core development corridors (Riyadh, Jeddah, Al-Jouf) and completely frozen prior to executing Al-Kharj evaluation. This provides an uncompromised assessment of transferability across unseen geographic regions.
+\newpage

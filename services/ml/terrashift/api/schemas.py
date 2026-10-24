@@ -15,6 +15,7 @@ class AnalyzeRequest(BaseModel):
     year_t2: int = Field(..., ge=MIN_YEAR, le=MAX_YEAR)
     threshold: float = Field(default=0.50, ge=0.10, le=0.90, description="Change probability threshold tau")
     min_area_m2: float = Field(default=2000.0, ge=100.0, le=500000.0, description="Minimum polygon area in m²")
+    model_type: Optional[str] = Field(default="siamese_tuned", description="Change detection model paradigm")
 
     @model_validator(mode="after")
     def validate_request(self) -> "AnalyzeRequest":
