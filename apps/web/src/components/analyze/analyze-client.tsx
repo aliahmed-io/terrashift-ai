@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { StudioShell, MapCanvasOverlay, type StudioViewMode } from "@/components/studio-nav";
 import { useAoi, CORRIDOR_PROFILES, type CorridorId } from "@/lib/aoi-context";
+import { calculatePolygonAreaKm2 } from "@/lib/tiles";
+import type { RasterStatusInfo } from "@/components/map/map-canvas";
 
 const MapCanvas = dynamic(() => import("@/components/map/map-canvas").then((m) => m.MapCanvas), {
   ssr: false,
@@ -61,24 +63,48 @@ function formatComma(num: number, decimals = 3): string {
 
 export function AnalyzeClient() {
   const {
+    activeAoi,
+    updatePolygon,
+    clearAoi,
     activeCorridor,
     activeCorridorId,
     setActiveCorridorId,
     activeYear,
-    activeMonth,
     temporalModifier,
     getRasterUrl,
   } = useAoi();
 
   const [layerIdx, setLayerIdx] = useState<number>(0);
   const [viewMode, setViewMode] = useState<StudioViewMode>("diagnostic");
+  const [isDrawing, setIsDrawing] = useState<boolean>(false);
+  const [rasterStatus, setRasterStatus] = useState<RasterStatusInfo>({
+    status: "idle",
+    latencyMs: null,
+    origin: null,
+  });
   const zoomActionsRef = useRef<{ zoomIn: () => void; zoomOut: () => void } | null>(null);
   const [cardSlide, setCardSlide] = useState<0 | 1>(0);
   const [threshold, setThreshold] = useState<number>(0.48);
+  const [debouncedThreshold, setDebouncedThreshold] = useState<number>(0.48);
   const [selectedModel, setSelectedModel] = useState<string>("alphaearth_hybrid");
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [liveChangePct, setLiveChangePct] = useState<number | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedThreshold(threshold);
+    }, 140);
+    return () => window.clearTimeout(timer);
+  }, [threshold]);
+
+  const isCustomPolygon =
+    activeAoi?.source === "drawn" && Array.isArray(activeAoi.polygon) && activeAoi.polygon.length >= 3;
+  const effectivePolygon = isCustomPolygon ? activeAoi.polygon : activeCorridor.polygon;
+  const customAreaKm2 = isCustomPolygon ? calculatePolygonAreaKm2(effectivePolygon) : null;
+  const defaultAreaKm2 = calculatePolygonAreaKm2(activeCorridor.polygon);
+  const areaScaleRatio =
+    customAreaKm2 !== null && defaultAreaKm2 > 0 ? Math.max(0.05, customAreaKm2 / defaultAreaKm2) : 1;
 
   const corridorCenter: [number, number] = [
     (activeCorridor.bbox[0] + activeCorridor.bbox[2]) / 2,
@@ -106,7 +132,7 @@ export function AnalyzeClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          polygon: activeCorridor.polygon,
+          polygon: effectivePolygon,
           yearT1: 2017,
           yearT2: Math.max(2018, activeYear),
           threshold,
@@ -158,7 +184,7 @@ export function AnalyzeClient() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         change_percentage: liveChangePct ?? activeCorridor.baseChangePct,
-        changed_area_m2: Math.round(activeCorridor.baseAreaHa * 10000),
+        changed_area_m2: Math.round(activeCorridor.baseAreaHa * 10000 * areaScaleRatio),
         year_t1: 2018,
         year_t2: activeYear,
         epsg_code: activeCorridor.epsg,
@@ -180,7 +206,7 @@ export function AnalyzeClient() {
   const spectralRows = WADI_SPECTRAL_ROWS.map((r) => {
     const threshMod = 1 + (0.45 - threshold) * 0.35;
     const modVal = Math.min(0.92, Math.max(0.02, r.val * temporalModifier * threshMod));
-    const modDist = Math.max(85, Math.round(r.distM * temporalModifier * threshMod));
+    const modDist = Math.max(25, Math.round(r.distM * temporalModifier * threshMod * Math.sqrt(areaScaleRatio)));
     return {
       valStr: formatComma(modVal, 3),
       distStr: `${modDist.toLocaleString("en-US")} m`,
@@ -197,31 +223,41 @@ export function AnalyzeClient() {
         <MapCanvas
           yearT1={2018}
           yearT2={activeYear}
-          polygon={activeCorridor.polygon}
-          isDrawing={false}
-          onDrawingChange={() => {}}
-          onPolygonChange={() => {}}
+          polygon={effectivePolygon}
+          isDrawing={isDrawing}
+          onDrawingChange={setIsDrawing}
+          onPolygonChange={(poly) => {
+            if (poly) {
+              updatePolygon(poly, `${activeCorridor.shortName} Custom AOI`);
+            }
+          }}
           center={corridorCenter}
           zoom={12.5}
           compareMode={viewMode === "compare" || currentLayer.id === "split"}
-          effectRasterUrl={getRasterUrl(currentLayer.id, threshold)}
+          effectRasterUrl={getRasterUrl(currentLayer.id, debouncedThreshold)}
           effectBbox={activeCorridor.bbox}
           showEffectOverlay={viewMode === "diagnostic" && currentLayer.id !== "split"}
           effectOpacity={0.85}
           zoomActionsRef={zoomActionsRef}
           showDefaultZoomControls={false}
+          onRasterStatusChange={setRasterStatus}
         />
 
         <MapCanvasOverlay
           onZoomIn={() => zoomActionsRef.current?.zoomIn()}
           onZoomOut={() => zoomActionsRef.current?.zoomOut()}
-          activeEffectLabel={`${currentLayer.label} · ${activeMonth} ${activeYear}`}
+          activeEffectLabel={currentLayer.label}
           onCycleEffect={handleCycleLayer}
           viewMode={viewMode}
           onSelectViewMode={setViewMode}
+          isDrawing={isDrawing}
+          onToggleDrawing={() => setIsDrawing((v) => !v)}
+          isCustomPolygon={isCustomPolygon}
+          onResetPolygon={clearAoi}
+          rasterStatus={rasterStatus}
         />
 
-        {/* Floating White Card matching approved ui_clean_studio.png */}
+        {/* Floating White Card */}
         <div className="absolute top-12 right-14 w-[380px] rounded-[22px] bg-white p-7 shadow-[0_16px_48px_rgba(0,0,0,0.14)]">
           <div className="mb-5 flex items-center justify-between">
             <button
@@ -233,6 +269,11 @@ export function AnalyzeClient() {
               <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-[#1c1f23] transition-opacity group-hover:opacity-75">
                 {displayTitle}
               </h2>
+              <div className="mt-0.5 text-[11px] font-medium text-[#8c929c]">
+                {isCustomPolygon
+                  ? `Custom AOI · ${(customAreaKm2 ?? 0).toFixed(2).replace(".", ",")} km² (Drag blue corners)`
+                  : `${defaultAreaKm2.toFixed(2).replace(".", ",")} km² · Drag blue corners to resize`}
+              </div>
             </button>
             <button
               type="button"
@@ -251,8 +292,8 @@ export function AnalyzeClient() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
+                <path d="m7 15 5 5 5-5" />
+                <path d="m7 9 5-5 5 5" />
               </svg>
             </button>
           </div>
@@ -261,8 +302,10 @@ export function AnalyzeClient() {
             <>
               <div className="mb-5 flex items-center justify-between text-[13px] font-medium text-[#3b4048]">
                 <span>NDVI &amp; Spectral Shift</span>
-                {liveChangePct !== null && (
+                {liveChangePct !== null ? (
                   <span className="text-[12px] font-semibold text-[#22b567]">Δ {formatComma(liveChangePct, 2)} %</span>
+                ) : (
+                  <span className="text-[11px] font-medium text-[#8c929c]">{currentLayer.id.toUpperCase()}</span>
                 )}
               </div>
 

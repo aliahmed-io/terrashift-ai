@@ -4,6 +4,8 @@ import React, { useState, useRef } from "react";
 import dynamic from "next/dynamic";
 import { StudioShell, MapCanvasOverlay, type StudioViewMode } from "@/components/studio-nav";
 import { useAoi, CORRIDOR_PROFILES, type CorridorId } from "@/lib/aoi-context";
+import { calculatePolygonAreaKm2 } from "@/lib/tiles";
+import type { RasterStatusInfo } from "@/components/map/map-canvas";
 
 const MapCanvas = dynamic(() => import("@/components/map/map-canvas").then((m) => m.MapCanvas), {
   ssr: false,
@@ -43,11 +45,13 @@ function formatComma(num: number, decimals = 3): string {
 
 export function StitchCommandDeck() {
   const {
+    activeAoi,
+    updatePolygon,
+    clearAoi,
     activeCorridor,
     activeCorridorId,
     setActiveCorridorId,
     activeYear,
-    activeMonth,
     temporalModifier,
     getRasterUrl,
   } = useAoi();
@@ -55,10 +59,23 @@ export function StitchCommandDeck() {
   const [cardSlide, setCardSlide] = useState<0 | 1>(0);
   const [effectIdx, setEffectIdx] = useState<number>(0);
   const [viewMode, setViewMode] = useState<StudioViewMode>("diagnostic");
+  const [isDrawing, setIsDrawing] = useState<boolean>(false);
+  const [rasterStatus, setRasterStatus] = useState<RasterStatusInfo>({
+    status: "idle",
+    latencyMs: null,
+    origin: null,
+  });
   const zoomActionsRef = useRef<{ zoomIn: () => void; zoomOut: () => void } | null>(null);
   const [cardCollapsed, setCardCollapsed] = useState<boolean>(false);
 
   const currentEffect = CITY_EFFECTS[effectIdx] ?? CITY_EFFECTS[0];
+
+  const isCustomPolygon = activeAoi?.source === "drawn" && Array.isArray(activeAoi.polygon) && activeAoi.polygon.length >= 3;
+  const effectivePolygon = isCustomPolygon ? activeAoi.polygon : activeCorridor.polygon;
+  const customAreaKm2 = isCustomPolygon ? calculatePolygonAreaKm2(effectivePolygon) : null;
+  const defaultAreaKm2 = calculatePolygonAreaKm2(activeCorridor.polygon);
+  const areaScaleRatio =
+    customAreaKm2 !== null && defaultAreaKm2 > 0 ? Math.max(0.05, customAreaKm2 / defaultAreaKm2) : 1;
 
   const corridorCenter: [number, number] = [
     (activeCorridor.bbox[0] + activeCorridor.bbox[2]) / 2,
@@ -76,10 +93,10 @@ export function StitchCommandDeck() {
     setActiveCorridorId(nextKey);
   };
 
-  // Compute live rows modulated by activeYear & activeMonth from bottom timeline bar
+  // Compute live rows modulated by activeYear, activeMonth & edited blue AOI area
   const computedRows = activeCorridor.anomalyRows.map((row) => {
     const val = Math.min(0.95, Math.max(0.02, row.baseVal * temporalModifier));
-    const areaHa = Math.max(12, Math.round(row.baseAreaHa * temporalModifier));
+    const areaHa = Math.max(1, Math.round(row.baseAreaHa * temporalModifier * areaScaleRatio));
     const colorClass = row.tone === "emerald" ? "bg-[#22b567]" : row.tone === "amber" ? "bg-[#f39223]" : "bg-[#e94235]";
     return {
       label: row.label,
@@ -117,10 +134,14 @@ export function StitchCommandDeck() {
         <MapCanvas
           yearT1={2018}
           yearT2={activeYear}
-          polygon={activeCorridor.polygon}
-          isDrawing={false}
-          onDrawingChange={() => {}}
-          onPolygonChange={() => {}}
+          polygon={effectivePolygon}
+          isDrawing={isDrawing}
+          onDrawingChange={setIsDrawing}
+          onPolygonChange={(poly) => {
+            if (poly) {
+              updatePolygon(poly, `${activeCorridor.shortName} Custom AOI`);
+            }
+          }}
           center={corridorCenter}
           zoom={12.5}
           compareMode={viewMode === "compare" || currentEffect.id === "split"}
@@ -130,16 +151,22 @@ export function StitchCommandDeck() {
           effectOpacity={0.85}
           zoomActionsRef={zoomActionsRef}
           showDefaultZoomControls={false}
+          onRasterStatusChange={setRasterStatus}
         />
 
-        {/* Top-left dark pill zoom controls + subtle coordinate grid numbers + bottom-left effect switcher */}
+        {/* Top-left dark pill zoom controls + bottom-left effect switcher & AOI controls */}
         <MapCanvasOverlay
           onZoomIn={() => zoomActionsRef.current?.zoomIn()}
           onZoomOut={() => zoomActionsRef.current?.zoomOut()}
-          activeEffectLabel={`${currentEffect.label} · ${activeMonth} ${activeYear}`}
+          activeEffectLabel={currentEffect.label}
           onCycleEffect={handleCycleEffect}
           viewMode={viewMode}
           onSelectViewMode={setViewMode}
+          isDrawing={isDrawing}
+          onToggleDrawing={() => setIsDrawing((v) => !v)}
+          isCustomPolygon={isCustomPolygon}
+          onResetPolygon={clearAoi}
+          rasterStatus={rasterStatus}
         />
 
         {/* Re-open button if card was collapsed */}
@@ -152,7 +179,7 @@ export function StitchCommandDeck() {
             {activeCorridor.name}
           </button>
         ) : (
-          /* Floating White Card (Exact Golf Field proportion, spacing & footer arrows) */
+          /* Floating White Card */
           <div className="absolute top-12 right-14 w-[380px] rounded-[22px] bg-white p-7 shadow-[0_16px_48px_rgba(0,0,0,0.14)]">
             <div className="mb-5 flex items-center justify-between">
               <button
@@ -164,6 +191,11 @@ export function StitchCommandDeck() {
                 <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-[#1c1f23] transition-opacity group-hover:opacity-75">
                   {activeCorridor.name}
                 </h2>
+                <div className="mt-0.5 text-[11px] font-medium text-[#8c929c]">
+                  {isCustomPolygon
+                    ? `Custom AOI · ${(customAreaKm2 ?? 0).toFixed(2).replace(".", ",")} km² (Drag blue corners)`
+                    : `${defaultAreaKm2.toFixed(2).replace(".", ",")} km² · Drag blue corners to resize`}
+                </div>
               </button>
               <button
                 type="button"
@@ -190,13 +222,13 @@ export function StitchCommandDeck() {
             {cardSlide === 0 ? (
               <>
                 <div className="mb-5 flex items-center justify-between text-[13px] font-medium text-[#3b4048]">
-                  <span>Anomaly</span>
+                  <span>Anomaly Breakdown</span>
                   <button
                     type="button"
                     onClick={handleCycleEffect}
-                    className="cursor-pointer text-[11.5px] text-[#8c929c] transition-colors hover:text-[#1c1f23]"
+                    className="cursor-pointer rounded-md bg-[#f4f5f7] px-2 py-0.5 text-[11px] font-semibold text-[#1c1f23] transition-colors hover:bg-[#edeff2]"
                   >
-                    {activeMonth} {activeYear}
+                    Switch AI Layer
                   </button>
                 </div>
 
@@ -258,7 +290,7 @@ export function StitchCommandDeck() {
               </>
             )}
 
-            {/* Bottom Card Carousel Footer (Exact Left Arrow + Dots + Right Arrow) */}
+            {/* Bottom Card Carousel Footer */}
             <div className="mt-7 flex items-center justify-between">
               <button
                 type="button"

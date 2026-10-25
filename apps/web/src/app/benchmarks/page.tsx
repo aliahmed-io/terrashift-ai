@@ -93,9 +93,13 @@ interface LeaderboardEntry {
   model_id: string;
   model_name: string;
   category: string;
+  pooled_precision?: number;
   pooled_strict_precision?: number;
+  pooled_f1?: number;
   pooled_event_f1?: number;
+  macro_precision?: number;
   macro_strict_precision?: number;
+  macro_f1?: number;
   macro_event_f1?: number;
   strict_precision: number;
   validity_precision: number;
@@ -429,7 +433,7 @@ export default function BenchmarksPage() {
               </div>
 
               {saudiSubTab === "leaderboard" ? (
-                <div className="my-auto overflow-hidden rounded-xl border border-[#edf0f3]">
+                <div className="my-2 overflow-hidden rounded-xl border border-[#edf0f3]">
                   <table className="w-full text-left text-[11px]">
                     <thead className="bg-[#f7f8fa] text-[10px] uppercase tracking-wider text-[#8c929c]">
                       <tr>
@@ -444,18 +448,18 @@ export default function BenchmarksPage() {
                     </thead>
                     <tbody className="divide-y divide-[#edf0f3] font-medium text-[#1c1f23] tabular-nums">
                       {(saudiData?.multi_model_leaderboard ?? [
-                        { model_id: "alphaearth_hybrid", model_name: "TerraShift v6.0 Hybrid (Siamese + AlphaEarth + L2A)", category: "Hybrid Foundation", pooled_event_f1: 0.792, macro_event_f1: 0.825, event_f1: 0.792, pooled_strict_precision: 0.655, macro_strict_precision: 0.701, strict_precision: 0.655, recall: 1.000, false_alarms: 10, negative_zone_hits: 0, fa_density_100km2: 11.0, pure_cpu_latency_s: 1.485 },
-                        { model_id: "siamese_tuned_filtered", model_name: "TerraShift v5.1 (Tuned Siamese + L2A Guards)", category: "Hybrid Physics-AI", pooled_event_f1: 0.535, macro_event_f1: 0.641, event_f1: 0.535, pooled_strict_precision: 0.365, macro_strict_precision: 0.472, strict_precision: 0.365, recall: 1.000, false_alarms: 33, negative_zone_hits: 0, fa_density_100km2: 36.2, pure_cpu_latency_s: 1.450 },
-                        { model_id: "alphaearth_cosine", model_name: "Google AlphaEarth V1 64-D Cosine (Model A)", category: "Foundation Model", pooled_event_f1: 0.270, macro_event_f1: 0.314, event_f1: 0.270, pooled_strict_precision: 0.159, macro_strict_precision: 0.191, strict_precision: 0.159, recall: 0.895, false_alarms: 90, negative_zone_hits: 23, fa_density_100km2: 98.7, pure_cpu_latency_s: 0.498 },
-                        { model_id: "multispectral_physical", model_name: "Pure Sentinel-2 L2A Physical Baseline", category: "Conventional RS", pooled_event_f1: 0.265, macro_event_f1: 0.267, event_f1: 0.265, pooled_strict_precision: 0.154, macro_strict_precision: 0.155, strict_precision: 0.154, recall: 0.947, false_alarms: 99, negative_zone_hits: 0, fa_density_100km2: 108.6, pure_cpu_latency_s: 0.556 },
-                        { model_id: "siamese_untuned", model_name: "Untuned Siamese U-Net Baseline (RGB)", category: "Deep Learning", pooled_event_f1: 0.238, macro_event_f1: 0.253, event_f1: 0.238, pooled_strict_precision: 0.136, macro_strict_precision: 0.146, strict_precision: 0.136, recall: 0.947, false_alarms: 114, negative_zone_hits: 5, fa_density_100km2: 125.0, pure_cpu_latency_s: 0.518 },
-                        { model_id: "dynamic_world_lulc", model_name: "Google Dynamic World V1 LULC Transition", category: "LULC Classifier", pooled_event_f1: 0.197, macro_event_f1: 0.279, event_f1: 0.197, pooled_strict_precision: 0.143, macro_strict_precision: 0.335, strict_precision: 0.143, recall: 0.316, false_alarms: 36, negative_zone_hits: 6, fa_density_100km2: 39.5, pure_cpu_latency_s: 0.497 },
-                        { model_id: "alphaearth_dynamic_world", model_name: "AlphaEarth + Dynamic World Transition (Model B)", category: "Foundation + LULC", pooled_event_f1: 0.163, macro_event_f1: 0.259, event_f1: 0.163, pooled_strict_precision: 0.133, macro_strict_precision: 0.336, strict_precision: 0.133, recall: 0.211, false_alarms: 26, negative_zone_hits: 4, fa_density_100km2: 28.5, pure_cpu_latency_s: 0.464 },
+                        { model_id: "alphaearth_hybrid", model_name: "TerraShift v6.0 Hybrid (Siamese + AlphaEarth + L2A)", category: "Hybrid Foundation", pooled_f1: 0.792, macro_f1: 0.825, event_f1: 0.792, pooled_precision: 0.655, macro_precision: 0.701, strict_precision: 0.655, recall: 1.000, false_alarms: 10, negative_zone_hits: 0, fa_density_100km2: 11.0, pure_cpu_latency_s: 1.485 },
+                        { model_id: "siamese_tuned_filtered", model_name: "TerraShift v5.1 (Tuned Siamese + L2A Guards)", category: "Hybrid Physics-AI", pooled_f1: 0.535, macro_f1: 0.641, event_f1: 0.535, pooled_precision: 0.365, macro_precision: 0.472, strict_precision: 0.365, recall: 1.000, false_alarms: 33, negative_zone_hits: 0, fa_density_100km2: 36.2, pure_cpu_latency_s: 1.450 },
+                        { model_id: "alphaearth_cosine", model_name: "Google AlphaEarth V1 64-D Cosine (Model A)", category: "Foundation Model", pooled_f1: 0.270, macro_f1: 0.314, event_f1: 0.270, pooled_precision: 0.159, macro_precision: 0.191, strict_precision: 0.159, recall: 0.895, false_alarms: 90, negative_zone_hits: 23, fa_density_100km2: 98.7, pure_cpu_latency_s: 0.498 },
+                        { model_id: "multispectral_physical", model_name: "Pure Sentinel-2 L2A Physical Baseline", category: "Conventional RS", pooled_f1: 0.265, macro_f1: 0.267, event_f1: 0.265, pooled_precision: 0.154, macro_precision: 0.155, strict_precision: 0.154, recall: 0.947, false_alarms: 99, negative_zone_hits: 0, fa_density_100km2: 108.6, pure_cpu_latency_s: 0.556 },
+                        { model_id: "siamese_untuned", model_name: "Untuned Siamese U-Net Baseline (RGB)", category: "Deep Learning", pooled_f1: 0.238, macro_f1: 0.253, event_f1: 0.238, pooled_precision: 0.136, macro_precision: 0.146, strict_precision: 0.136, recall: 0.947, false_alarms: 114, negative_zone_hits: 5, fa_density_100km2: 125.0, pure_cpu_latency_s: 0.518 },
+                        { model_id: "dynamic_world_lulc", model_name: "Google Dynamic World V1 LULC Transition", category: "LULC Classifier", pooled_f1: 0.197, macro_f1: 0.279, event_f1: 0.197, pooled_precision: 0.143, macro_precision: 0.245, strict_precision: 0.143, recall: 0.316, false_alarms: 36, negative_zone_hits: 6, fa_density_100km2: 39.5, pure_cpu_latency_s: 0.497 },
+                        { model_id: "alphaearth_dynamic_world", model_name: "AlphaEarth + Dynamic World Transition (Model B)", category: "Foundation + LULC", pooled_f1: 0.163, macro_f1: 0.259, event_f1: 0.163, pooled_precision: 0.133, macro_precision: 0.336, strict_precision: 0.133, recall: 0.211, false_alarms: 26, negative_zone_hits: 4, fa_density_100km2: 28.5, pure_cpu_latency_s: 0.464 },
                       ]).map((m, idx) => {
-                        const pF1 = m.pooled_event_f1 ?? m.event_f1;
-                        const mF1 = m.macro_event_f1 ?? m.event_f1;
-                        const pPrec = m.pooled_strict_precision ?? m.strict_precision;
-                        const mPrec = m.macro_strict_precision ?? m.strict_precision;
+                        const pF1 = m.pooled_f1 ?? m.event_f1;
+                        const mF1 = m.macro_f1 ?? m.event_f1;
+                        const pPrec = m.pooled_precision ?? m.strict_precision;
+                        const mPrec = m.macro_precision ?? m.strict_precision;
                         return (
                           <tr key={m.model_id} className={idx === 0 ? "bg-[#22b567]/5" : ""}>
                             <td className="px-2 py-1 text-[#8c929c] font-bold">#{idx + 1}</td>
@@ -484,7 +488,7 @@ export default function BenchmarksPage() {
                   </table>
                 </div>
               ) : (
-                <div className="my-auto overflow-hidden rounded-xl border border-[#edf0f3]">
+                <div className="my-2 overflow-hidden rounded-xl border border-[#edf0f3]">
                   <table className="w-full text-left text-[11.5px]">
                     <thead className="bg-[#f7f8fa] text-[10.5px] uppercase tracking-wider text-[#8c929c]">
                       <tr>
@@ -563,24 +567,24 @@ export default function BenchmarksPage() {
                 </p>
               </div>
 
-              <div className="space-y-2 text-[11.5px]">
-                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2">
+              <div className="my-2 space-y-1.5 text-[11.5px]">
+                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] px-2.5 py-1.5">
                   <span className="text-[#5c626b]">Google Earth Engine V1</span>
                   <span className="font-semibold text-[#22b567]">64-D AlphaEarth + 9-Class Dynamic World</span>
                 </div>
-                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2">
+                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] px-2.5 py-1.5">
                   <span className="text-[#5c626b]">AWS Open Data STAC</span>
                   <span className="font-semibold text-[#1c1f23]">Windowed L2A COG HTTP Range Reads</span>
                 </div>
-                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2">
+                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] px-2.5 py-1.5">
                   <span className="text-[#5c626b]">Physical Spectral Guard</span>
                   <span className="font-semibold text-[#22b567]">Directional ΔNDBI (Built) + ΔNDVI (Agri)</span>
                 </div>
-                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2">
+                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] px-2.5 py-1.5">
                   <span className="text-[#5c626b]">Localization Purity Gate</span>
                   <span className="font-semibold text-[#1c1f23]">PoC ≥ 0,15 &amp; IoU ≥ 0,05 (Exact WGS84 Clip)</span>
                 </div>
-                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] p-2">
+                <div className="flex items-center justify-between rounded-lg bg-[#f7f8fa] px-2.5 py-1.5">
                   <span className="text-[#5c626b]">Operational Dual-Mode</span>
                   <span className="font-semibold text-[#1c1f23]">5-Day L2A Tactical (v5.1) + Annual GEE (v6.0)</span>
                 </div>

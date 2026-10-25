@@ -29,6 +29,14 @@ export interface MapFeature {
   properties: MapFeatureProperties;
 }
 
+export type RasterLoadStatus = "idle" | "loading" | "slow" | "ready" | "fallback" | "error";
+
+export interface RasterStatusInfo {
+  status: RasterLoadStatus;
+  latencyMs: number | null;
+  origin: "ml-engine" | "sample-fallback" | null;
+}
+
 export interface MapCanvasProps {
   yearT1: number;
   yearT2: number;
@@ -52,6 +60,36 @@ export interface MapCanvasProps {
   effectOpacity?: number | undefined;
   zoomActionsRef?: React.MutableRefObject<{ zoomIn: () => void; zoomOut: () => void } | null> | undefined;
   showDefaultZoomControls?: boolean | undefined;
+  onRasterStatusChange?: ((info: RasterStatusInfo) => void) | undefined;
+}
+
+// Client-side memory cache so switching back to an already-rendered AI layer is instantaneous (0ms)
+const CLIENT_RASTER_CACHE = new Map<string, { blobUrl: string; origin: "ml-engine" | "sample-fallback" }>();
+
+function getOpenVertices(polygon: [number, number][] | null): [number, number][] {
+  if (!polygon || polygon.length < 3) return [];
+  const first = polygon[0];
+  const last = polygon[polygon.length - 1];
+  if (first && last && first[0] === last[0] && first[1] === last[1] && polygon.length > 3) {
+    return polygon.slice(0, -1);
+  }
+  return [...polygon];
+}
+
+function closeRing(vertices: [number, number][]): [number, number][] {
+  if (vertices.length < 3) return vertices;
+  const first = vertices[0]!;
+  return [...vertices, [first[0], first[1]]];
+}
+
+function computeBboxFromPolygon(
+  polygon: [number, number][] | null,
+  fallback?: [number, number, number, number],
+): [number, number, number, number] | undefined {
+  if (!polygon || polygon.length < 3) return fallback;
+  const lons = polygon.map((p) => p[0]);
+  const lats = polygon.map((p) => p[1]);
+  return [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)];
 }
 
 function buildMapStyle(year: number): maplibregl.StyleSpecification {
@@ -117,10 +155,7 @@ function buildPolygonGeoJson(polygon: [number, number][] | null): GeoJSON.Featur
   if (!polygon || polygon.length < 3) {
     return { type: "FeatureCollection", features: [] };
   }
-  const ring =
-    polygon[0]?.[0] === polygon[polygon.length - 1]?.[0] && polygon[0]?.[1] === polygon[polygon.length - 1]?.[1]
-      ? polygon
-      : [...polygon, polygon[0] ?? [0, 0]];
+  const ring = closeRing(getOpenVertices(polygon));
 
   return {
     type: "FeatureCollection",
@@ -134,6 +169,55 @@ function buildPolygonGeoJson(polygon: [number, number][] | null): GeoJSON.Featur
         properties: {},
       },
     ],
+  };
+}
+
+function buildVertexHandlesGeoJson(polygon: [number, number][] | null): GeoJSON.FeatureCollection {
+  const open = getOpenVertices(polygon);
+  if (open.length < 3) {
+    return { type: "FeatureCollection", features: [] };
+  }
+
+  const features: GeoJSON.Feature[] = [];
+
+  // Corner handles
+  open.forEach((coord, idx) => {
+    features.push({
+      type: "Feature",
+      geometry: {
+        type: "Point",
+        coordinates: coord,
+      },
+      properties: {
+        vertexIndex: idx,
+        handleType: "corner",
+      },
+    });
+  });
+
+  // Edge midpoint handles (allow dragging an edge or inserting a vertex)
+  open.forEach((coord, idx) => {
+    const nextCoord = open[(idx + 1) % open.length]!;
+    const mid: [number, number] = [
+      Number(((coord[0] + nextCoord[0]) / 2).toFixed(6)),
+      Number(((coord[1] + nextCoord[1]) / 2).toFixed(6)),
+    ];
+    features.push({
+      type: "Feature",
+      geometry: {
+        type: "Point",
+        coordinates: mid,
+      },
+      properties: {
+        edgeIndex: idx,
+        handleType: "midpoint",
+      },
+    });
+  });
+
+  return {
+    type: "FeatureCollection",
+    features,
   };
 }
 
@@ -160,9 +244,9 @@ function applyBasemapMode(map: maplibregl.Map | null, mode: "s2" | "mapbox") {
   }
 }
 
-function applyDiagnosticOverlay(
+function mountOrUpdateDiagnosticOverlay(
   map: maplibregl.Map | null,
-  effectRasterUrl?: string,
+  resolvedImageUrl?: string,
   effectBbox?: [number, number, number, number],
   showEffectOverlay: boolean = true,
   effectOpacity: number = 0.85,
@@ -172,7 +256,7 @@ function applyDiagnosticOverlay(
   const sourceId = "diagnostic-overlay-source";
   const layerId = "diagnostic-overlay-layer";
 
-  if (!effectRasterUrl || !effectBbox || showEffectOverlay === false) {
+  if (!resolvedImageUrl || !effectBbox || showEffectOverlay === false) {
     if (map.getLayer(layerId)) {
       map.removeLayer(layerId);
     }
@@ -190,6 +274,19 @@ function applyDiagnosticOverlay(
     [minLon, minLat],
   ];
 
+  const existingSource = map.getSource(sourceId) as maplibregl.ImageSource | undefined;
+  if (existingSource && typeof existingSource.updateImage === "function") {
+    try {
+      existingSource.updateImage({ url: resolvedImageUrl, coordinates });
+      if (map.getLayer(layerId)) {
+        map.setPaintProperty(layerId, "raster-opacity", effectOpacity);
+      }
+      return;
+    } catch {
+      // Fallback to recreate if updateImage fails
+    }
+  }
+
   if (map.getLayer(layerId)) {
     map.removeLayer(layerId);
   }
@@ -200,7 +297,7 @@ function applyDiagnosticOverlay(
   try {
     map.addSource(sourceId, {
       type: "image",
-      url: effectRasterUrl,
+      url: resolvedImageUrl,
       coordinates,
     });
 
@@ -246,6 +343,7 @@ export function MapCanvas({
   effectOpacity = 0.85,
   zoomActionsRef,
   showDefaultZoomControls = true,
+  onRasterStatusChange,
 }: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const compareContainerRef = useRef<HTMLDivElement>(null);
@@ -258,15 +356,22 @@ export function MapCanvas({
   const appliedYearT2Ref = useRef(yearT2);
   const polygonRef = useRef(polygon);
   polygonRef.current = polygon;
+  const onPolygonChangeRef = useRef(onPolygonChange);
+  onPolygonChangeRef.current = onPolygonChange;
+  const isDrawingRef = useRef(isDrawing);
+  isDrawingRef.current = isDrawing;
   const basemapSourceRef = useRef(basemapSource);
   basemapSourceRef.current = basemapSource;
   const onCameraMoveRef = useRef(onCameraMove);
   onCameraMoveRef.current = onCameraMove;
+  const onRasterStatusChangeRef = useRef(onRasterStatusChange);
+  onRasterStatusChangeRef.current = onRasterStatusChange;
 
-  const effectRasterUrlRef = useRef(effectRasterUrl);
-  effectRasterUrlRef.current = effectRasterUrl;
-  const effectBboxRef = useRef(effectBbox);
-  effectBboxRef.current = effectBbox;
+  // Dynamic bbox tracks the edited blue polygon so AI overlay aligns with user's edited shape
+  const dynamicBbox = computeBboxFromPolygon(polygon, effectBbox);
+  const resolvedBlobUrlRef = useRef<string | undefined>(undefined);
+  const effectBboxRef = useRef(dynamicBbox);
+  effectBboxRef.current = dynamicBbox;
   const showEffectOverlayRef = useRef(showEffectOverlay);
   showEffectOverlayRef.current = showEffectOverlay;
   const effectOpacityRef = useRef(effectOpacity);
@@ -276,6 +381,32 @@ export function MapCanvas({
   const [cursorPos, setCursorPos] = useState<[number, number] | null>(null);
   const activeVerticesRef = useRef<[number, number][]>([]);
   activeVerticesRef.current = activeVertices;
+
+  // State for dragging existing blue polygon corners/edges
+  const [isDraggingVertex, setIsDraggingVertex] = useState(false);
+  const [liveDragAreaKm2, setLiveDragAreaKm2] = useState<number | null>(null);
+  const dragStateRef = useRef<{
+    mode: "corner" | "edge" | "translate";
+    index: number;
+    startLngLat: [number, number];
+    initialVertices: [number, number][];
+    currentVertices: [number, number][];
+  } | null>(null);
+
+  // State for AI Raster loading / lag / not-responding feedback
+  const [rasterStatus, setRasterStatus] = useState<RasterLoadStatus>("idle");
+  const [rasterLatencyMs, setRasterLatencyMs] = useState<number | null>(null);
+  const [elapsedLoadMs, setElapsedLoadMs] = useState<number>(0);
+  const [retryCounter, setRetryCounter] = useState<number>(0);
+
+  const updateStatus = useCallback(
+    (status: RasterLoadStatus, latencyMs: number | null, origin: "ml-engine" | "sample-fallback" | null) => {
+      setRasterStatus(status);
+      setRasterLatencyMs(latencyMs);
+      onRasterStatusChangeRef.current?.({ status, latencyMs, origin });
+    },
+    [],
+  );
 
   const syncMaps = useCallback((source: maplibregl.Map, target: maplibregl.Map) => {
     let active = false;
@@ -360,8 +491,41 @@ export function MapCanvas({
         source: "aoi-polygon-source",
         paint: {
           "line-color": "#38BDF8",
-          "line-width": 2,
+          "line-width": 2.2,
           "line-dasharray": [4, 2],
+        },
+      });
+
+      // Interactive draggable vertex & edge handles for editing the blue AOI shape
+      map.addSource("aoi-vertices-source", {
+        type: "geojson",
+        data: buildVertexHandlesGeoJson(polygonRef.current),
+      });
+
+      map.addLayer({
+        id: "aoi-midpoint-handles",
+        type: "circle",
+        source: "aoi-vertices-source",
+        filter: ["==", ["get", "handleType"], "midpoint"],
+        paint: {
+          "circle-radius": 5,
+          "circle-color": "#38BDF8",
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#FFFFFF",
+          "circle-opacity": 0.85,
+        },
+      });
+
+      map.addLayer({
+        id: "aoi-corner-handles",
+        type: "circle",
+        source: "aoi-vertices-source",
+        filter: ["==", ["get", "handleType"], "corner"],
+        paint: {
+          "circle-radius": 7,
+          "circle-color": "#FFFFFF",
+          "circle-stroke-width": 3,
+          "circle-stroke-color": "#0284C7",
         },
       });
 
@@ -447,20 +611,163 @@ export function MapCanvas({
         }
       });
 
-      map.on("mouseenter", "change-features-fill", () => {
-        map.getCanvas().style.cursor = "pointer";
+      // Cursor feedback on corner and midpoint handles
+      map.on("mouseenter", "aoi-corner-handles", () => {
+        if (!isDrawingRef.current && !dragStateRef.current) {
+          map.getCanvas().style.cursor = "grab";
+        }
       });
-      map.on("mouseleave", "change-features-fill", () => {
-        if (!isDrawing) map.getCanvas().style.cursor = "";
+      map.on("mouseleave", "aoi-corner-handles", () => {
+        if (!isDrawingRef.current && !dragStateRef.current) {
+          map.getCanvas().style.cursor = "";
+        }
+      });
+      map.on("mouseenter", "aoi-midpoint-handles", () => {
+        if (!isDrawingRef.current && !dragStateRef.current) {
+          map.getCanvas().style.cursor = "grab";
+        }
+      });
+      map.on("mouseleave", "aoi-midpoint-handles", () => {
+        if (!isDrawingRef.current && !dragStateRef.current) {
+          map.getCanvas().style.cursor = "";
+        }
       });
 
-      applyDiagnosticOverlay(
-        map,
-        effectRasterUrlRef.current,
-        effectBboxRef.current,
-        showEffectOverlayRef.current,
-        effectOpacityRef.current,
-      );
+      // Start dragging a corner handle
+      map.on("mousedown", "aoi-corner-handles", (e: maplibregl.MapLayerMouseEvent) => {
+        if (isDrawingRef.current) return;
+        const feat = e.features?.[0];
+        const vIdx = feat?.properties?.["vertexIndex"];
+        if (typeof vIdx !== "number") return;
+        e.preventDefault();
+        const open = getOpenVertices(polygonRef.current);
+        if (open.length < 3) return;
+        map.dragPan.disable();
+        map.getCanvas().style.cursor = "grabbing";
+        dragStateRef.current = {
+          mode: "corner",
+          index: vIdx,
+          startLngLat: [e.lngLat.lng, e.lngLat.lat],
+          initialVertices: open.map((p) => [p[0], p[1]]),
+          currentVertices: open.map((p) => [p[0], p[1]]),
+        };
+        setIsDraggingVertex(true);
+        setLiveDragAreaKm2(calculatePolygonAreaKm2(closeRing(open)));
+      });
+
+      // Start dragging an edge midpoint handle (moves that edge segment)
+      map.on("mousedown", "aoi-midpoint-handles", (e: maplibregl.MapLayerMouseEvent) => {
+        if (isDrawingRef.current) return;
+        const feat = e.features?.[0];
+        const eIdx = feat?.properties?.["edgeIndex"];
+        if (typeof eIdx !== "number") return;
+        e.preventDefault();
+        const open = getOpenVertices(polygonRef.current);
+        if (open.length < 3) return;
+        map.dragPan.disable();
+        map.getCanvas().style.cursor = "grabbing";
+        dragStateRef.current = {
+          mode: "edge",
+          index: eIdx,
+          startLngLat: [e.lngLat.lng, e.lngLat.lat],
+          initialVertices: open.map((p) => [p[0], p[1]]),
+          currentVertices: open.map((p) => [p[0], p[1]]),
+        };
+        setIsDraggingVertex(true);
+        setLiveDragAreaKm2(calculatePolygonAreaKm2(closeRing(open)));
+      });
+
+      // Update blue polygon live during mousemove
+      map.on("mousemove", (e: maplibregl.MapMouseEvent) => {
+        const drag = dragStateRef.current;
+        if (!drag) return;
+
+        const nextVertices: [number, number][] = drag.initialVertices.map((p) => [p[0], p[1]]);
+        const dLng = e.lngLat.lng - drag.startLngLat[0];
+        const dLat = e.lngLat.lat - drag.startLngLat[1];
+
+        if (drag.mode === "corner") {
+          const initV = drag.initialVertices;
+          // If it's a 4-corner axis-aligned rectangle, resize the rectangle smoothly
+          const isRect =
+            initV.length === 4 &&
+            (Math.abs(initV[0]![0] - initV[3]![0]) < 1e-4 || Math.abs(initV[0]![0] - initV[1]![0]) < 1e-4);
+
+          if (isRect) {
+            const idx = drag.index;
+            const oppIdx = (idx + 2) % 4;
+            const opp = initV[oppIdx]!;
+            const newLon = Number(e.lngLat.lng.toFixed(6));
+            const newLat = Number(e.lngLat.lat.toFixed(6));
+            const minLon = Math.min(opp[0], newLon);
+            const maxLon = Math.max(opp[0], newLon);
+            const minLat = Math.min(opp[1], newLat);
+            const maxLat = Math.max(opp[1], newLat);
+            nextVertices[0] = [minLon, minLat];
+            nextVertices[1] = [maxLon, minLat];
+            nextVertices[2] = [maxLon, maxLat];
+            nextVertices[3] = [minLon, maxLat];
+          } else {
+            nextVertices[drag.index] = [Number(e.lngLat.lng.toFixed(6)), Number(e.lngLat.lat.toFixed(6))];
+          }
+        } else if (drag.mode === "edge") {
+          const idx1 = drag.index;
+          const idx2 = (drag.index + 1) % nextVertices.length;
+          nextVertices[idx1] = [
+            Number((drag.initialVertices[idx1]![0] + dLng).toFixed(6)),
+            Number((drag.initialVertices[idx1]![1] + dLat).toFixed(6)),
+          ];
+          nextVertices[idx2] = [
+            Number((drag.initialVertices[idx2]![0] + dLng).toFixed(6)),
+            Number((drag.initialVertices[idx2]![1] + dLat).toFixed(6)),
+          ];
+        }
+
+        drag.currentVertices = nextVertices;
+        const closed = closeRing(nextVertices);
+        setLiveDragAreaKm2(calculatePolygonAreaKm2(closed));
+
+        const polySrc = map.getSource("aoi-polygon-source") as maplibregl.GeoJSONSource | undefined;
+        polySrc?.setData(buildPolygonGeoJson(closed));
+
+        const handleSrc = map.getSource("aoi-vertices-source") as maplibregl.GeoJSONSource | undefined;
+        handleSrc?.setData(buildVertexHandlesGeoJson(closed));
+
+        const newBbox = computeBboxFromPolygon(closed, effectBboxRef.current);
+        if (newBbox && resolvedBlobUrlRef.current && showEffectOverlayRef.current) {
+          mountOrUpdateDiagnosticOverlay(
+            map,
+            resolvedBlobUrlRef.current,
+            newBbox,
+            showEffectOverlayRef.current,
+            effectOpacityRef.current,
+          );
+        }
+      });
+
+      const finishVertexDrag = () => {
+        const drag = dragStateRef.current;
+        if (!drag) return;
+        dragStateRef.current = null;
+        setIsDraggingVertex(false);
+        setLiveDragAreaKm2(null);
+        map.dragPan.enable();
+        map.getCanvas().style.cursor = "";
+        const closed = closeRing(drag.currentVertices);
+        onPolygonChangeRef.current(closed);
+      };
+
+      map.on("mouseup", finishVertexDrag);
+
+      if (resolvedBlobUrlRef.current) {
+        mountOrUpdateDiagnosticOverlay(
+          map,
+          resolvedBlobUrlRef.current,
+          effectBboxRef.current,
+          showEffectOverlayRef.current,
+          effectOpacityRef.current,
+        );
+      }
     });
 
     mapRef.current = map;
@@ -477,17 +784,113 @@ export function MapCanvas({
     };
   }, []);
 
+  // Preload AI Raster URL and track loading / slow / fallback / error status so the map never lags silently
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
-    if (map.isStyleLoaded()) {
-      applyDiagnosticOverlay(map, effectRasterUrl, effectBbox, showEffectOverlay, effectOpacity);
-    } else {
-      map.once("load", () => {
-        applyDiagnosticOverlay(map, effectRasterUrl, effectBbox, showEffectOverlay, effectOpacity);
-      });
+
+    if (!effectRasterUrl || !showEffectOverlay) {
+      updateStatus("idle", null, null);
+      if (map && map.isStyleLoaded()) {
+        mountOrUpdateDiagnosticOverlay(map, undefined, dynamicBbox, false, effectOpacity);
+      }
+      return;
     }
-  }, [effectRasterUrl, effectBbox, showEffectOverlay, effectOpacity]);
+
+    // Check client-side cache first for 0ms instant switching
+    const cached = CLIENT_RASTER_CACHE.get(effectRasterUrl);
+    if (cached && retryCounter === 0) {
+      resolvedBlobUrlRef.current = cached.blobUrl;
+      updateStatus(cached.origin === "ml-engine" ? "ready" : "fallback", 1, cached.origin);
+      if (map) {
+        if (map.isStyleLoaded()) {
+          mountOrUpdateDiagnosticOverlay(map, cached.blobUrl, dynamicBbox, showEffectOverlay, effectOpacity);
+        } else {
+          map.once("load", () => {
+            mountOrUpdateDiagnosticOverlay(map, cached.blobUrl, dynamicBbox, showEffectOverlay, effectOpacity);
+          });
+        }
+      }
+      return;
+    }
+
+    let cancelled = false;
+    const abortCtrl = new AbortController();
+    const startMs = performance.now();
+    setElapsedLoadMs(0);
+    updateStatus("loading", null, null);
+
+    const intervalId = window.setInterval(() => {
+      const elapsed = Math.round(performance.now() - startMs);
+      setElapsedLoadMs(elapsed);
+      if (elapsed >= 1200) {
+        setRasterStatus((prev) => (prev === "loading" ? "slow" : prev));
+      }
+    }, 120);
+
+    fetch(effectRasterUrl, { signal: abortCtrl.signal })
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const originHeader = res.headers.get("X-Raster-Origin");
+        const origin: "ml-engine" | "sample-fallback" =
+          originHeader === "ml-engine" ? "ml-engine" : "sample-fallback";
+        const blob = await res.blob();
+        if (cancelled) return;
+        const blobUrl = URL.createObjectURL(blob);
+        CLIENT_RASTER_CACHE.set(effectRasterUrl, { blobUrl, origin });
+        resolvedBlobUrlRef.current = blobUrl;
+
+        const latency = Math.max(1, Math.round(performance.now() - startMs));
+        updateStatus(origin === "ml-engine" ? "ready" : "fallback", latency, origin);
+
+        const currentMap = mapRef.current;
+        if (currentMap) {
+          if (currentMap.isStyleLoaded()) {
+            mountOrUpdateDiagnosticOverlay(
+              currentMap,
+              blobUrl,
+              effectBboxRef.current,
+              showEffectOverlayRef.current,
+              effectOpacityRef.current,
+            );
+          } else {
+            currentMap.once("load", () => {
+              mountOrUpdateDiagnosticOverlay(
+                currentMap,
+                blobUrl,
+                effectBboxRef.current,
+                showEffectOverlayRef.current,
+                effectOpacityRef.current,
+              );
+            });
+          }
+        }
+      })
+      .catch((err: unknown) => {
+        if (cancelled || (err instanceof DOMException && err.name === "AbortError")) return;
+        const latency = Math.round(performance.now() - startMs);
+        updateStatus("error", latency, null);
+      })
+      .finally(() => {
+        window.clearInterval(intervalId);
+      });
+
+    return () => {
+      cancelled = true;
+      abortCtrl.abort();
+      window.clearInterval(intervalId);
+    };
+  }, [effectRasterUrl, showEffectOverlay, retryCounter, updateStatus]);
+
+  // Update overlay coordinates or opacity immediately when polygon bbox or opacity changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    if (resolvedBlobUrlRef.current && showEffectOverlay) {
+      mountOrUpdateDiagnosticOverlay(map, resolvedBlobUrlRef.current, dynamicBbox, showEffectOverlay, effectOpacity);
+    }
+  }, [dynamicBbox, showEffectOverlay, effectOpacity]);
 
   useEffect(() => {
     if (!zoomActionsRef) return;
@@ -632,10 +1035,13 @@ export function MapCanvas({
 
   useEffect(() => {
     const geojson = buildPolygonGeoJson(polygon);
+    const handlesGeojson = buildVertexHandlesGeoJson(polygon);
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
       const src = map.getSource("aoi-polygon-source") as maplibregl.GeoJSONSource | undefined;
       src?.setData(geojson);
+      const handlesSrc = map.getSource("aoi-vertices-source") as maplibregl.GeoJSONSource | undefined;
+      handlesSrc?.setData(handlesGeojson);
     }
     const compareMap = compareMapRef.current;
     if (compareMap && compareMap.isStyleLoaded()) {
@@ -887,34 +1293,104 @@ export function MapCanvas({
         )}
       </div>
 
+      {/* Live AI Spectral Overlay Loading / Lag / Error Status Banner */}
+      {showEffectOverlay && (rasterStatus === "loading" || rasterStatus === "slow" || rasterStatus === "error") && (
+        <div className="pointer-events-auto absolute inset-x-0 top-5 z-30 flex justify-center px-4">
+          <div
+            role="status"
+            aria-live="polite"
+            className={`flex items-center gap-2.5 rounded-xl border px-3.5 py-2 text-[12px] font-medium shadow-lg backdrop-blur-md ${
+              rasterStatus === "error"
+                ? "border-[#e94235]/50 bg-[#1b1e23]/95 text-[#ff8b82]"
+                : rasterStatus === "slow"
+                  ? "border-[#f39223]/50 bg-[#1b1e23]/95 text-[#fbbf24]"
+                  : "border-white/15 bg-[#1b1e23]/90 text-white"
+            }`}
+          >
+            {rasterStatus === "error" ? (
+              <>
+                <span className="h-2 w-2 rounded-full bg-[#e94235]" />
+                <span>AI Raster Service Not Responding ({rasterLatencyMs ?? 0} ms)</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (effectRasterUrl) CLIENT_RASTER_CACHE.delete(effectRasterUrl);
+                    setRetryCounter((c) => c + 1);
+                  }}
+                  className="ml-1 cursor-pointer rounded-md bg-white/15 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-white/25"
+                >
+                  Retry
+                </button>
+              </>
+            ) : (
+              <>
+                <svg
+                  className="h-3.5 w-3.5 animate-spin text-[#38BDF8]"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                  <path
+                    className="opacity-90"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+                <span>
+                  {rasterStatus === "slow"
+                    ? `AI Engine Computing Spectral Overlay (${(elapsedLoadMs / 1000).toFixed(1)}s)...`
+                    : "Loading AI Spectral Overlay..."}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Live Blue AOI Corner/Edge Drag Telemetry HUD */}
+      {isDraggingVertex && liveDragAreaKm2 !== null && (
+        <div className="pointer-events-none absolute inset-x-0 top-5 z-30 flex justify-center px-4">
+          <div className="flex items-center gap-2.5 rounded-xl border border-[#38BDF8]/50 bg-[#1b1e23]/95 px-4 py-2 text-xs font-medium text-white shadow-xl backdrop-blur-md">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-[#38BDF8]" />
+            <span>Resizing Blue AOI Boundary</span>
+            <span>·</span>
+            <span className="font-mono font-semibold text-[#38BDF8]">
+              {formatArea(liveDragAreaKm2 * 1_000_000)}
+            </span>
+            <span className="text-white/60">(Release mouse to apply)</span>
+          </div>
+        </div>
+      )}
+
       {/* Live Polygon Drawing Status Bar */}
       {isDrawing ? (
-        <div className="pointer-events-none absolute inset-x-0 top-4 z-30 flex justify-center px-4">
+        <div className="pointer-events-none absolute inset-x-0 top-5 z-30 flex justify-center px-4">
           <div
             role="status"
             aria-live="polite"
             className={`flex items-center gap-3 rounded-xl border px-4 py-2 text-xs shadow-xl backdrop-blur-md ${
               isAreaOversized
                 ? "border-crimson-400/60 bg-crimson-400/20 text-crimson-400"
-                : "border-signal-400/40 bg-ink-900/95 text-bone-100"
+                : "border-[#38BDF8]/50 bg-[#1b1e23]/95 text-white"
             }`}
           >
             <span
-              className={`size-2 animate-ping rounded-full ${isAreaOversized ? "bg-crimson-400" : "bg-signal-400"}`}
+              className={`size-2 animate-ping rounded-full ${isAreaOversized ? "bg-crimson-400" : "bg-[#38BDF8]"}`}
               aria-hidden="true"
             />
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Vertex {activeVertices.length + 1}</span>
+              <span className="font-semibold">Drawing Custom AOI · Vertex {activeVertices.length + 1}</span>
               <span aria-hidden="true">·</span>
               <span className="tabular-nums">
                 Area: <strong>{formatArea(liveAreaKm2 * 1_000_000)}</strong>
                 {isAreaOversized ? " (Exceeds 100\u00A0km² limit)" : " / 100\u00A0km² max"}
               </span>
               <span aria-hidden="true">·</span>
-              <span className="text-bone-300">
+              <span className="text-white/70">
                 {activeVertices.length >= 3
-                  ? "Click first point or press Enter to finish · Esc to cancel"
-                  : "Click map to place boundary points · Esc to cancel"}
+                  ? "Click first point, double-click, or press Enter to finish · Esc to cancel"
+                  : "Click map to place corners · Esc to cancel"}
               </span>
             </div>
           </div>

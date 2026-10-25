@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useState, type ReactNode } from "react";
 import { useAoi, CORRIDOR_PROFILES, TIMELINE_MONTHS, TIMELINE_YEARS, type CorridorId } from "@/lib/aoi-context";
+import type { RasterStatusInfo } from "@/components/map/map-canvas";
 
 const STUDIO_LINKS = [
   { href: "/", label: "Overview" },
@@ -17,24 +18,6 @@ const STUDIO_LINKS = [
 
 export interface StudioNavProps {
   readonly rightSlot?: ReactNode;
-}
-
-function IconSearch() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.3-4.3" />
-    </svg>
-  );
 }
 
 function IconChevronDown() {
@@ -119,8 +102,7 @@ function IconBiTemporal({ className }: { readonly className?: string } = {}) {
 export function StudioNav({ rightSlot }: StudioNavProps = {}) {
   const pathname = usePathname();
   const { activeCorridorId, setActiveCorridorId, activeCorridor } = useAoi();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [corridorMenuOpen, setCorridorMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
 
   const corridors = Object.values(CORRIDOR_PROFILES).filter(
@@ -130,30 +112,16 @@ export function StudioNav({ rightSlot }: StudioNavProps = {}) {
 
   return (
     <header className="relative z-40 flex h-[60px] shrink-0 items-center justify-between border-b border-[#f0f2f5] bg-white px-5">
-      {/* Left: Hamburger + Outlined Isometric Icon + Brand */}
-      <div className="flex min-w-[200px] items-center gap-4">
-        <button
-          type="button"
-          aria-label="Select Corridor"
-          onClick={() => {
-            setDrawerOpen((v) => !v);
-            setSearchOpen(false);
-          }}
-          className="flex h-8 w-8 cursor-pointer flex-col items-center justify-center gap-[4px] text-[#22252a] transition-opacity hover:opacity-75"
-        >
-          <span className="h-[1.8px] w-[18px] rounded-full bg-[#22252a]" />
-          <span className="h-[1.8px] w-[18px] rounded-full bg-[#22252a]" />
-          <span className="h-[1.8px] w-[18px] rounded-full bg-[#22252a]" />
-        </button>
-
-        <Link href="/" className="flex items-center gap-2 transition-opacity hover:opacity-85">
+      {/* Left: Brand Identity */}
+      <div className="flex min-w-[160px] items-center gap-3">
+        <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-85">
           <svg
-            width="16"
-            height="16"
+            width="17"
+            height="17"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#5c626b"
-            strokeWidth="1.8"
+            stroke="#1c1f23"
+            strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
@@ -162,7 +130,7 @@ export function StudioNav({ rightSlot }: StudioNavProps = {}) {
             <path d="M12 12v9" />
             <path d="M12 12L3 7.5" />
           </svg>
-          <span className="text-[13px] font-bold tracking-[-0.01em] text-[#1c1f23]">TerraShift</span>
+          <span className="text-[13.5px] font-bold tracking-[-0.01em] text-[#1c1f23]">TerraShift</span>
         </Link>
       </div>
 
@@ -190,109 +158,62 @@ export function StudioNav({ rightSlot }: StudioNavProps = {}) {
         })}
       </nav>
 
-      {/* Right: Active Corridor Pill + Search Icon + Soft Avatar Circle */}
-      <div className="flex min-w-[200px] items-center justify-end gap-3.5">
+      {/* Right: Single Clean Corridor Selector Pill (no fake auth avatar or redundant icons) */}
+      <div className="flex min-w-[160px] items-center justify-end gap-2.5">
         {rightSlot ? (
           rightSlot
         ) : (
           <button
             type="button"
-            onClick={() => {
-              setDrawerOpen((v) => !v);
-              setSearchOpen(false);
-            }}
-            className="hidden cursor-pointer items-center gap-2 rounded-lg bg-[#f6f7f9] px-3 py-1.5 text-[11.5px] font-medium text-[#3b4048] transition-colors hover:bg-[#edeff2] xl:flex"
+            onClick={() => setCorridorMenuOpen((v) => !v)}
+            className="flex cursor-pointer items-center gap-2 rounded-xl border border-[#e4e7ec] bg-[#f8f9fb] px-3.5 py-1.5 text-[12px] font-semibold text-[#1c1f23] transition-colors hover:bg-[#edeff2]"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-[#22b567]" />
+            <span className="h-2 w-2 rounded-full bg-[#22b567]" />
             <span>{activeCorridor.shortName}</span>
+            <IconChevronDown />
           </button>
         )}
-
-        <button
-          type="button"
-          aria-label="Search Corridors"
-          onClick={() => {
-            setSearchOpen((v) => !v);
-            setDrawerOpen(false);
-          }}
-          className="cursor-pointer text-[#5c626b] transition-colors hover:text-[#1c1f23]"
-        >
-          <IconSearch />
-        </button>
-
-        <div
-          title={`${activeCorridor.name} (${activeCorridor.tileId})`}
-          className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#e6ebe8]"
-        >
-          <svg viewBox="0 0 32 32" className="h-full w-full">
-            <circle cx="16" cy="12" r="5" fill="#7a9987" />
-            <path d="M6 29c1.8-5.5 5.4-8 10-8s8.2 2.5 10 8" fill="#7a9987" />
-          </svg>
-        </div>
       </div>
 
-      {/* Left Hamburger Corridor Switcher Popover */}
-      {drawerOpen && (
-        <div className="absolute top-[64px] left-5 z-50 w-[310px] rounded-[18px] border border-[#edeff2] bg-white p-3 shadow-[0_16px_48px_rgba(0,0,0,0.14)]">
-          <div className="px-2.5 py-1.5 text-[11px] font-semibold tracking-wider text-[#8c929c] uppercase">
-            Active Observation Corridor
+      {/* Unified Corridor Switcher Popover */}
+      {corridorMenuOpen && (
+        <div className="absolute top-[64px] right-5 z-50 w-[320px] rounded-[18px] border border-[#edeff2] bg-white p-3.5 shadow-[0_16px_48px_rgba(0,0,0,0.14)]">
+          <div className="mb-2 px-1 text-[11px] font-semibold tracking-wider text-[#8c929c] uppercase">
+            Select Observation Corridor
           </div>
-          <div className="mt-1 space-y-1">
-            {(Object.keys(CORRIDOR_PROFILES) as CorridorId[]).map((id) => {
-              const item = CORRIDOR_PROFILES[id];
-              const isSelected = id === activeCorridorId;
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter corridors..."
+            className="mb-2 w-full rounded-xl bg-[#f6f7f9] px-3 py-2 text-[12px] text-[#1c1f23] placeholder:text-[#8c929c] focus:outline-none"
+          />
+          <div className="max-h-64 space-y-1 overflow-y-auto">
+            {corridors.map((c) => {
+              const isSelected = c.id === activeCorridorId;
               return (
                 <button
-                  key={id}
+                  key={c.id}
                   type="button"
                   onClick={() => {
-                    setActiveCorridorId(id);
-                    setDrawerOpen(false);
+                    setActiveCorridorId(c.id as CorridorId);
+                    setCorridorMenuOpen(false);
+                    setQuery("");
                   }}
                   className={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 text-left transition-colors ${
-                    isSelected ? "bg-[#f4f5f7] font-semibold text-[#1c1f23]" : "text-[#3b4048] hover:bg-[#f8f9fb]"
+                    isSelected ? "bg-[#f0f3f1] font-semibold text-[#1c1f23]" : "text-[#3b4048] hover:bg-[#f6f7f9]"
                   }`}
                 >
                   <div>
-                    <div className="text-[12.5px]">{item.name}</div>
-                    <div className="text-[11px] text-[#8c929c]">{item.coordsLabel}</div>
+                    <div className="text-[12.5px] font-semibold text-[#1c1f23]">{c.name}</div>
+                    <div className="text-[11px] text-[#8c929c]">
+                      {c.tileId} · {c.coordsLabel}
+                    </div>
                   </div>
                   {isSelected && <span className="h-2 w-2 rounded-full bg-[#22b567]" />}
                 </button>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {/* Right Search Popover */}
-      {searchOpen && (
-        <div className="absolute top-[64px] right-5 z-50 w-[320px] rounded-[18px] border border-[#edeff2] bg-white p-3.5 shadow-[0_16px_48px_rgba(0,0,0,0.14)]">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filter Sentinel-2 corridors..."
-            className="w-full rounded-xl bg-[#f6f7f9] px-3 py-2 text-[12.5px] text-[#1c1f23] placeholder:text-[#8c929c] focus:outline-none"
-          />
-          <div className="mt-2 max-h-56 space-y-1 overflow-y-auto">
-            {corridors.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => {
-                  setActiveCorridorId(c.id);
-                  setSearchOpen(false);
-                  setQuery("");
-                }}
-                className="w-full cursor-pointer rounded-xl px-3 py-2 text-left transition-colors hover:bg-[#f6f7f9]"
-              >
-                <div className="text-[12.5px] font-semibold text-[#1c1f23]">{c.name}</div>
-                <div className="text-[11px] text-[#8c929c]">
-                  {c.tileId} · {c.coordsLabel}
-                </div>
-              </button>
-            ))}
           </div>
         </div>
       )}
@@ -305,20 +226,19 @@ export function StudioTimelineBar() {
   const [yearMenuOpen, setYearMenuOpen] = useState(false);
 
   return (
-    <footer className="relative z-30 flex h-[58px] shrink-0 items-center gap-4 border-t border-[#f0f2f5] bg-white px-5">
-      {/* Year Pill Selector */}
+    <footer className="relative z-30 flex h-[54px] shrink-0 items-center gap-4 border-t border-[#f0f2f5] bg-white px-5">
       <div className="relative">
         <button
           type="button"
           onClick={() => setYearMenuOpen((v) => !v)}
-          className="flex h-[36px] cursor-pointer items-center gap-2.5 rounded-xl border border-[#e4e7ec] bg-white px-4 text-[12.5px] font-semibold text-[#1c1f23] shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:bg-[#f8f9fb]"
+          className="flex h-[34px] cursor-pointer items-center gap-2.5 rounded-xl border border-[#e4e7ec] bg-white px-4 text-[12px] font-semibold text-[#1c1f23] shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors hover:bg-[#f8f9fb]"
         >
           <span>{activeYear}</span>
           <IconChevronDown />
         </button>
 
         {yearMenuOpen && (
-          <div className="absolute bottom-[44px] left-0 z-50 w-[110px] rounded-2xl border border-[#edeff2] bg-white p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.14)]">
+          <div className="absolute bottom-[42px] left-0 z-50 w-[110px] rounded-2xl border border-[#edeff2] bg-white p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.14)]">
             {TIMELINE_YEARS.map((yr) => (
               <button
                 key={yr}
@@ -327,7 +247,7 @@ export function StudioTimelineBar() {
                   setActiveYear(yr);
                   setYearMenuOpen(false);
                 }}
-                className={`w-full cursor-pointer rounded-xl px-3 py-1.5 text-left text-[12.5px] tabular-nums transition-colors ${
+                className={`w-full cursor-pointer rounded-xl px-3 py-1.5 text-left text-[12px] tabular-nums transition-colors ${
                   yr === activeYear
                     ? "bg-[#edeff2] font-semibold text-[#1c1f23]"
                     : "text-[#636973] hover:bg-[#f6f7f9] hover:text-[#1c1f23]"
@@ -340,7 +260,6 @@ export function StudioTimelineBar() {
         )}
       </div>
 
-      {/* Full-Width Segmented Month Track (#edeff2) */}
       <div className="flex flex-1 items-center rounded-xl bg-[#edeff2] p-[3px]">
         {TIMELINE_MONTHS.map((m) => {
           const active = m === activeMonth;
@@ -349,7 +268,7 @@ export function StudioTimelineBar() {
               key={m}
               type="button"
               onClick={() => setActiveMonth(m)}
-              className={`flex-1 cursor-pointer rounded-[9px] py-[6px] text-center text-[12px] transition-all ${
+              className={`flex-1 cursor-pointer rounded-[9px] py-[5px] text-center text-[11.5px] transition-all ${
                 active
                   ? "bg-white font-semibold text-[#1c1f23] shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
                   : "font-medium text-[#636973] hover:text-[#1c1f23]"
@@ -364,12 +283,20 @@ export function StudioTimelineBar() {
   );
 }
 
-export function StudioShell({ children, rightSlot }: { readonly children: ReactNode; readonly rightSlot?: ReactNode }) {
+export function StudioShell({
+  children,
+  rightSlot,
+  showTimelineBar = false,
+}: {
+  readonly children: ReactNode;
+  readonly rightSlot?: ReactNode;
+  readonly showTimelineBar?: boolean;
+}) {
   return (
     <div className="flex h-dvh w-full flex-col overflow-hidden bg-white font-sans text-[#1c1f23] antialiased select-none">
       <StudioNav rightSlot={rightSlot} />
       <main className="relative flex-1 overflow-hidden bg-[#f6f7f9]">{children}</main>
-      <StudioTimelineBar />
+      {showTimelineBar && <StudioTimelineBar />}
     </div>
   );
 }
@@ -383,6 +310,11 @@ export interface MapCanvasOverlayProps {
   readonly onCycleEffect?: () => void;
   readonly viewMode?: StudioViewMode;
   readonly onSelectViewMode?: (mode: StudioViewMode) => void;
+  readonly isDrawing?: boolean;
+  readonly onToggleDrawing?: () => void;
+  readonly isCustomPolygon?: boolean;
+  readonly onResetPolygon?: () => void;
+  readonly rasterStatus?: RasterStatusInfo;
 }
 
 export function MapCanvasOverlay({
@@ -392,7 +324,15 @@ export function MapCanvasOverlay({
   onCycleEffect,
   viewMode = "diagnostic",
   onSelectViewMode,
+  isDrawing = false,
+  onToggleDrawing,
+  isCustomPolygon = false,
+  onResetPolygon,
+  rasterStatus,
 }: MapCanvasOverlayProps = {}) {
+  const isLoading = rasterStatus?.status === "loading" || rasterStatus?.status === "slow";
+  const isError = rasterStatus?.status === "error";
+
   return (
     <>
       {/* Top-Left Dark Translucent Pill Zoom Button Pair */}
@@ -442,8 +382,8 @@ export function MapCanvasOverlay({
         </button>
       </div>
 
-      {/* Bottom-left View Mode Switcher + Layer Badge */}
-      <div className="absolute bottom-5 left-5 z-10 flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+      {/* Bottom-left View Mode Switcher + AOI Shape Controls + Layer & AI Status Badge */}
+      <div className="absolute bottom-5 left-5 z-10 flex flex-wrap items-center gap-2">
         {onSelectViewMode && (
           <div className="flex items-center rounded-xl border border-white/10 bg-[#1b1e23]/90 p-1 text-[11px] font-medium text-white/70 shadow-md backdrop-blur-md">
             <button
@@ -479,6 +419,50 @@ export function MapCanvasOverlay({
           </div>
         )}
 
+        {/* Interactive Blue AOI Box Edit / Redraw / Reset Controls */}
+        {onToggleDrawing && (
+          <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#1b1e23]/90 p-1 text-[11px] font-medium text-white shadow-md backdrop-blur-md">
+            <button
+              type="button"
+              onClick={onToggleDrawing}
+              title="Draw a new blue AOI polygon or drag the white/blue corner handles on the map"
+              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1 transition-colors ${
+                isDrawing
+                  ? "bg-[#38BDF8] font-semibold text-[#0B0F17]"
+                  : "text-white/85 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="3" cy="3" r="2" />
+                <circle cx="21" cy="3" r="2" />
+                <circle cx="21" cy="21" r="2" />
+                <circle cx="3" cy="21" r="2" />
+              </svg>
+              <span>{isDrawing ? "Cancel Draw" : "Redraw AOI Box"}</span>
+            </button>
+            {isCustomPolygon && onResetPolygon && (
+              <button
+                type="button"
+                onClick={onResetPolygon}
+                title="Reset blue AOI shape to default corridor bounds"
+                className="cursor-pointer rounded-lg bg-white/10 px-2 py-1 text-[10.5px] font-semibold text-[#38BDF8] transition-colors hover:bg-white/20"
+              >
+                Reset AOI
+              </button>
+            )}
+          </div>
+        )}
+
         {viewMode !== "satellite" && activeEffectLabel && onCycleEffect && (
           <button
             type="button"
@@ -486,37 +470,47 @@ export function MapCanvasOverlay({
             title="Click to cycle neural diagnostic layer"
             className="flex cursor-pointer items-center gap-2 rounded-xl border border-[#edeff2] bg-white/95 px-3 py-1.5 text-[11.5px] font-medium text-[#1c1f23] shadow-[0_4px_16px_rgba(0,0,0,0.1)] backdrop-blur-md transition-colors hover:bg-white"
           >
-            <span className="h-2 w-2 animate-pulse rounded-full bg-[#22b567]" />
+            {isLoading ? (
+              <svg
+                className="h-3 w-3 animate-spin text-[#38BDF8]"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  isError
+                    ? "bg-[#e94235]"
+                    : rasterStatus?.status === "fallback"
+                      ? "bg-[#f39223]"
+                      : "bg-[#22b567]"
+                }`}
+              />
+            )}
             <span>{activeEffectLabel}</span>
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#8c929c"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="ml-0.5 opacity-60"
-              aria-hidden="true"
-            >
-              <path d="m7 15 5 5 5-5" />
-              <path d="m7 9 5-5 5 5" />
-            </svg>
+            {rasterStatus && rasterStatus.status !== "idle" && (
+              <span
+                className={`rounded-md px-1.5 py-0.5 font-mono text-[10px] font-semibold ${
+                  isLoading
+                    ? "bg-[#38BDF8]/15 text-[#0284C7]"
+                    : isError
+                      ? "bg-[#e94235]/15 text-[#e94235]"
+                      : "bg-[#22b567]/12 text-[#18864b]"
+                }`}
+              >
+                {isLoading
+                  ? "Loading..."
+                  : isError
+                    ? "Offline"
+                    : `${rasterStatus.latencyMs ?? 1}ms`}
+              </span>
+            )}
           </button>
         )}
-      </div>
-
-      {/* Subtle Coordinate Grid Indices matching reference */}
-      <div className="pointer-events-none absolute top-11 right-24 left-24 flex justify-between text-[10px] font-medium text-[#1c1f23]/45">
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
-          <span key={n}>{n}</span>
-        ))}
-      </div>
-      <div className="pointer-events-none absolute top-24 bottom-12 left-20 flex flex-col justify-between text-[10px] font-medium text-[#1c1f23]/45">
-        {[7, 6, 5, 4, 3, 2, 1, 0].map((n) => (
-          <span key={n}>{n}</span>
-        ))}
       </div>
     </>
   );
