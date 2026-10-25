@@ -5,13 +5,13 @@
 \label{sec:ai_intro}
 The central research inquiry of this senior project centers on comparing distinct algorithmic paradigms for satellite change detection in hyper-arid environments. This chapter provides a rigorous mathematical and structural exposition of all artificial intelligence models developed, calibrated, and evaluated within TerraShift AI:
 \begin{enumerate}
-    \item \textbf{Deep Siamese Convolutional U-Net} with difference-attention skip connections.
-    \item \textbf{AlphaEarth Model A:} Unsupervised 64-dimensional latent cosine dissimilarity.
-    \item \textbf{AlphaEarth Model B:} Foundation embedding divergence fused with Dynamic World LULC probability transitions.
-    \item \textbf{AlphaEarth Model C:} Lightweight supervised classification over 257-dimensional vector difference features.
-    \item \textbf{AlphaEarth Model D:} Hybrid foundation model gated by directional physical spectral guards.
-    \item \textbf{Directional Physical Spectral Guards} formulated from electromagnetic reflectance physics.
-    \item \textbf{Connected Component Polygonization} and minimum-area spatial filtering.
+    \item \textbf{Deep Siamese Convolutional U-Net} with difference-attention skip connections (\texttt{siamese\_untuned} and \texttt{siamese\_tuned\_filtered}).
+    \item \textbf{AlphaEarth Model A (\texttt{alphaearth\_cosine}):} Unsupervised 64-dimensional latent cosine dissimilarity ($\tau=0.12$).
+    \item \textbf{AlphaEarth Model B (\texttt{alphaearth\_dynamic\_world}):} Foundation embedding divergence fused with Dynamic World LULC probability transitions.
+    \item \textbf{Standalone Dynamic World V1 (\texttt{dynamic\_world\_lulc}):} Google Dynamic World 9-class built-up and agricultural probability transition detector.
+    \item \textbf{TerraShift v6.0 Hybrid (\texttt{alphaearth\_hybrid}, Model D):} Multi-modal fusion of Siamese U-Net spatial boundaries, AlphaEarth 64-D embeddings, and Sentinel-2 L2A directional physical spectral guards.
+    \item \textbf{Directional Physical Spectral Guards} formulated from electromagnetic reflectance physics ($\Delta\text{NDBI}, \Delta\text{NDVI}$, and albedo drift bounds).
+    \item \textbf{Exact WGS84 Bounding-Box Clipping \& Connected Component Polygonization}.
 \end{enumerate}
 
 \section{Siamese U-Net Deep Learning Architecture}
@@ -104,7 +104,7 @@ The Generalized Soft Dice loss optimizes region overlap directly:
 \end{equation}
 where $\epsilon = 10^{-6}$ provides numerical stability. Training hyperparameters are set to $\lambda_{\text{BCE}} = 0.5$, $\lambda_{\text{Dice}} = 0.5$, batch size of 16, AdamW optimizer with initial learning rate $\eta = 3 \times 10^{-4}$, and cosine annealing decay.
 
-\section{Model A: Unsupervised AlphaEarth Cosine Dissimilarity}
+\section{Model A: Unsupervised AlphaEarth Cosine Dissimilarity (\texttt{alphaearth\_cosine})}
 \label{sec:ai_model_a}
 AlphaEarth Model A evaluates Google's 64-dimensional annual satellite embeddings in an entirely unsupervised metric-space formulation.
 
@@ -133,9 +133,9 @@ Applying the optimal screening threshold $\tau_{\text{dist}} = 0.12$ established
     \label{eq:mask_model_a}
 \end{equation}
 
-\section{Model B: AlphaEarth + Dynamic World Transition Analysis}
+\section{Model B \& Standalone Dynamic World Transition Analysis (\texttt{alphaearth\_dynamic\_world} and \texttt{dynamic\_world\_lulc})}
 \label{sec:ai_model_b}
-Model B couples AlphaEarth latent embedding divergence with explicit land-cover transition probabilities from Google Dynamic World \citep{brown2022dynamicworld}.
+To evaluate whether global land-cover probability models can solve arid change detection alone or in combination with AlphaEarth, we formulate both **Standalone Google Dynamic World V1 LULC Transition (\texttt{dynamic\_world\_lulc})** and **Model B (\texttt{alphaearth\_dynamic\_world})** \citep{brown2022dynamicworld}.
 
 \subsection{Semantic Transition Verification}
 Let $\mathbf{P}_1(x, y), \mathbf{P}_2(x, y) \in [0, 1]^9$ denote the Dynamic World 9-class probability vectors at dates $T_1$ and $T_2$. In Saudi development corridors, genuine anthropogenic changes are dominated by two primary class transitions:
@@ -151,92 +151,60 @@ Let $\mathbf{P}_1(x, y), \mathbf{P}_2(x, y) \in [0, 1]^9$ denote the Dynamic Wor
         \label{eq:dw_crop_delta}
     \end{equation}
 \end{enumerate}
-Model B enforces that a pixel is flagged as changed if and only if **both** latent vector divergence and physical semantic class transitions coincide:
+Standalone Dynamic World (\texttt{dynamic\_world\_lulc}) triggers whenever $(\Delta P_{\text{built}} \ge 0.12 \lor \abs{\Delta P_{\text{crops}}} \ge 0.18) \land V(x,y)$, whereas Model B (\texttt{alphaearth\_dynamic\_world}) requires both latent vector divergence and semantic class transition:
 \begin{equation}
     M_B(x, y) = \left( D_{\text{cosine}}(x, y) \ge 0.10 \right) \land \left( \Delta P_{\text{built}}(x, y) \ge 0.15 \lor \abs{\Delta P_{\text{crops}}(x, y)} \ge 0.20 \right) \land V(x, y)
     \label{eq:mask_model_b}
 \end{equation}
 
-\section{Model C: Supervised AlphaEarth Vector Difference Classifier}
-\label{sec:ai_model_c}
-Model C introduces a lightweight supervised machine learning classifier operating directly on embedding transition feature vectors.
+\subsection{Methodological Exclusion of Unverified Supervised Classifiers}
+While our codebase retains a 257-dimensional supervised classifier interface (\texttt{AlphaEarthDifferenceClassifier}) for future use with surveyed cadastral pixel masks, we strictly prohibit fitting a supervised classifier on coarse parcel bounding boxes or synthetic calibration distributions during official benchmarks. Calling \texttt{predict()} without an explicitly fitted ground-truth model raises a \texttt{RuntimeError}, verified by unit test \texttt{test\_alphaearth\_classifier\_requires\_explicit\_fit}.
 
-\subsection{Feature Vector Formulation}
-For each pixel $(x, y)$, we construct a 257-dimensional feature representation $\mathbf{f}(x, y)$ that explicitly captures both baseline states, directional difference, absolute magnitude, and angular distance:
-\begin{equation}
-    \mathbf{f}(x, y) = \Big[ \mathbf{u}(x, y) \,\|\, \mathbf{v}(x, y) \,\|\, (\mathbf{v} - \mathbf{u}) \,\|\, \abs{\mathbf{v} - \mathbf{u}} \,\|\, D_{\text{cosine}}(x, y) \Big] \in \R^{257}
-    \label{eq:feature_vector_c}
-\end{equation}
-where $\mathbf{u}, \mathbf{v} \in \R^{64}$, $(\mathbf{v} - \mathbf{u}) \in \R^{64}$, $|\mathbf{v} - \mathbf{u}| \in \R^{64}$, and $D_{\text{cosine}} \in \R^1$.
-
-\subsection{Classifier Architecture and CPU Execution}
-To satisfy NFR-01 (sub-second CPU compute), we employ a \textbf{Histogram-Based Gradient Boosting Classifier} (\texttt{HistGradientBoostingClassifier} from Scikit-Learn). The model is configured with:
-\begin{itemize}
-    \item Maximum iterations (trees): $M = 35$
-    \item Maximum tree depth: $d = 5$
-    \item Minimum samples per leaf: 20
-    \item Learning rate: $\alpha = 0.10$
-\end{itemize}
-Because features are pre-binned into 256 discrete histogram integer bins, inference over an entire $256 \times 256$ corridor ($65,536$ feature vectors) executes in under \textbf{40 milliseconds} on a single CPU thread. Change predictions are generated by thresholding the predicted positive class posterior probability $\hat{P}_C(x, y) \ge 0.50$.
-
-\section{Model D: AlphaEarth + TerraShift Physical Spectral Guard Hybrid}
+\section{Model D: TerraShift v6.0 Hybrid (\texttt{alphaearth\_hybrid})}
 \label{sec:ai_model_d}
-Model D represents the pinnacle of our foundation model research: a hybrid framework that bridges self-supervised latent representation learning with deterministic electromagnetic remote sensing physics.
+Model D (\texttt{alphaearth\_hybrid}) represents the pinnacle of our architecture: a multi-modal fusion framework that combines the **Siamese U-Net spatial boundary prior**, **Google AlphaEarth V1 64-D semantic embeddings**, and **Sentinel-2 Level-2A directional physical spectral guards**.
 
-\subsection{Directional Physical Spectral Guard Logic}
-Model D leverages AlphaEarth cosine distance ($\tau=0.12$) as a broad, high-sensitivity initial screening filter, but gates all candidates through directional physical spectral rules derived from authentic Sentinel-2 Level-2A surface reflectance:
+\subsection{Multi-Modal Spatial-Semantic-Physical Consensus}
+Standalone AlphaEarth cosine distance ($D_{\text{cosine}} \ge 0.12$) suffers from desert albedo and coastal sabkha moisture false alarms, whereas the Siamese U-Net coupled with L2A spectral indices occasionally retains small peripheral soil-disturbance false positives. Model D fuses all three complementary modalities:
 \begin{enumerate}
-    \item \textbf{Built Infrastructure Development Rule:} Natural desert soil converting into graded residential foundations, roads, or industrial pads must exhibit a positive shift in the Normalized Difference Built-Up Index:
-    \begin{equation}
-        \Delta\text{NDBI}(x, y) = \text{NDBI}_{T_2}(x, y) - \text{NDBI}_{T_1}(x, y) \ge +0.04
-        \label{eq:guard_ndbi}
-    \end{equation}
-    \item \textbf{Vegetation Dynamics Rule:} Agricultural parcel activation (center pivots) or date palm cultivation must exhibit substantial greening, while seasonal crop harvesting produces symmetric vegetative loss:
-    \begin{equation}
-        \abs{\Delta\text{NDVI}(x, y)} = \abs{\text{NDVI}_{T_2}(x, y) - \text{NDVI}_{T_1}(x, y)} \ge 0.10
-        \label{eq:guard_ndvi}
-    \end{equation}
-    \item \textbf{Extreme Latent Divergence Override:} In rare events of major structural transformation where spectral indices may saturate, an extreme cosine distance override is triggered:
-    \begin{equation}
-        D_{\text{cosine}}(x, y) \ge 0.25
-        \label{eq:guard_override}
-    \end{equation}
+    \item \textbf{Built Infrastructure \& Earthworks Consensus:} A pixel is confirmed as urban/industrial construction if it passes the tuned Siamese + L2A physical mask $M_{\text{Siam+Phys}}(x,y) = 1$ (requiring $\Delta\text{NDBI} \ge +0.025$ or brightness/SWIR compaction shift) **AND** exhibits real latent representation divergence in AlphaEarth ($D_{\text{cosine}}(x,y) \ge 0.065$) or high structural probability ($P_{\text{Siam}}(x,y) \ge 0.66$).
+    \item \textbf{Agricultural Pivot Consensus:} A pixel is confirmed as agricultural canopy activation or fallowing when $\abs{\Delta\text{NDVI}(x,y)} \ge 0.12$ is corroborated by AlphaEarth latent divergence ($D_{\text{cosine}}(x,y) \ge 0.075$).
+    \item \textbf{Strong Semantic-Physical Discovery:} High-magnitude AlphaEarth shifts ($D_{\text{cosine}}(x,y) \ge 0.16$) that simultaneously satisfy strict L2A physical verification ($\Delta\text{NDBI} \ge +0.045 \lor \abs{\Delta\text{NDVI}} \ge 0.14$) are also retained.
 \end{enumerate}
 
 \subsection{Composite Decision Rule}
-The final binary change mask for Model D is defined as:
+The final binary change mask for TerraShift v6.0 Hybrid (\texttt{alphaearth\_hybrid}) is:
 \begin{equation}
-    M_D(x, y) = \left( D_{\text{cosine}}(x, y) \ge 0.12 \right) \land \left( \Delta\text{NDBI} \ge +0.04 \lor \abs{\Delta\text{NDVI}} \ge 0.10 \lor D_{\text{cosine}} \ge 0.25 \right) \land V(x, y)
+    M_{\text{Hybrid}}(x, y) = \Big[ \big( M_{\text{Siam+Phys}}(x, y) \land (D_{\text{cosine}} \ge 0.065 \lor P_{\text{Siam}} \ge 0.66) \big) \lor \big( D_{\text{cosine}} \ge 0.16 \land (\Delta\text{NDBI} \ge 0.045 \lor \abs{\Delta\text{NDVI}} \ge 0.14) \big) \Big] \land V(x, y)
     \label{eq:mask_model_d}
 \end{equation}
-This formulation mathematically eliminates false alarms triggered by natural desert gravel albedo shifts, sun angle variation, or sabkha moisture fluctuations, because unpaved desert terrain cannot produce positive $\Delta\text{NDBI} \ge +0.04$ or significant $\Delta\text{NDVI}$ shifts.
+This tri-modal formulation suppresses **91.2\%** of untuned false alarms ($114 \to 10$) and eliminates **100\%** of negative control zone false alarms ($0$ hits across all 4 corridors) while preserving **100.0\%** event recall ($19/19$).
 
-\section{Connected Component Analysis and Minimum-Area Pruning}
+\section{Connected Component Analysis, Exact AOI Clipping, and Minimum-Area Pruning}
 \label{sec:ai_polygonization}
-Raw pixel-level classification masks contain high-frequency spatial noise, isolated single-pixel misclassifications, and fragmented parcel boundaries. TerraShift AI converts raw raster masks into analysis-ready vector GIS layers through an automated topological polygonization pipeline:
+Raw pixel-level classification masks are converted into analysis-ready vector GIS layers through an automated topological polygonization pipeline (\texttt{services/ml/terrashift/geo/components.py}):
 
 \begin{enumerate}
-    \item \textbf{8-Connectivity Component Labeling:} Contiguous clusters of active change pixels are segmented using 2D 8-connectivity connected-component labeling via \texttt{scipy.ndimage.label}:
+    \item \textbf{8-Connectivity Component Labeling:} Contiguous clusters of active change pixels are segmented using 2D 8-connectivity connected-component labeling:
     \begin{equation}
         \mathcal{C} = \{ C_1, C_2, \dots, C_K \}
         \label{eq:connected_components}
     \end{equation}
-    \item \textbf{Geometric Boundary Extraction:} For each connected component $C_k$, exterior boundary coordinates are traced using Rasterio contouring and converted into closed 2D polygons using Shapely.
-    \item \textbf{Geodetic WGS84 Surface Area Measurement:} Polygon vertex coordinates are transformed from raster pixel indices $(i, j)$ into geographic lon/lat coordinates $(\lambda, \phi)$ via the georeferenced affine transformation matrix:
+    \item \textbf{Geometric Boundary Extraction \& Exact AOI Clipping:} For each connected component $C_k$, exterior boundary coordinates are transformed into geographic lon/lat coordinates $(\lambda, \phi)$ in \texttt{EPSG:4326} and geometrically intersected with the exact corridor bounding box $\mathcal{B}_{\text{AOI}} = \text{box}(\lambda_{\min}, \phi_{\min}, \lambda_{\max}, \phi_{\max})$:
     \begin{equation}
-        \begin{bmatrix} \lambda \\ \phi \\ 1 \end{bmatrix} = \begin{bmatrix} a & b & c \\ d & e & f \\ 0 & 0 & 1 \end{bmatrix} \begin{bmatrix} j \\ i \\ 1 \end{bmatrix}
-        \label{eq:affine_transform}
+        P_k^{\text{clipped}} = P_k \cap \mathcal{B}_{\text{AOI}}
+        \label{eq:aoi_clipping}
     \end{equation}
-    True physical surface area in square meters ($A_k$) is calculated using the WGS84 ellipsoidal geodesic formula via \texttt{pyproj.Geod}:
+    This guarantees that no vectorized polygon ever extends outside the target AOI or exceeds $100.0\%$ of the corridor surface area.
+    \item \textbf{Geodetic WGS84 Surface Area Measurement:} True physical surface area in square meters ($A_k$) is integrated on the WGS84 ellipsoid via \texttt{pyproj.Geod(ellps="WGS84")}:
     \begin{equation}
-        A_k = \text{Geod.polygon\_area}(\bm{\lambda}_k, \bm{\phi}_k)
+        A_k = \abs{\text{Geod.geometry\_area\_perimeter}(P_k^{\text{clipped}})[0]}
         \label{eq:geod_area}
     \end{equation}
-    \item \textbf{Minimum-Area Spatial Pruning:} In operational municipal surveillance, human authorities cannot inspect sub-pixel or trivial noise speckles. Any detected polygon whose true physical surface area is smaller than a calibrated minimum threshold ($A_{\min} = 3,500\text{ m}^2$, corresponding to approximately 35 contiguous Sentinel-2 pixels) is pruned:
+    \item \textbf{Minimum-Area Spatial Pruning:} Any polygon whose clipped WGS84 geodesic area is smaller than $A_{\min} = 3{,}500\text{ m}^2$ is pruned:
     \begin{equation}
-        \mathcal{C}_{\text{pruned}} = \{ C_k \in \mathcal{C} \mid A_k \ge 3,500\text{ m}^2 \}
+        \mathcal{C}_{\text{pruned}} = \{ P_k^{\text{clipped}} \mid A_k \ge 3{,}500\text{ m}^2 \}
         \label{eq:area_pruning}
     \end{equation}
-    \item \textbf{Attribution and Semantic Labeling:} For each surviving polygon, the system extracts the mean confidence score, mean cosine distance, and mean $\Delta\text{NDBI}$ and $\Delta\text{NDVI}$ values, dynamically assigning semantic labels (e.g., ``Bare ground to built infrastructure'', ``Agricultural vegetative activation'').
 \end{enumerate}
 \newpage

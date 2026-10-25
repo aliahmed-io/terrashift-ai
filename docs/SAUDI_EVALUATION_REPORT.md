@@ -1,6 +1,7 @@
 # TerraShift AI — Saudi Reference Benchmark Evaluation Report (v6.1 Verified GEE + STAC)
 
-**Evaluation Timestamp**: 2026-10-24T21:41:09Z  
+**Author**: Omar Ayyash (Student ID: `S22107722`) · **Supervisor**: Dr. Passent  
+**Evaluation Timestamp**: 2026-10-25T01:41:09Z  
 **Benchmark Version**: Pilot v6.1 (Authenticated Google Earth Engine `project='terrashift'` + AWS Earth Search STAC, Localization-Aware 1-to-1 Matching, Pooled & Macro Metrics)  
 **Total Evaluated AOI**: $91.19\text{ km}^2$ across 4 distinct Saudi corridors (Riyadh, Jeddah, Al-Jouf, and Held-Out Al-Kharj)  
 **Evaluation Script**: [`scripts/saudi_evaluation.py`](file:///d:/terrashift-ai/scripts/saudi_evaluation.py)  

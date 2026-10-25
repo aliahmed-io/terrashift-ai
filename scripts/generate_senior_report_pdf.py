@@ -104,7 +104,7 @@ class NumberedCanvas(canvas.Canvas):
 
         # Running Footer
         self.line(54, 42, A4[0] - 54, 42)
-        footer_caption = "Kingdom of Saudi Arabia · Vision 2030 Geospatial AI Monitoring"
+        footer_caption = "Omar Ayyash (ID: S22107722) · Kingdom of Saudi Arabia · Vision 2030 Geospatial AI Monitoring"
         self.drawString(54, 30, footer_caption)
 
         page_str = f"Page {self._pageNumber} of {total_pages}"
@@ -1102,9 +1102,9 @@ def build_senior_project_pdf():
 
     author_table_data = [
         [
-            Paragraph("<b>Prepared by:</b><br/>Ali Ahmed<br/>Student ID: 441008291", styles["TableCellBold"]),
+            Paragraph("<b>Prepared by:</b><br/>Omar Ayyash<br/>Student ID: S22107722", styles["TableCellBold"]),
             Paragraph(
-                "<b>Supervised by:</b><br/>Prof. Dr. Senior Supervisor<br/>Department of Computer Science",
+                "<b>Supervised by:</b><br/>Dr. Passent<br/>Department of Computer Science",
                 styles["TableCellBold"],
             ),
         ]
@@ -1135,7 +1135,7 @@ def build_senior_project_pdf():
     story.append(Paragraph("Approval of the Examination Committee", styles["ReportChapTitle"]))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#1B365D"), spaceAfter=14))
 
-    cert_text = """This senior project report entitled <b>'TerraShift AI: An AI-Assisted Geospatial Platform for Satellite-Based Land-Surface Change Detection and Environmental Monitoring in Saudi Arabia'</b>, prepared by <b>Ali Ahmed</b> (Student ID: 441008291), has been thoroughly reviewed, evaluated, and approved by the Examination Committee in partial fulfillment of the requirements for the degree of Bachelor of Science in Computer Science."""
+    cert_text = """This senior project report entitled <b>'TerraShift AI: An AI-Assisted Geospatial Platform for Satellite-Based Land-Surface Change Detection and Environmental Monitoring in Saudi Arabia'</b>, prepared by <b>Omar Ayyash</b> (Student ID: S22107722), has been thoroughly reviewed, evaluated, and approved by the Examination Committee in partial fulfillment of the requirements for the degree of Bachelor of Science in Computer Science."""
     story.append(Paragraph(cert_text, styles["ReportBody"]))
     story.append(Spacer(1, 20))
 
@@ -1148,7 +1148,7 @@ def build_senior_project_pdf():
         ],
         [
             Paragraph("Principal Supervisor", styles["TableCellBold"]),
-            Paragraph("Prof. Dr. Senior Supervisor", styles["TableCell"]),
+            Paragraph("Dr. Passent", styles["TableCell"]),
             Paragraph("Dept. of Computer Science", styles["TableCell"]),
             Paragraph("____________________", styles["TableCell"]),
         ],
@@ -1187,7 +1187,7 @@ def build_senior_project_pdf():
 
     story.append(Spacer(1, 35))
     story.append(
-        Paragraph("<b>Official Examination Date:</b> October 24, 2026 / Rabi' Al-Thani 1448 AH", styles["ReportBody"])
+        Paragraph("<b>Official Examination Date:</b> October 25, 2026 / Rabi' Al-Thani 1448 AH", styles["ReportBody"])
     )
     story.append(
         Paragraph("<b>Institutional Classification:</b> Senior Design Project (Capstone II)", styles["ReportBody"])
@@ -1200,11 +1200,11 @@ def build_senior_project_pdf():
     story.append(Paragraph("Declaration of Academic Integrity", styles["ReportChapTitle"]))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#1B365D"), spaceAfter=14))
 
-    decl_p1 = """I hereby declare that this capstone report entitled <b>'TerraShift AI: An AI-Assisted Geospatial Platform for Satellite-Based Land-Surface Change Detection and Environmental Monitoring in Saudi Arabia'</b> represents my own original, independent engineering investigation and research, conducted under the academic supervision of Prof. Dr. Senior Supervisor."""
+    decl_p1 = """I hereby declare that this capstone report entitled <b>'TerraShift AI: An AI-Assisted Geospatial Platform for Satellite-Based Land-Surface Change Detection and Environmental Monitoring in Saudi Arabia'</b> represents my own original, independent engineering investigation and research, conducted under the academic supervision of Dr. Passent."""
     decl_p2 = """I explicitly confirm that:
     <br/>1. This document has not been previously submitted, in whole or in part, for any other degree, diploma, or academic award at this or any other academic institution.
     <br/>2. All external scientific ideas, neural network architectures, pre-trained embeddings, open satellite datasets, and mathematical formulations have been properly cited and attributed in accordance with IEEE academic standards.
-    <br/>3. All reported empirical results, OSCD benchmark scores, and Saudi corridor evaluation metrics reflect authentic, reproducible experiments executed using real satellite data.
+    <br/>3. All reported empirical results, OSCD benchmark scores, and Saudi corridor evaluation metrics reflect authentic, reproducible experiments executed using real satellite data (allow_synthetic=False).
     <br/>4. The software code, FastAPI backend, Next.js web application, and evaluation harnesses presented in this report were developed and verified by the author."""
     story.append(Paragraph(decl_p1, styles["ReportBody"]))
     story.append(Spacer(1, 10))
@@ -1213,8 +1213,8 @@ def build_senior_project_pdf():
     story.append(Spacer(1, 40))
     dec_meta = [
         [
-            Paragraph("<b>Student Signature:</b><br/><br/>_____________________________________<br/><b>Ali Ahmed</b><br/>Student ID: 441008291", styles["ReportBody"]),
-            Paragraph("<b>Date of Submission:</b><br/><br/>October 24, 2026<br/>Riyadh, Kingdom of Saudi Arabia", styles["ReportBody"]),
+            Paragraph("<b>Student Signature:</b><br/><br/>_____________________________________<br/><b>Omar Ayyash</b><br/>Student ID: S22107722", styles["ReportBody"]),
+            Paragraph("<b>Date of Submission:</b><br/><br/>October 25, 2026<br/>Riyadh, Kingdom of Saudi Arabia", styles["ReportBody"]),
         ]
     ]
     t_dec = Table(dec_meta, colWidths=[250, 237])
@@ -1423,17 +1423,17 @@ def build_senior_project_pdf():
         ("  6.1", "Siamese U-Net Deep Learning Architecture & Skip Differences", "54"),
         ("  6.2", "Compound Loss Formulation: Weighted BCE + Soft Dice", "57"),
         ("  6.3", "Model A: Unsupervised AlphaEarth 64-D Cosine Dissimilarity", "59"),
-        ("  6.4", "Model B: AlphaEarth + Dynamic World Transition Analysis", "61"),
-        ("  6.5", "Model C: Supervised AlphaEarth Vector Difference Classifier", "62"),
-        ("  6.6", "Model D: AlphaEarth + Directional Physical Spectral Guard Hybrid", "64"),
+        ("  6.4", "Model B & Standalone Dynamic World V1 LULC Transition Analysis", "61"),
+        ("  6.5", "Methodological Exclusion of Unverified Supervised Classifiers", "62"),
+        ("  6.6", "Model D: TerraShift v6.0 Hybrid (Siamese + AlphaEarth + L2A Physics)", "64"),
         ("  6.7", "Directional Physical Spectral Guard Equations (NDBI, NDVI)", "65"),
-        ("  6.8", "Connected Component Analysis, Geodesic Area, and Polygonization", "67"),
+        ("  6.8", "Connected Component Analysis, Exact AOI Clipping, and Polygonization", "67"),
         ("Chapter 7", "Experimental Design & Benchmark Protocol", "69"),
         ("  7.1", "OSCD Academic Benchmark Protocol", "69"),
-        ("  7.2", "The Polygon Fragmentation Dilemma & Naive Metric Inflation", "71"),
-        ("  7.3", "Strict Greedy 1-to-1 Event-Matching Algorithm", "72"),
-        ("  7.4", "Rigorous Performance Metrics (Strict Precision, Validity, Recall, F1)", "74"),
-        ("  7.5", "Spatial False Alert Density Formulations (Macro vs. Pooled)", "76"),
+        ("  7.2", "The Polygon Fragmentation & Giant-Polygon Dilemmas", "71"),
+        ("  7.3", "Localization-Aware 1-to-1 Event-Matching Algorithm (PoC & IoU)", "72"),
+        ("  7.4", "Pooled (Micro) vs. Corridor Macro-Averaged Metrics", "74"),
+        ("  7.5", "4-Regime Localization Threshold Sensitivity Sweep", "76"),
         ("  7.6", "Negative Control Zone Auditing & Held-Out Generalization", "77"),
         ("Chapter 8", "Results, Comparative Evaluation, and Discussion", "79"),
         ("  8.1", "OSCD Academic Benchmark Reproduction Results", "79"),

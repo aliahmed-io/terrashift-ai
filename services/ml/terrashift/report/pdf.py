@@ -147,8 +147,8 @@ def generate_pdf_report(
         inventory,
         Spacer(1, 14),
         Paragraph(
-            "Notice: Surface changes are detected between multi-temporal Sentinel-2 MSI observations using PyTorch "
-            "Siamese U-Net feature differencing and radiometric index matching. Coordinates and areas are geodesic (WGS84).",
+            "Notice: Surface changes are detected between multi-temporal Sentinel-2 L2A and Google AlphaEarth V1 observations using "
+            "TerraShift AI (Prepared by Omar Ayyash, ID: S22107722). Coordinates and areas are clipped and integrated on the WGS84 ellipsoid.",
             fine,
         ),
     ]

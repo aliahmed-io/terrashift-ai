@@ -117,14 +117,12 @@ collection = (
 embedding_img = collection.first().select([f"A{i:02d}" for i in range(64)])
 \end{lstlisting}
 
-\subsection{Offline Deterministic Fallback Architecture}
-To guarantee uninterrupted execution during university grading, local network outages, or unconfigured cloud credentials, TerraShift includes a robust \textbf{EarthEngineManager fallback engine}. If the environment variable \texttt{EARTH\_ENGINE\_PROJECT\_ID} or local Earth Engine OAuth credentials are absent, the system detects this state prior to initiating network timeouts and immediately switches to a deterministic offline embedding generator. 
-
-The offline generator creates spatial coordinate-hash-seeded, unit-normalized 64-dimensional feature arrays cached directly to disk in \texttt{.cache/earth\_engine/}. This guarantees that unit tests, local development, and evaluation scripts execute deterministically in $\approx 0.05$ seconds without blocking on remote Google servers.
+\subsection{Strict Prohibition of Synthetic Benchmark Data \& SHA-256 Verified Caching}
+To guarantee uncompromising scientific integrity across all evaluations, \texttt{EarthEngineManager} enforces \texttt{allow\_synthetic=False} by default for all production and benchmark executions. When queried for any corridor, the system authenticates against Google Earth Engine (\texttt{project='terrashift'}) and verifies the 73-band tensor stack (64 AlphaEarth bands $A_{00}\dots A_{63}$ + 9 Dynamic World probability bands) against SHA-256 checksums stored in \texttt{services/ml/.cache/gee\_verified/}. If genuine Earth Engine data is unavailable, the pipeline immediately raises a \texttt{RuntimeError} rather than substituting synthetic embeddings. Deterministic fixture generation is isolated exclusively to explicitly flagged offline unit tests (\texttt{allow\_synthetic=True}).
 
 \section{Google Dynamic World Land-Cover Probability Stacks}
 \label{sec:data_dynamic_world}
-To support semantic transition detection (Model B), the platform ingests Google Dynamic World (\texttt{GOOGLE/DYNAMICWORLD/V1}) \citep{brown2022dynamicworld}. For any target year and bounding box, Dynamic World provides pixel-wise probability volumes across nine distinct land-use classes:
+To support semantic transition detection (both standalone \texttt{dynamic\_world\_lulc} and fused \texttt{alphaearth\_dynamic\_world}), the platform ingests Google Dynamic World V1 (\texttt{GOOGLE/DYNAMICWORLD/V1}) \citep{brown2022dynamicworld}. For any target year and bounding box, Dynamic World provides pixel-wise probability volumes across nine distinct land-use classes:
 \begin{equation}
     \mathbf{P}_{\text{DW}}(x, y) = \left[ p_{\text{water}}, p_{\text{trees}}, p_{\text{grass}}, p_{\text{flood\_veg}}, p_{\text{crops}}, p_{\text{shrub}}, p_{\text{built}}, p_{\text{bare}}, p_{\text{snow}} \right]
     \label{eq:dw_probs}
@@ -133,7 +131,7 @@ These probability tensors are extracted alongside AlphaEarth embeddings, providi
 
 \section{The Saudi Reference Benchmark Corridors}
 \label{sec:data_saudi_benchmark}
-A core scientific contribution of this thesis is the creation of the \textbf{Saudi Deployment Multi-Model Benchmark (v6.0)}. Spanning four geographic corridors across the Kingdom of Saudi Arabia, the benchmark encompasses \textbf{$91.19\text{ km}^2$} of diverse arid terrain, 19 verified parcel-level reference change events, and four undisturbed negative control zones (Table \ref{tab:saudi_corridors_summary}).
+A core scientific contribution of this thesis is the creation of the \textbf{Saudi Deployment Multi-Model Benchmark (v6.1)}. Spanning four geographic corridors across the Kingdom of Saudi Arabia, the benchmark encompasses \textbf{$91.19\text{ km}^2$} of diverse arid terrain, 19 parcel-level reference change events (coarse bounding-box envelopes curated from multi-date Sentinel-2 visual/spectral inspection and known Saudi landmarks), and four undisturbed negative control zones (Table \ref{tab:saudi_corridors_summary}).
 
 \begin{table}[htbp]
 \centering

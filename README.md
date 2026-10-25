@@ -1,13 +1,15 @@
 # TerraShift AI — Multi-Spectral Satellite Change Detection & Geospatial Intelligence Platform
 
-> **Production-grade Earth Observation & Deep Learning Platform** that ingests bi-temporal and multi-year Copernicus Sentinel-2 Level-2A surface reflectance imagery, neutralizes seasonal and atmospheric variance via a **5-Channel Weight-Sharing Siamese U-Net (`FC-Siam-diff`)**, and provides interactive research studios for **Grad-CAM++ XAI Attribution**, **BFAST Multi-Epoch Breakpoint Forecasting**, **Custom Image-Pair Confusion Matrices**, **IPCC Tier-1 Carbon & Urban Heat Valuation**, and **Live AWS STAC v1 Satellite Scene Discovery**.
+**Author:** Omar Ayyash · **Student ID:** `S22107722` · **Supervised by:** Dr. Passent  
+
+> **Production-grade Earth Observation & Deep Learning Platform** that ingests bi-temporal and multi-year Copernicus Sentinel-2 Level-2A surface reflectance imagery and Google AlphaEarth V1 64-D foundation embeddings (`project='terrashift'`), neutralizes seasonal and atmospheric variance via a **Weight-Sharing Siamese U-Net (`FC-Siam-diff`) + L2A Physical Spectral Guards**, and provides interactive research studios for **7-Model Saudi Corridor Benchmarking**, **Grad-CAM++ XAI Attribution**, **BFAST Multi-Epoch Breakpoint Forecasting**, **Custom Image-Pair Confusion Matrices**, **IPCC Tier-1 Carbon & Urban Heat Valuation**, and **Live AWS STAC v1 Satellite Scene Discovery**.
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x_Strict-3178C6.svg)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-16.3_(App_Router)-000000.svg)](https://nextjs.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.14_(Siamese_U--Net)-EE4C2C.svg)](https://pytorch.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![STAC](https://img.shields.io/badge/STAC-v1.0.0_(Element84_AWS)-10B981.svg)](https://stacspec.org/)
-[![Zero API Keys](https://img.shields.io/badge/API_Keys_Required-None_(100%25_Keyless)-FFB020.svg)](#2-zero-key-external-data-providers)
+[![GEE Verified](https://img.shields.io/badge/GEE_AlphaEarth_V1-Verified_(allow__synthetic%3DFalse)-0B6623.svg)](#0-system-enhancement-brief--verified-v61-saudi-benchmark-summary)
 
 ---
 

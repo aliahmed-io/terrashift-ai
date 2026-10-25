@@ -1,5 +1,6 @@
 # TerraShift AI — Saudi Reference Benchmark Evaluation Protocol
 
+**Author**: Omar Ayyash (Student ID: `S22107722`) · **Supervisor**: Dr. Passent  
 **Protocol Version**: 6.1 (Verified GEE + STAC Localization-Aware 1-to-1 Protocol)  
 **Effective Date**: October 2026  
 **Target Environment**: Kingdom of Saudi Arabia (Arid Limestone, Coastal Plain Sabkha, Northern Agricultural Basin, Central Oasis Logistics)  
